@@ -1179,11 +1179,11 @@ const SETUP = {
       <div class="f"><label for="uSch">School</label><select id="uSch"><option value="ALL">ALL (Super Admin / HQ / Senior)</option>${schoolList(true).map(s=>`<option>${h(s.code)}</option>`).join("")}</select></div>
       <button class="btn p">Create</button></form>
       <p class="hint">Senior / Viewer sees the Dashboard and Reports only and cannot change anything — give this to your Commandant with the QR code. Usernames without "@" become name@${h(LOGIN_DOMAIN)}.</p></div>
-      <div class="panel"><h2>All users</h2><div class="scroll"><table><tr><th>Name</th><th>Login</th><th>Role</th><th>School</th><th>Active</th></tr>${Lu.map(u=>`<tr><td>${h(u.name)}</td><td>${h(u.email)}</td>
+      <div class="panel"><h2>All users</h2><div class="scroll"><table><tr><th>Name</th><th>Login</th><th>Role</th><th>School</th><th>Active</th></tr>${Lu.map(u=>`<tr><td><input class="in" style="max-width:220px" value="${h(u.name)}" data-uf="name" data-id="${h(u.uid)}" aria-label="Name of ${h(u.email)}"></td><td>${h(u.email)}</td>
        <td><select class="in" data-uf="role" data-id="${h(u.uid)}" ${u.uid===me().uid?"disabled":""}>${Object.entries(ROLES).map(([k,v])=>`<option value="${k}" ${u.role===k?"selected":""}>${v}</option>`).join("")}</select></td>
        <td><select class="in" data-uf="school" data-id="${h(u.uid)}" ${u.uid===me().uid?"disabled":""}><option ${u.school==="ALL"?"selected":""}>ALL</option>${schoolList(true).map(s=>`<option ${u.school===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select></td>
        <td><input type="checkbox" data-uf="active" data-id="${h(u.uid)}" ${u.active?"checked":""} ${u.uid===me().uid?"disabled":""} style="width:20px;height:20px"></td></tr>`).join("")}</table></div>
-       <p class="hint">To remove someone, untick Active — their past entries stay in the log.</p></div>`; },
+       <p class="hint">Edit a name and press Tab or click elsewhere to save; it shows at the top of that person's screen and on their new log entries (older entries keep the name they were saved with). To remove someone, untick Active — their past entries stay in the log.</p></div>`; },
   general(){ const st=ST(); return `<div class="panel"><h2>General</h2><form data-form="general" class="grid">
       <div class="f wide" style="grid-column:span 2"><label for="sOrg">Organisation name</label><input id="sOrg" value="${h(st.org||"")}"></div>
       <div class="f"><label>Academic session</label><input value="${h(session())}" disabled></div>
@@ -1193,7 +1193,7 @@ const SETUP = {
       <div class="f"><label for="sIdle">Auto sign-out after (minutes idle, 0 = never)</label><input id="sIdle" type="number" min="0" max="480" value="${h(ST().idleMinutes??30)}"></div>
       <div class="f wide" style="grid-column:1/-1"><label for="sFoot">Default report footer</label><input id="sFoot" value="${h(st.reportFooter||"")}" placeholder="e.g. Prepared by DQ Office, APEIs Peshawar"></div>
       <button class="btn p">Save</button></form>
-      <p class="hint"><b>Auto sign-out:</b> if a PC is left signed in, it signs itself out after this many minutes with no typing or clicking (Senior / Viewer on his phone is never signed out).</p><p class="hint"><b>What the cutoff does:</b> strength figures are always live. The cutoff only marks where "today's movement" starts — e.g. 08:00 means the morning report counts admissions and withdrawals since 08:00 yesterday. Choose other periods (today, this week, this month, custom) in Reports.</p></div>
+      <p class="hint"><b>Auto sign-out:</b> if a PC is left signed in, it signs itself out after this many minutes with no typing or clicking (Super Admin and Senior / Viewer are never signed out automatically — only when they press Sign out).</p><p class="hint"><b>What the cutoff does:</b> strength figures are always live. The cutoff only marks where "today's movement" starts — e.g. 08:00 means the morning report counts admissions and withdrawals since 08:00 yesterday. Choose other periods (today, this week, this month, custom) in Reports.</p></div>
       <div class="panel"><h2>Logo</h2><p class="hint">Shown on the sign-in page, the header and printed reports. PNG or JPG; it is resized automatically.</p>
       <div class="row" style="justify-content:flex-start">${st.logo?`<img src="${h(st.logo)}" alt="" style="height:64px;border:1px solid var(--line);border-radius:6px;padding:4px;background:#fff">`:""}<label class="btn">Choose image <input type="file" accept="image/*" data-chg="logo" hidden></label>${st.logo?`<button class="btn r" data-act="logoDel">Remove</button>`:""}</div></div>`; },
   labels(){ return `<div class="panel"><h2>Labels & terms</h2><p class="hint">Change any column heading used on screen, in reports and in Excel.</p><form data-form="labels" class="grid">
@@ -1464,7 +1464,10 @@ document.addEventListener("change", async e => {
   if(el.dataset.rp){ if(!(el.tagName==="TEXTAREA"||el.type==="text")) setRp(el); return; }
   try{
     if(el.dataset.wf){ const w=S.waiting.find(x=>x.id===el.dataset.id); if(!w||!canWait(el.dataset.wf,w)) return; await DB.apply({set:[],inc:[],upd:[{col:"waiting",id:w.id,data:{[el.dataset.wf]:el.value,updatedAt:TS,updatedBy:me().name||""}}]}); toast("Saved."); return; }
-    if(el.dataset.uf && isSA()){ await DB.apply({set:[],inc:[],upd:[{col:"users",id:el.dataset.id,data:{[el.dataset.uf]: el.type==="checkbox"?el.checked:el.value}}]}); toast("User updated."); return; }
+    if(el.dataset.uf && isSA()){ const f=el.dataset.uf; let v=el.type==="checkbox"?el.checked:el.value; if(f==="name"){ v=v.trim(); if(!v){ toast("Name cannot be blank.",true); el.value=(S.users.find(u=>u.uid===el.dataset.id)||{}).name||""; return; } }
+      await DB.apply({set:[],inc:[],upd:[{col:"users",id:el.dataset.id,data:{[f]:v}}]});
+      if(el.dataset.id===me().uid && f==="name"){ S.user={...S.user,name:v}; boot(); toast("Your name is updated."); return; }
+      toast(f==="name"?`Name changed to "${v}".`:"User updated."); return; }
     if(el.dataset.sc && isSA()){ const sc=cloneSchool(setupSchool()), k=el.dataset.sc; sc[k] = ["cap","order"].includes(k) ? Number(el.value) : k==="active" ? el.value==="true" : el.value; await DB.apply(saveSchoolOps(sc)); toast("School updated."); return; }
     if(el.dataset.cf && isSA()){ const sc=cloneSchool(setupSchool()), c=sc.classes[+el.dataset.i], k=el.dataset.cf; if(k==="inc") c.inc=Math.max(0,Number(el.value)||0); else if(k==="lvl"){ if(el.value.trim()) c.lvl=el.value.trim(); else delete c.lvl; } else c[k]=el.value.trim(); await DB.apply(saveSchoolOps(sc)); toast("Class updated."); return; }
     if(el.dataset.pf && isSA()){ const P=clone(presets()), i=+el.dataset.i; if(el.dataset.pf==="default") await saveSettings({defaultPreset:P[i].id},"Default preset changed."); else { P[i].name=el.value; await savePresets(P,"Preset renamed."); } return; }
@@ -1528,7 +1531,7 @@ document.addEventListener("submit", e => { const f=e.target; if(!f.dataset.form)
 
 /* ---------- auto sign-out after inactivity (protects an unattended PC) ---------- */
 let lastAct=Date.now(); for(const ev of ["mousemove","mousedown","keydown","touchstart","scroll"]) document.addEventListener(ev,()=>{ lastAct=Date.now(); },{passive:true});
-setInterval(async()=>{ const mins=Number(ST().idleMinutes ?? 30); if(DEMO||!mins||!S.user||S.user.pending||role()==="viewer") return;
+setInterval(async()=>{ const mins=Number(ST().idleMinutes ?? 30); if(DEMO||!mins||!S.user||S.user.pending||["viewer","superadmin"].includes(role())) return;   // Super Admin and Senior stay signed in until they sign out
   if(Date.now()-lastAct > mins*60e3){ S.idleOut=true; await DB.signOut(); } }, 30e3);
 
 /* =====================================================================
