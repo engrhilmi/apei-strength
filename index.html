@@ -261,7 +261,7 @@ const groupsList = () => [...new Set(schoolList().map(s=>s.grp||"APSACS"))];
 function defaultSettings(){
   return { org:"APEIs Peshawar Garrison", session:"2026-27", sessionStart:"2026-04-01", cutoff:"08:00", defaultPeriod:"cutoff",
     categories:DEFAULT_CATS, labels:{}, actions:DEFAULT_ACTIONS, stages:DEFAULT_STAGES, waitStatuses:DEFAULT_WAIT_ST, consGroup:"APSACS",
-    waTemplates:DEFAULT_WA, presets:defaultPresets(), defaultPreset:"birdseye", logo:"", reportFooter:"" };
+    waTemplates:DEFAULT_WA, presets:defaultPresets(), defaultPreset:"birdseye", logo:"", reportFooter:"", idleMinutes:30 };
 }
 
 /* =====================================================================
@@ -398,7 +398,7 @@ const Local = {
   async allDocs(c){ return Object.entries(this.st[c]||{}).map(([id,v])=>({id,...v})); },
   async createUser(u){ const uid=newId(); await this.apply({set:[{col:"users",id:uid,data:{name:u.name,role:u.role,school:u.school,uid,email:asEmail(u.email),active:true}}],upd:[],inc:[]}); },
   async backup(){ return this.st; },
-  async changePw(){ toast("Demo mode: passwords are not used."); },
+  async changePw(){ toast("Demo mode: passwords are not used."); return true; },
   reset(){ this.seed(); this.pull(); ensureSnapshot(); refresh(); toast("Demo data reset to your Drive figures."); }
 };
 
@@ -449,7 +449,10 @@ const Fire = {
   async signIn(email,pw){ await this.m.signInWithEmailAndPassword(this.auth, asEmail(email), pw); },
   async signOut(){ await this.m.signOut(this.auth); },
   async resetPw(email){ await this.m.sendPasswordResetEmail(this.auth, asEmail(email)); },
-  async changePw(pw){ await this.m.updatePassword(this.auth.currentUser, pw); toast("Password changed."); },
+  async changePw(oldPw, newPw){   // proves the current password first, so nobody at an unattended PC can change it
+    const m=this.m, u=this.auth.currentUser;
+    await m.reauthenticateWithCredential(u, m.EmailAuthProvider.credential(u.email, oldPw));
+    await m.updatePassword(u, newPw); toast("Password changed."); return true; },
   conv(o){ const r={}; for(const [k,v] of Object.entries(o)) r[k] = v===TS ? this.m.serverTimestamp() : v; return r; },
   async apply(ops, quiet){
     const m=this.m, db=this.db; let b=m.writeBatch(db), n=0; const batches=[b];
@@ -512,6 +515,9 @@ const NAV = [
   ["reports","Reports",()=>true],
   ["setup","Setup",()=>isSA()]
 ];
+// one chip: "Jawad · Clerk · GAPS"; the name is skipped when it just repeats the role (e.g. "Super Admin")
+function whoLabel(){ const r=ROLES[role()]||role()||"", n=(me().name||me().email||"").trim(); const parts=[];
+  const rr=r.replace(/\s*\(.*\)$/,""); if(n && !norm(rr).startsWith(norm(n))) parts.push(n); if(!norm(n).startsWith(norm(rr))) parts.push(rr); if(mySchool()) parts.push(mySchool()); return h(parts.join(" · ")); }
 const homeView = () => role()==="clerk" ? "entry" : "dash";
 const VIEWS = {};
 let pendingRegions = new Set();
@@ -526,7 +532,7 @@ function boot(){
   app.innerHTML = `
   <div class="band" id="band"><div class="brandrow">${ST().logo?`<img src="${h(ST().logo)}" alt="" class="logo">`:""}<div><h1>${h(ST().org||"APEIs Peshawar Garrison")} — Strength Portal</h1>
     <small>Session ${h(session())} · ${DEMO?"Demo mode (this browser only)":"Live (Firebase)"}</small></div></div>
-    <div class="who">${DEMO?`<span class="chip demo">DEMO</span>`:""}<span class="chip">${h(me().name||me().email)}</span><span class="chip">${h(ROLES[role()]||role())}${mySchool()?" · "+h(mySchool()):""}</span>
+    <div class="who">${DEMO?`<span class="chip demo">DEMO</span>`:""}<span class="chip">${whoLabel()}</span>
     ${DEMO?`<button class="btn s" data-act="switchUser">Switch role</button>`:`<button class="btn s" data-act="pwDlg">Password</button>`}
     <button class="btn s" data-act="signOut">Sign out</button></div></div>
   <nav id="nav"></nav><main id="main"></main>`;
@@ -572,6 +578,7 @@ function loginHtml(){
       <div class="f"><label for="lEmail">Email or username</label><input id="lEmail" required autocomplete="username"></div>
       <div class="f"><label for="lPw">Password</label><input id="lPw" type="password" required autocomplete="current-password"></div>
       <button class="btn p">Sign in</button></form>
+    ${S.idleOut?`<div class="note">You were signed out after ${Number(ST().idleMinutes??30)} minutes without activity, to keep the portal safe.</div>`:""}
     <p class="hint"><a href="#" data-act="forgot">Forgot password?</a> (works only for real email addresses). You stay signed in on this device until you sign out.</p></div></div>`;
 }
 function gateHtml(){
@@ -1183,9 +1190,10 @@ const SETUP = {
       <div class="f"><label for="sStart">Session start date</label><input id="sStart" type="date" value="${h(st.sessionStart||"2026-04-01")}"></div>
       <div class="f"><label for="sCut">Daily cutoff time</label><input id="sCut" type="time" value="${h(st.cutoff||"08:00")}"></div>
       <div class="f"><label for="sPer">Default movement period</label><select id="sPer">${Object.entries(PERIODS).filter(([k])=>k!=="custom").map(([k,v])=>`<option value="${k}" ${(st.defaultPeriod||"cutoff")===k?"selected":""}>${v}</option>`).join("")}</select></div>
+      <div class="f"><label for="sIdle">Auto sign-out after (minutes idle, 0 = never)</label><input id="sIdle" type="number" min="0" max="480" value="${h(ST().idleMinutes??30)}"></div>
       <div class="f wide" style="grid-column:1/-1"><label for="sFoot">Default report footer</label><input id="sFoot" value="${h(st.reportFooter||"")}" placeholder="e.g. Prepared by DQ Office, APEIs Peshawar"></div>
       <button class="btn p">Save</button></form>
-      <p class="hint"><b>What the cutoff does:</b> strength figures are always live. The cutoff only marks where "today's movement" starts — e.g. 08:00 means the morning report counts admissions and withdrawals since 08:00 yesterday. Choose other periods (today, this week, this month, custom) in Reports.</p></div>
+      <p class="hint"><b>Auto sign-out:</b> if a PC is left signed in, it signs itself out after this many minutes with no typing or clicking (Senior / Viewer on his phone is never signed out).</p><p class="hint"><b>What the cutoff does:</b> strength figures are always live. The cutoff only marks where "today's movement" starts — e.g. 08:00 means the morning report counts admissions and withdrawals since 08:00 yesterday. Choose other periods (today, this week, this month, custom) in Reports.</p></div>
       <div class="panel"><h2>Logo</h2><p class="hint">Shown on the sign-in page, the header and printed reports. PNG or JPG; it is resized automatically.</p>
       <div class="row" style="justify-content:flex-start">${st.logo?`<img src="${h(st.logo)}" alt="" style="height:64px;border:1px solid var(--line);border-radius:6px;padding:4px;background:#fff">`:""}<label class="btn">Choose image <input type="file" accept="image/*" data-chg="logo" hidden></label>${st.logo?`<button class="btn r" data-act="logoDel">Remove</button>`:""}</div></div>`; },
   labels(){ return `<div class="panel"><h2>Labels & terms</h2><p class="hint">Change any column heading used on screen, in reports and in Excel.</p><form data-form="labels" class="grid">
@@ -1359,7 +1367,12 @@ const ACT = {
   switchUser: () => { S.user=null; boot(); },
   signOut: async () => { await DB.signOut(); location.hash=""; },
   forgot: async (el,e) => { e.preventDefault(); const v=$("#lEmail").value; if(!v){ toast("Type your email first.",true); return; } try{ await DB.resetPw(v); toast("Reset link sent to "+asEmail(v)); }catch(err){ toast(err.message,true); } },
-  pwDlg: () => modal(`<h3>Change your password</h3><form data-form="pw"><div class="f"><label for="pw1">New password (6+ characters)</label><input id="pw1" type="password" minlength="6" required></div><div class="row"><button type="button" class="btn" data-act="closeModal">Cancel</button><button class="btn p">Change</button></div></form>`),
+  pwDlg: () => modal(`<h3>Change your password</h3><form data-form="pw" autocomplete="off"><div class="grid" style="grid-template-columns:1fr">
+      <div class="f"><label for="pw0">Current password</label><input id="pw0" type="password" required autocomplete="current-password"></div>
+      <div class="f"><label for="pw1">New password (at least 8 characters)</label><input id="pw1" type="password" minlength="8" required autocomplete="new-password"></div>
+      <div class="f"><label for="pw2">New password again</label><input id="pw2" type="password" minlength="8" required autocomplete="new-password"></div></div>
+      <p class="hint" id="pwMsg">Your current password is checked before anything changes.</p>
+      <div class="row"><button type="button" class="btn" data-act="closeModal">Cancel</button><button class="btn p">Change password</button></div></form>`),
   closeModal, modalBg: (el,e) => { if(e.target===el) closeModal(); },
   dashSchool: el => { S.dashSchool=el.dataset.id; for(const r of ["dPills","dSchool","dSum","dCards"]) fillRegion(r,true); if(el.tagName!=="BUTTON"||el.classList.contains("cardhead")) $("#dDetail").scrollIntoView({behavior:"smooth",block:"start"}); },
   toggleClass: el => { const k=el.dataset.id; S.open.has(k)?S.open.delete(k):S.open.add(k); fillRegion("dSchool",true); },
@@ -1470,7 +1483,10 @@ document.addEventListener("keydown", e => {
 const FORMS = {
   login: async () => { try{ await DB.signIn($("#lEmail").value,$("#lPw").value); }catch(e){ toast("Sign-in failed: "+((e.code||"").replace("auth/","")||e.message),true); } },
   bootstrap: async () => { try{ await DB.bootstrap($("#bName").value.trim()); toast("System created. Welcome, Super Admin."); }catch(e){ toast("Setup failed: "+e.message,true); } },
-  pw: async () => { try{ await DB.changePw($("#pw1").value); closeModal(); }catch(e){ toast(e.code==="auth/requires-recent-login"?"Please sign out and in again, then retry.":e.message,true); } },
+  pw: async () => { const o=$("#pw0").value, n=$("#pw1").value, n2=$("#pw2").value, msg=t=>{ $("#pwMsg").innerHTML=`<span class="neg">${h(t)}</span>`; };
+    if(n!==n2) return msg("The two new passwords do not match."); if(n===o) return msg("The new password must be different from the current one.");
+    try{ await DB.changePw(o,n); closeModal(); }
+    catch(e){ const c=e.code||""; msg(["auth/wrong-password","auth/invalid-credential","auth/invalid-login-credentials"].includes(c)?"Current password is wrong — nothing was changed.":c==="auth/too-many-requests"?"Too many wrong tries. Wait a few minutes, then try again.":c==="auth/weak-password"?"New password is too weak; use at least 8 characters.":(e.message||c)); $("#pw0").select(); } },
   entry: saveEntry,
   wait: async () => { const code=waitSchool(); const d={school:code,cl:$("#wCl").value,date:$("#wDate").value,name:$("#wName").value.trim(),father:$("#wFather").value.trim(),unit:$("#wUnit").value.trim(),contact:$("#wCon").value.trim(),dob:$("#wDob").value.trim(),schRemarks:$("#wRem").value.trim(),dqRemarks:"",marks:"",admsn:"",status:waitSts()[0].name,session:session(),at:TS,by:me().uid,byName:me().name||""};
     if(!d.name) return; await DB.apply({set:[{col:"waiting",id:newId(),data:d}],upd:[],inc:[]}); toast(`${d.name} added to ${d.cl}.`); for(const id of ["wName","wFather","wUnit","wCon","wDob","wRem"]) $("#"+id).value=""; $("#wName").focus(); },
@@ -1493,7 +1509,7 @@ const FORMS = {
   addUser: async () => { const u={name:$("#uName").value.trim(),email:$("#uEmail").value.trim(),password:$("#uPw")?.value,role:$("#uRole").value,school:$("#uSch").value};
     if(["clerk","principal"].includes(u.role)&&u.school==="ALL"){ toast("Pick the school for a clerk or principal.",true); return; }
     try{ await DB.createUser(u); toast(`Login created: ${asEmail(u.email)}`+(DEMO?"":` · password ${u.password} — share it privately.`)); fillRegion("stBody",true); }catch(e){ toast("Could not create: "+(e.code||e.message),true); } },
-  general: async () => { await saveSettings({org:$("#sOrg").value.trim(),sessionStart:$("#sStart").value,cutoff:$("#sCut").value,defaultPeriod:$("#sPer").value,reportFooter:$("#sFoot").value.trim()},"Settings saved."); boot(); },
+  general: async () => { await saveSettings({idleMinutes:Math.max(0,Number($("#sIdle").value)||0),org:$("#sOrg").value.trim(),sessionStart:$("#sStart").value,cutoff:$("#sCut").value,defaultPeriod:$("#sPer").value,reportFooter:$("#sFoot").value.trim()},"Settings saved."); boot(); },
   labels: async f => { const fd=new FormData(f), lab={}; for(const k of Object.keys(DEFAULT_LABELS)){ const v=String(fd.get(k)||"").trim(); if(v && v!==DEFAULT_LABELS[k]) lab[k]=v; } await saveSettings({labels:lab},"Labels saved."); },
   actions: async f => { const fd=new FormData(f); const A=actions().map((a,i)=>({...a,label:String(fd.get("l_"+i)||a.label).trim()||a.label,kind:fd.get("k_"+i)||a.kind,on:fd.get("o_"+i)==="on"}));
     const nc=String(fd.get("newcode")||"").trim().toUpperCase().replace(/[^A-Z0-9_]/g,""), nl=String(fd.get("newlabel")||"").trim();
@@ -1509,6 +1525,11 @@ const FORMS = {
     ops.set.push({col:"settings",id:"app",data:{session:ns,sessionStart:$("#roStart").value},merge:true}); await DB.apply(ops); toast(`Session ${ns} started.`); boot(); }
 };
 document.addEventListener("submit", e => { const f=e.target; if(!f.dataset.form) return; e.preventDefault(); Promise.resolve(FORMS[f.dataset.form](f)).catch(err=>toast(err.message,true)); });
+
+/* ---------- auto sign-out after inactivity (protects an unattended PC) ---------- */
+let lastAct=Date.now(); for(const ev of ["mousemove","mousedown","keydown","touchstart","scroll"]) document.addEventListener(ev,()=>{ lastAct=Date.now(); },{passive:true});
+setInterval(async()=>{ const mins=Number(ST().idleMinutes ?? 30); if(DEMO||!mins||!S.user||S.user.pending||role()==="viewer") return;
+  if(Date.now()-lastAct > mins*60e3){ S.idleOut=true; await DB.signOut(); } }, 30e3);
 
 /* =====================================================================
    12) START
