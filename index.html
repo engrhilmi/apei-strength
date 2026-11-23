@@ -184,6 +184,15 @@ td.errc{background:var(--redsoft)!important;color:var(--red);font-weight:700}tr.
 .umenu-list button{all:unset;cursor:pointer;padding:9px 12px;border-radius:8px;font-weight:600;font-size:14px}.umenu-list button:hover,.umenu-list button:focus-visible{background:var(--soft)}
 .umenu-list button.danger{color:var(--red);border-top:1px solid var(--line);margin-top:4px;border-radius:0 0 8px 8px}.umenu-who{padding:8px 12px 10px;font-weight:800;border-bottom:1px solid var(--line);margin-bottom:4px}.umenu-who small{display:block;font-weight:500;color:var(--mute)}
 nav .navback{margin:0 0 0 auto;align-self:center;flex:none}
+
+/* buttons never get cut: inside form grids they may wrap to two lines */
+.grid>.btn,.grid>button,.grid .row .btn{white-space:normal;line-height:1.2;overflow-wrap:anywhere;text-align:center}.btn{max-width:100%}
+.grid>.btn,.grid>button{justify-self:stretch}
+.actrow{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+
+.f label.btn,.f .pills label.btn{font-size:14px;color:var(--ink);font-weight:600}
+.ph .pills .btn,.ph>.btn{min-height:34px;padding:5px 12px;font-size:14px}
+.grid .f>label{min-height:1.2em}
 </style>
 </head>
 <body>
@@ -1454,7 +1463,7 @@ VIEWS.daycare = {
      <div class="panel"><div class="ph"><h2>Day care — all schools</h2><div class="pills">${expBar("daycare")}</div></div><div class="scroll" id="dcSum"></div></div>
      <div class="panel"><div class="ph"><h2>${h(code)} — ${h(S.schools[code].name)}</h2>${mySchool()?"":`<div class="pills">${dcSchools().map(s=>`<button class="pill ${s.code===code?"on":""}" data-act="go" data-id="daycare" data-p="school=${h(s.code)}">${h(s.code)}</button>`).join("")}</div>`}</div>
       ${ed?`<form data-form="dcSave" data-id="${h(code)}" class="grid">
-        <div class="f"><label for="dcCap">Places (vacancies sanctioned)</label><input id="dcCap" type="number" min="0" value="${h(d.cap??"")}"></div>
+        <div class="f"><label for="dcCap" title="Number of places sanctioned">Places</label><input id="dcCap" type="number" min="0" value="${h(d.cap??"")}"></div>
         <div class="f"><label for="dcStr">Children now</label><input id="dcStr" type="number" min="0" value="${h(d.useReg?dcStr(code):d.str??"")}" ${d.useReg?"disabled title=\"Counted from the register below\"":""}></div>
         <div class="f"><label for="dcFee">Fee per month (Rs)</label><input id="dcFee" type="number" min="0" value="${h(d.fee??"")}"></div>
         <div class="f"><label for="dcUse">Children now =</label><select id="dcUse"><option value="">the number I type</option><option value="1" ${d.useReg?"selected":""}>count of the register below</option></select></div>
@@ -1516,7 +1525,7 @@ function feeRetHtml(){ const code=feeSchool(), fd=S.fd; if(!fd) return ""; const
     <div class="pills" style="margin:8px 0">${[["list","By student (names)"],["sum","Totals only"]].map(([k,l])=>`<button class="pill ${fd.mode===k?"on":""}" data-act="feeMode" data-id="${k}" ${ed?"":"disabled"}>${l}</button>`).join("")}</div>
     ${fd.mode==="list"?`${ed?`<div class="grid" style="margin-bottom:8px"><div class="f combo wide" style="grid-column:span 2"><label for="fdQ">Add a defaulter — type name or Adm No</label><input id="fdQ" autocomplete="off" placeholder="name / Adm No of a ${h(code)} student"><div class="combo-list" id="fdQList" hidden></div></div>
         <div class="f"><label for="fdM">Months unpaid</label><input id="fdM" type="number" min="1" max="24" value="1"></div>
-        <div class="row" style="margin:0;align-self:end"><button type="button" class="btn" data-act="tplFee">Excel template</button><label class="btn">Import Excel <input type="file" accept=".xlsx,.xls,.csv" data-chg="impFee" hidden></label></div></div>
+        <div class="f" style="grid-column:span 2"><label>Or many at once</label><div class="pills"><button type="button" class="btn" data-act="tplFee">Excel template</button><label class="btn">Import Excel <input type="file" accept=".xlsx,.xls,.csv" data-chg="impFee" hidden></label></div></div></div>
         <div id="fdImp">${S.imp?.kind==="fee"?impTableHtml(S.imp):""}</div>`:""}
       <div class="scroll">${rows.length?`<table><tr><th>#</th><th>Adm No</th><th>Name</th><th>Class – Sec</th><th>Category</th><th class="n">Monthly fee</th><th class="n">Months</th><th class="n">Amount (Rs)</th><th></th></tr>${rows.map((r,i)=>`<tr><td class="mute">${i+1}</td><td>${h(r.adm)}</td><td><span class="dn" data-act="openStu" data-id="${h(r.id)}">${h(r.name)}</span></td><td>${h(r.cl)}-${h(r.sec)}</td><td>${h(catLabel(r.cat))}</td><td class="n">${nf(r.fee||0)}</td>
         <td class="n">${ed?`<input class="in num" type="number" min="1" data-fd="m" data-id="${h(r.id)}" value="${h(r.m)}">`:h(r.m)}</td><td class="n">${ed?`<input class="in" style="width:100px" type="number" min="0" data-fd="amt" data-id="${h(r.id)}" value="${h(r.amt)}">`:nf(r.amt)}</td><td>${ed?`<button class="btn s r" data-act="feeDrop" data-id="${h(r.id)}">✕</button>`:""}</td></tr>`).join("")}</table>`:`<div class="empty">No defaulters added yet.</div>`}</div>`
@@ -1525,8 +1534,8 @@ function feeRetHtml(){ const code=feeSchool(), fd=S.fd; if(!fd) return ""; const
     <div class="grid" style="margin-top:10px"><div class="f"><label>Defaulters</label><b class="big2">${nf(retTotal(sum))}</b></div><div class="f"><label>Amount</label><b class="big2">${nf(sum.amt)}</b></div>
       <div class="f"><label>1x · 2x · 3x · 4x · 5x+</label><b>${[1,2,3,4,5].map(i=>sum["m"+i]||0).join(" · ")}</b></div>
       ${hasDc(S.schools[code])?`<label class="ck"><input type="checkbox" id="fdDc" ${fd.incDc?"checked":""} ${ed?"":"disabled"}> Student strength includes day care</label>`:""}
-      <div class="f wide" style="grid-column:span 2"><label for="fdRem">Remarks</label><input id="fdRem" value="${h(fd.remarks)}" ${ed?"":"disabled"}></div>
-      ${ed?`<button class="btn p" data-act="feeSave">Save return for ${fmtD(Date.parse(fd.day+"T12:00"))}</button>`:""}</div>
+      <div class="f wide" style="grid-column:span 2"><label for="fdRem">Remarks</label><input id="fdRem" value="${h(fd.remarks)}" ${ed?"":"disabled"}></div></div>
+    ${ed?`<div class="actrow"><span class="hint" style="margin:0">Saving replaces any return already saved for this school and date.</span><button class="btn p" data-act="feeSave">Save return for ${fmtD(Date.parse(fd.day+"T12:00"))}</button></div>`:""}
     <p class="hint">Amount for each student = months × the monthly fee of their category and class (Fee structure tab); you can overwrite it. Student strength is taken as on the same date.</p></div>`; }
 async function feeSaveRet(){ const fd=S.fd, code=fd.code; fd.remarks=$("#fdRem")?.value.trim()||""; fd.incDc=!!$("#fdDc")?.checked;
   const sum=fd.mode==="list"?retSum(fd.rows):Object.fromEntries(["m1","m2","m3","m4","m5","amt"].map(k=>[k,Math.max(0,Number(fd.sum[k])||0)]));
@@ -2246,7 +2255,7 @@ const SETUP = {
       <div class="f"><label for="sStart">Session start date</label><input id="sStart" type="date" value="${h(st.sessionStart||"2026-04-01")}"></div>
       <div class="f"><label for="sCut">Daily cutoff time</label><input id="sCut" type="time" value="${h(st.cutoff||"08:00")}"></div>
       <div class="f"><label for="sPer">Default movement period</label><select id="sPer">${Object.entries(PERIODS).filter(([k])=>k!=="custom").map(([k,v])=>`<option value="${k}" ${(st.defaultPeriod||"cutoff")===k?"selected":""}>${v}</option>`).join("")}</select></div>
-      <div class="f"><label for="sIdle">Auto sign-out after (minutes idle, 0 = never)</label><input id="sIdle" type="number" min="0" max="480" value="${h(ST().idleMinutes??30)}"></div>
+      <div class="f"><label for="sIdle" title="0 = never">Auto sign-out (idle minutes)</label><input id="sIdle" type="number" min="0" max="480" value="${h(ST().idleMinutes??30)}"></div>
       <div class="f wide" style="grid-column:1/-1"><label for="sFoot">Default report footer</label><input id="sFoot" value="${h(st.reportFooter||"")}" placeholder="e.g. Prepared by DQ Office, APEIs Peshawar"></div>
       <button class="btn p">Save</button></form>
       <p class="hint"><b>Auto sign-out:</b> if a PC is left signed in, it signs itself out after this many minutes with no typing or clicking (Super Admin and Senior / Viewer are never signed out automatically — only when they press Sign out).</p><p class="hint"><b>What the cutoff does:</b> strength figures are always live. The cutoff only marks where "today's movement" starts — e.g. 08:00 means the morning report counts admissions and withdrawals since 08:00 yesterday. Choose other periods (today, this week, this month, custom) in Reports.</p></div>
@@ -2347,7 +2356,7 @@ function themeForm(form){ const u=form==="uiDefault"?{theme:"oxford",mode:"auto"
     <div class="grid" style="margin-top:10px"><div class="f"><label>Light / dark</label><select name="mode">${[["auto","Follow the device"],["light","Light"],["dark","Dark"]].map(([k,l])=>`<option value="${k}" ${u.mode===k?"selected":""}>${l}</option>`).join("")}</select></div>
     <div class="f"><label>Text size</label><select name="size">${[["s","Small"],["m","Normal"],["l","Large"]].map(([k,l])=>`<option value="${k}" ${u.size===k?"selected":""}>${l}</option>`).join("")}</select></div>
     <div class="f"><label>Spacing</label><select name="density">${[["normal","Comfortable"],["compact","Compact (more rows on screen)"]].map(([k,l])=>`<option value="${k}" ${u.density===k?"selected":""}>${l}</option>`).join("")}</select></div>
-    <button class="btn p">${form==="uiDefault"?"Save as default for everyone":"Apply"}</button></div></form>`; }
+    </div><div class="actrow"><button class="btn p">${form==="uiDefault"?"Save as default for everyone":"Apply"}</button></div></form>`; }
 function permDef(r,k){ const d=(ST().permDefaults||{})[r]; return d ? d[k]!==false : true; }
 
 /* =====================================================================
