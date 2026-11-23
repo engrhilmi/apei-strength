@@ -176,6 +176,14 @@ td.errc{background:var(--redsoft)!important;color:var(--red);font-weight:700}tr.
 .mini{font-size:12.5px;color:var(--mute)}
 .dcbar{display:flex;gap:4px;align-items:center}.big2{font:800 28px/1 "Red Hat Display",sans-serif}
 @media print{.tsb,.navback{display:none!important}}
+
+.band{display:block}.bandtop{display:flex;align-items:center;justify-content:space-between;gap:10px 18px;flex-wrap:wrap}
+.band .gsearch{max-width:none;margin-top:10px}.band .gsearch input{min-height:40px;font-size:15px}
+.umenu{position:relative}.ubtn span{max-width:220px;overflow:hidden;text-overflow:ellipsis;display:inline-block;vertical-align:bottom}
+.umenu-list{position:absolute;right:0;top:calc(100% + 6px);z-index:60;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.22);min-width:230px;padding:6px;display:flex;flex-direction:column}
+.umenu-list button{all:unset;cursor:pointer;padding:9px 12px;border-radius:8px;font-weight:600;font-size:14px}.umenu-list button:hover,.umenu-list button:focus-visible{background:var(--soft)}
+.umenu-list button.danger{color:var(--red);border-top:1px solid var(--line);margin-top:4px;border-radius:0 0 8px 8px}.umenu-who{padding:8px 12px 10px;font-weight:800;border-bottom:1px solid var(--line);margin-bottom:4px}.umenu-who small{display:block;font-weight:500;color:var(--mute)}
+nav .navback{margin:0 0 0 auto;align-self:center;flex:none}
 </style>
 </head>
 <body>
@@ -680,7 +688,7 @@ const HIDDEN = [["find",()=>canSeeStudents()],["student",()=>canSeeStudents()],[
 const allowed = v => NAV.some(n=>n[0]===v && n[2]()) || HIDDEN.some(n=>n[0]===v && n[1]());
 // one chip: "Jawad · Clerk · GAPS"; the name is skipped when it just repeats the role (e.g. "Super Admin")
 function whoLabel(){ const r=ROLES[role()]||role()||"", n=(me().name||me().email||"").trim(); const parts=[];
-  const rr=r.replace(/\s*\(.*\)$/,""); if(n && !norm(rr).startsWith(norm(n))) parts.push(n); if(!norm(n).startsWith(norm(rr))) parts.push(rr); if(mySchool()) parts.push(mySchool()); return h(parts.join(" · ")); }
+  const rr=r.replace(/\s*\(.*\)$/,""); if(n && !norm(rr).startsWith(norm(n))) parts.push(n); if(!norm(n).startsWith(norm(rr))) parts.push(rr); if(mySchool()) parts.push(mySchool()); if(!parts.length) parts.push(rr||n); return h(parts.join(" · ")); }
 const homeView = () => role()==="clerk" ? "entry" : "dash";
 const VIEWS = {};
 let pendingRegions = new Set();
@@ -712,15 +720,17 @@ function boot(){
   if(!S.navStack.length) S.navStack.push(location.hash||"#"+S.view);
   document.body.classList.toggle("nopr", !canPR());
   app.innerHTML = `
-  <div class="band" id="band"><div class="brandrow">${ST().logo?`<img src="${h(ST().logo)}" alt="" class="logo">`:""}<div><h1>${h(ST().org||"APEIs Peshawar Garrison")} — Strength Portal</h1>
+  <div class="band" id="band"><div class="bandtop"><div class="brandrow">${ST().logo?`<img src="${h(ST().logo)}" alt="" class="logo">`:""}<div><h1>${h(ST().org||"APEIs Peshawar Garrison")} — Strength Portal</h1>
     <small>Session ${h(session())} · ${DEMO?"Demo mode (this browser only)":"Live (Firebase)"}</small></div></div>
-    ${canSeeStudents()?`<div class="gsearch combo"><input id="gq" placeholder="Search students — name, Adm No, class (e.g. 9a), CNIC, phone…" autocomplete="off" aria-label="Search students"><div class="combo-list" id="gqList" hidden></div></div>`:""}
     <div class="who"><span class="sync" id="syncDot"></span>${DEMO?`<span class="chip demo">DEMO</span>`:""}
     <button class="btn s" data-act="reload" title="Fetch the latest figures again">⟳ Refresh</button>
-    <button class="btn s" data-act="themeDlg" title="Colours and text size">🎨 Theme</button>
-    <span class="chip">${whoLabel()}</span>
-    ${DEMO?`<button class="btn s" data-act="switchUser">Switch role</button>`:`<button class="btn s" data-act="pwDlg">Password</button>`}
-    <button class="btn s" data-act="signOut">Sign out</button></div></div>
+    <div class="umenu"><button class="btn s ubtn" data-act="menuToggle" aria-haspopup="true" aria-expanded="false" title="Your account">☰ <span>${whoLabel()}</span></button>
+      <div class="umenu-list" id="umenu" hidden role="menu">
+        <div class="umenu-who">${h(me().name||"")}<small>${h(ROLES[role()]||"")}${mySchool()?" · "+h(mySchool()):""}</small></div>
+        <button data-act="themeDlg" role="menuitem">🎨 Theme & text size</button>
+        ${DEMO?`<button data-act="switchUser" role="menuitem">⇄ Switch role</button>`:`<button data-act="pwDlg" role="menuitem">🔑 Change password</button>`}
+        <button data-act="signOut" role="menuitem" class="danger">⏻ Sign out</button></div></div></div></div>
+    ${canSeeStudents()?`<div class="gsearch combo"><input id="gq" placeholder="🔍 Search students in all schools — name, Adm No, class (e.g. 9a), father CNIC, phone…  (press /)" autocomplete="off" aria-label="Search students"><div class="combo-list" id="gqList" hidden></div></div>`:""}</div>
   <nav id="nav"></nav><main id="main"></main>`;
   document.documentElement.style.setProperty("--bandH", $("#band").offsetHeight+"px");
   wireGlobalSearch(); syncPaint();
@@ -729,8 +739,8 @@ function boot(){
 function navHtml(){
   const inc=S.transfers.filter(t=>t.status==="pending" && (isSA()||role()==="hq"||t.to===mySchool())).length;
   const back=S.navStack.length>1||HIDDEN.some(x=>x[0]===S.view);
-  return (back?`<button class="navback" data-act="back" title="Back to where you came from (Alt+←)">← Back</button>`:"")+
-    NAV.filter(n=>n[2]()).map(([k,l])=>`<a href="#${k}" class="${S.view===k?"on":""}">${l}${k==="transfers"&&inc?`<span class="badge">${inc}</span>`:""}</a>`).join("");
+  return NAV.filter(n=>n[2]()).map(([k,l])=>`<a href="#${k}" class="${S.view===k?"on":""}">${l}${k==="transfers"&&inc?`<span class="badge">${inc}</span>`:""}</a>`).join("")+
+    (back?`<button class="navback" data-act="back" title="Back to where you came from (Alt+←)">← Back</button>`:"");
 }
 function renderView(){
   const main=$("#main"); if(!main) return;
@@ -2671,6 +2681,7 @@ const ACT = {
   demoReset: () => ask("Reset demo data?","All test entries will be deleted.","Reset",async()=>Local.reset()),
   /* ---- v4: navigation ---- */
   back: () => goBack(),
+  menuToggle: el => { const m=$("#umenu"); m.hidden=!m.hidden; el.setAttribute("aria-expanded",String(!m.hidden)); },
   promoSchool: el => { promoState().school=el.dataset.id; fillRegion("stBody",true); },
   promoReset: () => { const P=promoState(); delete P.map[P.school]; delete P.stay[P.school]; fillRegion("stBody",true); },
   repDel: el => { delete promoState().rep[el.dataset.id]; fillRegion("stBody",true); },
@@ -2785,6 +2796,7 @@ document.addEventListener("change", async e => {
   }catch(err){ toast(err.message,true); }
 });
 document.addEventListener("click", e => {
+  const um=$("#umenu"); if(um && !um.hidden && !e.target.closest(".umenu")) um.hidden=true; else if(um && e.target.closest("#umenu [data-act]")) um.hidden=true;
   const el=e.target.closest("[data-act]"); if(!el || !ACT[el.dataset.act]) return;
   if((el.tagName==="A" && el.dataset.act!=="waEdit") || el.tagName==="BUTTON") e.preventDefault();
   Promise.resolve(ACT[el.dataset.act](el,e)).catch(err=>toast(err.message,true));
