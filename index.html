@@ -460,9 +460,15 @@ function deepMerge(a, b, fix){ const o=isPlain(a)?{...a}:{}; for(const [k,v] of 
 /* sync light: counts writes not yet confirmed by the server */
 const SYNC = { pending:0, last:Date.now(), err:"", online:navigator.onLine };
 function syncPaint(){ const el=document.getElementById("syncDot"); if(!el) return; const off=!navigator.onLine;
-  const [cls,txt,tip] = SYNC.err ? ["bad","Sync problem",SYNC.err] : off ? ["off","Offline — saved on this device","Entries are kept on this computer and upload by themselves when the internet returns."] : SYNC.pending ? ["busy","Saving…","Sending to the cloud"] : ["ok",DEMO?"Demo — this browser":"Synced "+fmtT(SYNC.last),DEMO?"Demo mode keeps data in this browser only.":"Everything is saved in the cloud."];
+  const age=Math.round((Date.now()-SYNC.last)/60e3);
+  const [cls,txt,tip] = SYNC.err ? ["bad","Sync problem",SYNC.err] : off ? ["off","Offline — saved on this device","Entries are kept on this computer and upload by themselves when the internet returns."] : SYNC.pending ? ["busy","Saving…","Sending to the cloud"]
+    : DEMO ? ["ok","Demo — this browser","Demo mode keeps data in this browser only."] : SYNC.cache ? ["busy","Connecting to server…","Showing the copy saved on this device until the server answers."]
+    : ["ok",`Live · checked ${fmtT(SYNC.last)}`,`Connected to the server. Last confirmed ${fmtDT(SYNC.last)}${age?` (${age} min ago)`:""}. Changes by any clerk appear by themselves; press Refresh to check now.`];
   el.className="sync "+cls; el.title=tip; el.innerHTML=`<i></i>${h(txt)}`; }
 addEventListener("online",()=>{ SYNC.err=""; syncPaint(); }); addEventListener("offline",syncPaint);
+/* every 3 minutes while the page is open and visible, confirm with the server (1–3 small reads) */
+setInterval(()=>{ if(DEMO||!S.user||S.user.pending||document.hidden||!navigator.onLine||!DB.check) return; DB.check().then(()=>refresh()).catch(e=>{ SYNC.err="Server not reachable: "+e.message; syncPaint(); }); }, 180e3);
+setInterval(syncPaint, 30e3);
 /* every student write also updates that school's small search index (stuIdx/{school}.i.{id}) — 6 small documents instead of thousands of reads */
 const IDX_F = ["admNo","name","father","cl","sec","gender","cat","status","fatherCnic","contact","dob","bform","motherCnic"];
 const idxArr = r => IDX_F.map(k=>String(r[k]??""));
@@ -538,7 +544,7 @@ const Local = {
   async allDocs(c){ return clone(Object.entries(this.st[c]||{}).map(([id,v])=>({id,...v}))); },
   async getDoc(c, id){ const v=this.st[c]?.[id]; return v ? clone({id,...v}) : null; },
   async query(c, field, op, val){ return (await this.allDocs(c)).filter(d=> op==="==" ? d[field]===val : op===">=" ? d[field]>=val : op==="<=" ? d[field]<=val : true); },
-  async reload(){ this.load(); this.pull(); refresh(); },
+  async reload(){ this.load(); this.pull(); SYNC.last=Date.now(); syncPaint(); refresh(); },
   async loadStudents(code){ return Object.entries(this.st.students||{}).map(([id,v])=>({id,...v})).filter(x=>x.school===code); },
   async txByStudent(id){ return Object.entries(this.st.transactions).map(([i,t])=>({id:i,...t,atMs:toMs(t.at)})).filter(t=>t.studentId===id).sort((a,b)=>tTime(b)-tTime(a)); },
   async createUser(u){ const uid=newId(); await this.apply({set:[{col:"users",id:uid,data:{name:u.name,role:u.role,school:u.school,uid,email:asEmail(u.email),active:true}}],upd:[],inc:[]}); },
@@ -575,7 +581,7 @@ const Fire = {
     }catch(e){ S.user={ uid:u.uid, email:u.email, error:e.message }; S.ready=true; boot(); }
   },
   listen(){
-    const m=this.m, db=this.db, on=(q,f)=>this.unsub.push(m.onSnapshot(q,f,e=>toast("Sync error: "+e.message,true)));
+    const m=this.m, db=this.db, on=(q,f,ign)=>this.unsub.push(m.onSnapshot(q,{includeMetadataChanges:true},snap=>{ if(!snap.metadata.fromCache){ SYNC.last=Date.now(); SYNC.cache=false; SYNC.err=""; } else if(!ign) SYNC.cache=true; syncPaint(); f(snap); },e=>{ SYNC.err=e.message; syncPaint(); toast("Sync error: "+e.message,true); }));
     const data = d => ({ id:d.id, ...d.data({serverTimestamps:"estimate"}) });
     const first={}; let done; const ready=new Promise(r=>done=r); const got=k=>{ first[k]=1; if(first.settings&&first.schools&&first.strength) done(); };
     const waitNow=()=>{ S.waiting=(this.waitAll||[]).filter(w=>w.session===session()&&!w.deleted); };
@@ -625,7 +631,15 @@ const Fire = {
   async allDocs(c){ return (await this.m.getDocs(this.m.collection(this.db,c))).docs.map(d=>({id:d.id,...d.data()})); },
   async getDoc(c, id){ const m=this.m, d=await m.getDoc(m.doc(this.db,c,id)); return d.exists() ? {id:d.id,...d.data()} : null; },
   async query(c, field, op, val){ const m=this.m; return (await m.getDocs(m.query(m.collection(this.db,c), m.where(field,op,val)))).docs.map(d=>{ const x={id:d.id,...d.data()}; if(x.at) x.atMs=toMs(x.at); return x; }); },
-  async reload(){ this.stop(); for(const k of Object.keys(S.stu)) delete S.stu[k]; S.asOfCache={}; S.txCache={}; await this.listen(); refresh(); },
+  /* ask the SERVER (not this device's saved copy) for the latest figures; fails if the server cannot be reached */
+  async check(){ const m=this.m, db=this.db;
+    const [st,sch,set]=await Promise.all([m.getDocsFromServer(m.collection(db,"strength")), m.getDocsFromServer(m.collection(db,"schools")), m.getDocFromServer(m.doc(db,"settings","app"))]);
+    S.strength=Object.fromEntries(st.docs.map(d=>{ const x=d.data(); return [d.id,{d:x.d||{},w:x.w||{},c:x.c||{}}]; })); S.schools=Object.fromEntries(sch.docs.map(d=>[d.id,{id:d.id,...d.data()}])); S.settings=set.data()||{};
+    SYNC.last=Date.now(); SYNC.cache=false; SYNC.err=""; syncPaint(); },
+  async reload(){ for(const k of Object.keys(S.stu)) delete S.stu[k]; S.asOfCache={}; S.txCache={};
+    try{ await this.m.enableNetwork(this.db); }catch(e){}
+    await Promise.race([this.check(), sleep(12000).then(()=>{ throw new Error("timeout"); })]);
+    this.stop(); await this.listen(); refresh(); },
   async loadStudents(code){ const m=this.m; return (await m.getDocs(m.query(m.collection(this.db,"students"), m.where("school","==",code)))).docs.map(d=>({id:d.id,...d.data()})); },
   async txByStudent(id){ const m=this.m; return (await m.getDocs(m.query(m.collection(this.db,"transactions"), m.where("studentId","==",id)))).docs.map(d=>{ const x={id:d.id,...d.data()}; x.atMs=toMs(x.at); return x; }).sort((a,b)=>tTime(b)-tTime(a)); },
   async bootstrap(name){
@@ -2691,7 +2705,9 @@ const ACT = {
   drill: el => drillGo(el),
   openStu: el => go("student",{id:el.dataset.id}),
   findDrop: el => setParams({[el.dataset.id]:""}), findMore: () => { S.findLim=1e6; fillRegion("fList",true); },
-  reload: async () => { toast("Refreshing…"); S.feeRets=null; S.asOfCache={}; S.txCache={}; S.catState=null; try{ await DB.reload(); }catch(e){ toast(e.message,true); return; } if(S.view==="fees"||S.view==="log") renderView(); toast("Up to date."); },
+  reload: async el => { if(el) el.disabled=true; toast("Checking with the server…"); S.feeRets=null; S.asOfCache={}; S.txCache={}; S.catState=null;
+    try{ await DB.reload(); }catch(e){ if(el) el.disabled=false; SYNC.err="Server not reachable"; syncPaint(); toast(navigator.onLine?"Could not reach the server — you are seeing the copy saved on this device. Try again in a minute.":"You are offline — showing the copy saved on this device.",true); return; }
+    if(el) el.disabled=false; renderView(); toast(`Up to date with the server at ${fmtT(Date.now())}.`); },
   themeDlg: () => modal(`<h3>Theme — colours and text size</h3><p class="hint" style="margin-top:0">Only for you, on this device.</p>${themeForm("uiMine")}<div class="row"><button class="btn" data-act="themeReset">Use the organisation default</button><button class="btn" data-act="closeModal">Close</button></div>`,"wide"),
   themeReset: () => { try{ localStorage.removeItem("apeis_ui"); }catch(e){} applyTheme(); closeModal(); toast("Default theme restored."); },
   /* ---- student record ---- */
