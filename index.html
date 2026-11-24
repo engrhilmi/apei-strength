@@ -194,6 +194,10 @@ nav .navback{margin:0 0 0 auto;align-self:center;flex:none}
 .ph .pills .btn,.ph>.btn{min-height:34px;padding:5px 12px;font-size:14px}
 .grid .f>label{min-height:1.2em}
 .fsbox{position:fixed;left:50%;transform:translateX(-50%);top:12px;z-index:200;max-width:min(680px,94vw);background:#fff;color:#111;border:2px solid #b3122a;border-radius:12px;padding:14px 16px;box-shadow:0 14px 40px rgba(0,0,0,.3);font-size:14.5px}
+.sttab td,.sttab th{text-align:center}.sttab td:first-child,.sttab th:first-child{text-align:left}.sttab .stchip{padding:3px 9px}
+@media print{.admform{page-break-after:always}}
+.bell{position:relative}.bell .badge{position:absolute;top:-6px;right:-6px;margin:0}
+.notes{min-width:340px;max-width:min(440px,92vw);max-height:70vh;overflow:auto}.note-i{padding:9px 12px;border-bottom:1px solid var(--line);font-size:13.5px}.note-i.new{background:var(--ambersoft)}.note-i[role=button]{cursor:pointer}.note-i:last-child{border:0}
 </style>
 </head>
 <body>
@@ -263,7 +267,7 @@ const STU_STATUS = ["On roll","Left","Transferred out","Passed out"];
 const DEFAULT_WAIT_ST = [{name:"Waiting",count:true},{name:"Test Taken",count:true},{name:"Granted",count:true},{name:"Not Responding",count:false},{name:"Admitted",count:false},{name:"Cancelled",count:false}];
 const DEFAULT_LABELS = { cl:"Cl", sec:"Sec", inc:"Inc Sec", auth:"Auth", str:"Current Str", g:"Girls", b:"Boys", sd:"Sur/ Dft", w:"Waiting List",
   pct:"% Fill", net:"Net", school:"School", total:"Total", gtotal:"G Total", in:"In", out:"Out", vac:"Vacant" };
-const DEFAULT_STAGES = [{name:"EYS",levels:["EYS-I","EYS-II","Pre-I"]},{name:"Primary",levels:["I","II","III"]},{name:"Middle",levels:["IV","V","VI","VII","VIII"]},{name:"Matric",levels:["IX","X"]},{name:"Inter",levels:["XI","XII"]}];
+const DEFAULT_STAGES = [{name:"EYS",levels:["EYS-I","EYS-II","Pre-I"]},{name:"Primary",levels:["I","II","III"]},{name:"Middle",levels:["IV","V","VI","VII","VIII"]},{name:"Matric",levels:["IX","X"]},{name:"Inter",levels:["XI","XII"]},{name:"O & A Level (APSIS)",levels:["IG-1","O-II","O-III","AS","A-II"]}];
 const PERIODS = { cutoff:"Since daily cutoff", today:"Today (since midnight)", yesterday:"Yesterday", "7d":"Last 7 days", month:"This month", session:"This session", custom:"Custom dates" };
 const DEFAULT_WA = [
   { id:"daily", name:"Daily strength (short)",
@@ -323,7 +327,7 @@ function toast(msg, err){ const t=$("#toast"); t.textContent=msg; t.className="t
 const S = { user:null, settings:{}, schools:{}, strength:{}, recentTx:[], transfers:[], waiting:[], users:[], snapshots:[],
             view:"dash", dashSchool:null, dashPeriod:null, open:new Set(), setupTab:"schools", setupSchool:null, logRows:null, ready:false,
             rcfg:null, rpid:null, rtab:"design", asOf:null, asOfCache:{}, stu:{}, waTpl:null, waPeriod:null, txCache:{}, imp:null,
-            idx:{}, daily:{}, tfrapps:[], dcare:{}, params:{}, navStack:[], sub:{} };
+            idx:{}, daily:{}, tfrapps:[], dcare:{}, reqs:[], params:{}, navStack:[], sub:{} };
 const me = () => S.user || {};
 const role = () => me().role;
 const isSA = () => role()==="superadmin";
@@ -354,9 +358,12 @@ const catGroupOf = c => (catGroups().find(g=>g.cats.includes(c))||{name:"Others"
 const stuFields = () => { const f=ST().studentFields?.length ? ST().studentFields : DEFAULT_STU_FIELDS; const have=new Set(f.map(x=>x.key)); return [...f, ...DEFAULT_STU_FIELDS.filter(x=>!have.has(x.key))]; };
 /* download / print permission: Super Admin always; otherwise the user's own setting, else the role default */
 const DL_ROLES = ["hq","viewer","principal","clerk"];
-function permOf(kind){ if(isSA()) return true; const u=me()[kind]; if(u==="yes") return true; if(u==="no") return false; const d=(ST().permDefaults||{})[role()]; return d ? d[kind]!==false : true; }
+const PERM_OFF = new Set(["sd"]);   // switched OFF unless the Super Admin allows it
+function permOf(kind){ if(isSA()) return true; const u=me()[kind]; if(u==="yes") return true; if(u==="no") return false; const d=(ST().permDefaults||{})[role()]; const v=d?.[kind]; return v===undefined ? !PERM_OFF.has(kind) : v!==false; }
 const canDL = () => permOf("dl"), canPR = () => permOf("pr"), canWA = () => permOf("wa"), canWD = () => permOf("wd");
-const PERMS = [["dl","Excel downloads"],["wd","Word downloads"],["pr","Print / PDF"],["wa","WhatsApp report"]];
+const canSD = () => permOf("sd");
+const PERMS = [["sd","Students' personal data (lists, biodata, forms)"],["dl","Excel downloads"],["wd","Word downloads"],["pr","Print / PDF"],["wa","WhatsApp report"]];
+const SD_MSG = "Downloading or printing students' personal details is not allowed for your account — ask the Super Admin.";
 const WD_MSG = "Word downloads are switched off for your account — ask the Super Admin.", DL_MSG = "Excel downloads are switched off for your account — ask the Super Admin.", PR_MSG = "Printing / PDF is switched off for your account — ask the Super Admin.";
 const waTemplates = () => ST().waTemplates?.length ? ST().waTemplates : DEFAULT_WA;
 const groupsList = () => [...new Set(schoolList().map(s=>s.grp||"APSACS"))];
@@ -381,7 +388,9 @@ function waitCount(code, cl){ if(S.asOf) return Number(((S.asOf.strength[code]||
 function catCounts(code, c){ const dc=(STR()[code]||{}).c||{}, o=c.cat||{}, p=c.cl+"|", r={};
   const keys=new Set([...Object.keys(o), ...Object.keys(dc).filter(k=>k.startsWith(p)).map(k=>k.slice(p.length))]);
   for(const k of keys){ const v=(Number(o[k])||0)+(dc[p+k]||0); if(v){ const ck=canonCat(k); r[ck]=(r[ck]||0)+v; if(!r[ck]) delete r[ck]; } } return r; }
-function lvlOf(c){ if(c.lvl) return c.lvl; let b=String(c.cl).replace(/\s*\(.*$/,"").trim().split(/\s+/)[0]; if(/^pre-?(1|i)$/i.test(b)) b="Pre-I"; return b; }
+/* other names for the same level: APSIS PG / Nur / KG = EYS-I / EYS-II / EYS-III (Pre-I) */
+const LVL_ALIAS = { pg:"EYS-I", playgroup:"EYS-I", nur:"EYS-II", nursery:"EYS-II", kg:"Pre-I", eysiii:"Pre-I", eys3:"Pre-I" };
+function lvlOf(c){ if(c.lvl) return c.lvl; let b=String(c.cl).replace(/\s*\(.*$/,"").trim().split(/\s+/)[0]; if(/^pre-?(1|i)$/i.test(b)) b="Pre-I"; return LVL_ALIAS[norm(b)] || b; }
 function classStats(code, c){
   const sc=SCH()[code]; let g=0,b=0,auth=0;
   const secs=c.secs.map(x=>{ const v=cur(code,c.cl,x.s); g+=v.g; b+=v.b; const a=secCap(sc,x); auth+=a; return {s:x.s,g:v.g,b:v.b,str:v.g+v.b,auth:a,sd:v.g+v.b-a}; });
@@ -492,7 +501,7 @@ function fsFail(e){ const msg=String(e?.message||e||""); if(!/INTERNAL ASSERTION
 addEventListener("unhandledrejection", e=>fsFail(e.reason)); addEventListener("error", e=>fsFail(e.error||e.message));
 setTimeout(()=>{ try{ sessionStorage.removeItem("apeis_fsfail"); }catch(x){} }, 10*60e3);
 /* every student write also updates that school's small search index (stuIdx/{school}.i.{id}) — 6 small documents instead of thousands of reads */
-const IDX_F = ["admNo","name","father","cl","sec","gender","cat","status","fatherCnic","contact","dob","bform","motherCnic","contact2"];
+const IDX_F = ["admNo","name","father","cl","sec","gender","cat","status","fatherCnic","contact","dob","bform","motherCnic","contact2","fatherRank","unit","serviceNo"];
 const idxArr = r => IDX_F.map(k=>String(r[k]??""));
 const idxObj = (id, school, a) => { const o={id,school}; IDX_F.forEach((k,i)=>o[k]=a[i]||""); return o; };
 function idxFind(id){ for(const [sc,m] of Object.entries(S.idx||{})) if(m[id]) return idxObj(id,sc,m[id]); return null; }
@@ -526,7 +535,7 @@ const Local = {
   load(){ try{ this.st = JSON.parse(localStorage.getItem(this.KEY)); }catch(e){ this.st=null; } if(!this.st) this.seed(); },
   save(){ try{ localStorage.setItem(this.KEY, JSON.stringify(this.st)); }catch(e){} },
   seed(){
-    const st = { meta:{setup:{at:Date.now()}}, settings:{ app:defaultSettings() }, schools:{}, strength:{}, transactions:{}, transfers:{}, waiting:{}, users:{}, snapshots:{}, students:{}, sessions:{}, stuIdx:{}, daily:{}, tfrapps:{}, dcare:{}, feeRet:{}, edits:{} };
+    const st = { meta:{setup:{at:Date.now()}}, settings:{ app:defaultSettings() }, schools:{}, strength:{}, transactions:{}, transfers:{}, waiting:{}, users:{}, snapshots:{}, students:{}, sessions:{}, requests:{}, stuIdx:{}, daily:{}, tfrapps:{}, dcare:{}, feeRet:{}, edits:{} };
     for (const sc of buildSeed()){ const w=sc._w; delete sc._w; st.schools[sc.code]=sc; st.strength[sc.code]={d:{},w,c:{}}; }
     const U = [["sa","Super Admin (you)","superadmin","ALL"],["hq","DQ Office","hq","ALL"],["sr","Comdt (Senior)","viewer","ALL"],["pr-gaps","Principal GAPS","principal","GAPS"],
       ["c-jm","Clerk JM","clerk","JM"],["c-mid","Clerk MidWsk","clerk","MidWsk"],["c-gaps","Clerk GAPS","clerk","GAPS"],["c-gc","Clerk GC","clerk","GC"],["c-bc","Clerk BC","clerk","BC"],["c-apsis","Clerk APSIS","clerk","APSIS"]];
@@ -546,6 +555,7 @@ const Local = {
     S.daily = Object.fromEntries(V("daily").map(d=>[d.id,d.s||{}]));
     S.tfrapps = V("tfrapps").filter(t=>!t.deleted).map(t=>({...t, atMs:toMs(t.at)}));
     S.dcare = Object.fromEntries(V("dcare").map(d=>[d.id,d]));
+    S.reqs = V("requests").filter(r=>r.day>=isoDay(Date.now()-3*864e5)).map(r=>({...r, atMs:toMs(r.at)}));
   },
   async start(){ this.load(); this.pull(); let uid=null; try{ uid=localStorage.getItem(this.KEY+"_who"); }catch(e){}
     S.user = uid && this.st.users[uid] ? this.st.users[uid] : null; S.ready=true; boot(); if(S.user) ensureSnapshot(); },
@@ -555,7 +565,7 @@ const Local = {
     addIdxOps(ops); patchStuCache(ops); const st=this.st, now=Date.now(), fx=v=>v===TS?now:v, fix = o => Object.fromEntries(Object.entries(o).map(([k,v])=>[k, fx(v)]));
     for (const x of ops.set){ st[x.col] ||= {}; if(x.col==="settings"&&x.id==="app"&&!x.merge){ st.settings.app=fix(x.data); continue; }
       st[x.col][x.id] = x.merge==="deep" ? deepMerge(st[x.col][x.id], x.data, fx) : x.merge ? {...(st[x.col][x.id]||{}), ...fix(x.data)} : fix(x.data); }
-    for (const x of ops.upd){ if(!st[x.col]?.[x.id]) throw new Error("Record not found"); Object.assign(st[x.col][x.id], fix(x.data)); }
+    for (const x of ops.upd){ if(!st[x.col]?.[x.id]) throw new Error("Record not found"); const d=fix(x.data); for(const [k,v] of Object.entries(d)){ if(v===DEL) delete st[x.col][x.id][k]; else st[x.col][x.id][k]=v; } }
     for (const x of ops.inc){ const sd=(st.strength[x.school] ||= {d:{},w:{},c:{}}); const d=(sd[x.f||"d"] ||= {}); d[x.key]=(d[x.key]||0)+x.n; if(!d[x.key]) delete d[x.key]; }
     for (const x of (ops.del||[])){ if(st[x.col]) delete st[x.col][x.id]; }
     for (const x of (ops.wait||[])){ const w=(st.strength[x.school] ||= {d:{},w:{}}).w ||= {}; w[x.cl]=x.n; }
@@ -564,6 +574,7 @@ const Local = {
   },
   async fetchTx(from,to){ return Object.entries(this.st.transactions).map(([id,t])=>({id,...t, atMs:toMs(t.at)})).filter(t=>t.atMs>=from&&t.atMs<=to).sort((a,b)=>b.atMs-a.atMs); },
   async allDocs(c){ return clone(Object.entries(this.st[c]||{}).map(([id,v])=>({id,...v}))); },
+  async countTx(code){ return Object.values(this.st.transactions||{}).filter(t=>t.school===code&&t.status==="ok").length; },
   async getDoc(c, id){ const v=this.st[c]?.[id]; return v ? clone({id,...v}) : null; },
   async query(c, field, op, val){ return (await this.allDocs(c)).filter(d=> op==="==" ? d[field]===val : op===">=" ? d[field]>=val : op==="<=" ? d[field]<=val : true); },
   async reload(){ this.load(); this.pull(); SYNC.last=Date.now(); syncPaint(); refresh(); },
@@ -599,7 +610,8 @@ const Fire = {
       const p = ps.data(); S.user = { ...p, uid:u.uid, email:u.email };
       if(!p.active){ S.user.inactive=true; S.ready=true; boot(); return; }
       await this.listen(); S.ready=true; if(!location.hash) S.view=homeView(); boot(); ensureSnapshot();
-      if(isSA() && !ST().idxBuilt) setTimeout(async()=>{ try{ if(!Object.keys(S.idx||{}).length){ await rebuildIdx(); } await saveSettings({idxBuilt:true},"Student search is ready."); }catch(e){ console.warn(e); } }, 4000);
+      setTimeout(()=>migrate().catch(e=>console.warn(e)),3000);
+      if(isSA() && !ST().idxV2) setTimeout(async()=>{ try{ await rebuildIdx(); await saveSettings({idxBuilt:true,idxV2:true},"Student search is ready (now also by rank, unit and service number)."); }catch(e){ console.warn(e); } }, 4000);
     }catch(e){ S.user={ uid:u.uid, email:u.email, error:e.message }; S.ready=true; boot(); }
   },
   listen(){
@@ -620,6 +632,7 @@ const Fire = {
     if(canSeeStudents()) on(m.collection(db,"stuIdx"), q=>{ S.idx=Object.fromEntries(q.docs.map(d=>[d.id,d.data().i||{}])); refresh(); });
     on(m.query(m.collection(db,"daily"), m.where("day",">=", isoDay(Date.now()-10*864e5))), q=>{ S.daily=Object.fromEntries(q.docs.map(d=>[d.id,d.data().s||{}])); refresh(); });
     on(m.collection(db,"tfrapps"), q=>{ S.tfrapps=q.docs.map(d=>{const x=data(d); x.atMs=toMs(x.at); return x;}).filter(t=>!t.deleted); refresh(); });
+    if(role()!=="viewer") on(m.query(m.collection(db,"requests"), m.where("day",">=", isoDay(Date.now()-3*864e5))), q=>{ S.reqs=q.docs.map(d=>{const x=data(d); x.atMs=toMs(x.at); return x;}); refresh(); });
     on(m.collection(db,"dcare"), q=>{ S.dcare=Object.fromEntries(q.docs.map(d=>[d.id,data(d)])); refresh(); });
     return Promise.race([ready, sleep(9000)]);
   },
@@ -652,6 +665,7 @@ const Fire = {
     return (await m.getDocs(q)).docs.map(d=>{ const x={id:d.id,...d.data()}; x.atMs=toMs(x.at); return x; });
   },
   async allDocs(c){ return (await this.m.getDocs(this.m.collection(this.db,c))).docs.map(d=>({id:d.id,...d.data()})); },
+  async countTx(code){ const m=this.m; const s=await m.getCountFromServer(m.query(m.collection(this.db,"transactions"), m.where("school","==",code), m.where("status","==","ok"))); return s.data().count; },
   async getDoc(c, id){ const m=this.m, d=await m.getDoc(m.doc(this.db,c,id)); return d.exists() ? {id:d.id,...d.data()} : null; },
   async query(c, field, op, val){ const m=this.m; return (await m.getDocs(m.query(m.collection(this.db,c), m.where(field,op,val)))).docs.map(d=>{ const x={id:d.id,...d.data()}; if(x.at) x.atMs=toMs(x.at); return x; }); },
   /* ask the SERVER (not this device's saved copy) for the latest figures; fails if the server cannot be reached */
@@ -758,6 +772,7 @@ function boot(){
     <small>Session ${h(session())} · ${DEMO?"Demo mode (this browser only)":"Live (Firebase)"}</small></div></div>
     <div class="who"><span class="sync" id="syncDot"></span>${DEMO?`<span class="chip demo">DEMO</span>`:""}
     <button class="btn s" data-act="reload" title="Fetch the latest figures again">⟳ Refresh</button>
+    ${role()!=="viewer"?`<div class="umenu"><button class="btn s bell" data-act="bell" title="Notifications">🔔<span class="badge" id="bellN" hidden></span></button><div class="umenu-list notes" id="bellList" hidden></div></div>`:""}
     <div class="umenu"><button class="btn s ubtn" data-act="menuToggle" aria-haspopup="true" aria-expanded="false" title="Your account">☰ <span>${whoLabel()}</span></button>
       <div class="umenu-list" id="umenu" hidden role="menu">
         <div class="umenu-who">${h(me().name||"")}<small>${h(ROLES[role()]||"")}${mySchool()?" · "+h(mySchool()):""}</small></div>
@@ -767,7 +782,7 @@ function boot(){
     ${canSeeStudents()?`<div class="gsearch combo"><input id="gq" placeholder="🔍 Search students in all schools — name, Adm No, class (e.g. 9a), father CNIC, phone…  (press /)" autocomplete="off" aria-label="Search students"><div class="combo-list" id="gqList" hidden></div></div>`:""}</div>
   <nav id="nav"></nav><main id="main"></main>`;
   document.documentElement.style.setProperty("--bandH", $("#band").offsetHeight+"px");
-  wireGlobalSearch(); syncPaint();
+  wireGlobalSearch(); syncPaint(); bellPaint();
   renderView();
 }
 function navHtml(){
@@ -795,7 +810,7 @@ function refresh(){
   if(rq) return; rq=true;
   requestAnimationFrame(()=>{ rq=false;
     if(!S.user || S.user.pending || !$("#main")){ if(S.user && !S.user.pending && !$("#main")) boot(); return; }
-    $("#nav").innerHTML=navHtml();
+    $("#nav").innerHTML=navHtml(); bellPaint();
     const V=VIEWS[S.view]; for (const id of Object.keys(V.regions||{})) fillRegion(id,false);
     V.live && V.live();
   });
@@ -808,7 +823,9 @@ document.addEventListener("keydown", e=>{ if(e.altKey && e.key==="ArrowLeft" && 
 function topBars(){ requestAnimationFrame(()=>{ for(const sc of $$("main .scroll, .modal .scroll")){
   let bar=sc.previousElementSibling; if(!bar || !bar.classList.contains("tsb")){ bar=document.createElement("div"); bar.className="tsb"; bar.innerHTML="<div></div>"; sc.before(bar);
     let lock=false; bar.addEventListener("scroll",()=>{ if(lock){ lock=false; return; } lock=true; sc.scrollLeft=bar.scrollLeft; }); sc.addEventListener("scroll",()=>{ if(lock){ lock=false; return; } lock=true; bar.scrollLeft=sc.scrollLeft; }); }
+  if(!sc.dataset.io){ sc.dataset.io=1; tsbIO.observe(sc); }
   bar.firstChild.style.width=sc.scrollWidth+"px"; bar.hidden = sc.scrollWidth <= sc.clientWidth+2; bar.scrollLeft=sc.scrollLeft; } }); }
+const tsbIO = new IntersectionObserver(es=>{ for(const e of es){ const bar=e.target.previousElementSibling; if(bar?.classList.contains("tsb")) bar.style.visibility=e.isIntersecting?"":"hidden"; } });
 addEventListener("resize",()=>topBars());
 
 /* ---------- theme: colour scheme, light/dark, text size — per person (this device); Super Admin sets the default ---------- */
@@ -861,7 +878,7 @@ VIEWS.dash = {
     <div class="panel"><div class="ph"><h2>Consolidated class-wise</h2><select class="in" style="width:auto" data-chg="liveCons">${["ALL",...groupsList()].map(g=>`<option ${consSel()===g?"selected":""} value="${h(g)}">${g==="ALL"?"All schools":"All "+h(g)}</option>`).join("")}</select></div><div class="scroll" id="dCons"></div></div>`,
   regions:{
     dKpi:()=>kpiHtml(schoolList().map(s=>s.code), periodWin(dashPeriod()), S.recentTx, dashPeriod()),
-    dStatus:()=>statusStrip(),
+    dStatus:()=>entryPanel(),
     dSum(){ const w=periodWin(dashPeriod()); const all=schoolList().map(s=>schoolStats(s.code,w)); const cols=["n","auth","str","g","b","sd","wait","net"];
       let body=""; for(const g of groupsList()){ const Lg=all.filter(s=>s.grp===g); body+=Lg.map(s=>statRow(`<b>${h(s.code)}</b> <span class="mute">${h(s.name)}</span>`,s,cols,"click"+(s.code===dashCode()?" sel":""),`data-act="dashSchool" data-id="${h(s.code)}"`,{school:s.code})).join(""); if(groupsList().length>1&&Lg.length>1) body+=statRow(`${h(L("total"))} ${h(g)}`,addUp(Lg),cols,"sub","",{grp:g}); }
       return `<table>${headRow(L("school"),cols)}<tbody>${body}${statRow(h(L("gtotal")),addUp(all),cols,"tot","",{all:"1"})}</tbody></table>`; },
@@ -954,7 +971,7 @@ VIEWS.entry = {
         <label class="btn">2. Choose filled file <input type="file" accept=".xlsx,.xls,.csv" data-chg="impEntries" hidden></label></div>
         <p class="hint">The template has every field plus a "Valid values" sheet listing this school's classes, sections, actions and categories. Every row is checked before anything is saved.</p>
         <div id="eImp"></div></details></div>
-      <div class="panel"><div class="ph"><h2>Recent entries — ${h(code)} (last 7 days)</h2><span class="hint" style="margin:0">${isSA()?"Super Admin can void any entry here or in Log.":"You can undo your own entry within 15 minutes."}</span></div><div class="scroll" id="eRecent"></div></div>`; },
+      <div class="panel"><div class="ph"><h2>Recent entries — ${h(code)} (last 7 days)</h2><span class="hint" style="margin:0">${isSA()?"Super Admin can void any entry here or in Log.":`You can undo your own entry within ${voidMinutes()} minutes.`}</span></div><div class="scroll" id="eRecent"></div></div>`; },
   regions:{
     eCls(){ const code=entrySchool(), cl=$("#fCS")?.dataset.cl; if(!code||!cl) return `<div class="empty">Pick a class – section to see its live strength.</div>`;
       const c=S.schools[code].classes.find(x=>x.cl===cl); if(!c) return ""; const st=classStats(code,c);
@@ -963,7 +980,7 @@ VIEWS.entry = {
       return `<table><tr><th>${h(L("cl"))}</th><th class="n">Typed count</th><th class="n">+ named</th><th class="n">${h(L("w"))}</th></tr>${sc.classes.map(c=>{ const m=manualWait(code,c.cl), t=waitCount(code,c.cl);
         return `<tr><td>${h(c.cl)}</td><td class="n"><input class="in num" type="number" min="0" data-wc="${h(c.cl)}" value="${m}"></td><td class="n">${t-m||""}</td><td class="n"><b>${t}</b></td></tr>`; }).join("")}<tr class="tot"><td>${h(L("total"))}</td><td></td><td></td><td class="n">${sc.classes.reduce((a,c)=>a+waitCount(code,c.cl),0)}</td></tr></table>`; },
     eImp(){ return impPreviewHtml(); },
-    eStat(){ return myStatusBar(entrySchool()); },
+    eStat(){ return myStatusBar2(entrySchool()); },
     eRecent(){ return txTable(S.recentTx.filter(t=>t.school===entrySchool()).slice(0,60), true); }
   },
   after(){ wireCombo(); entryToggle(); $("#fCS")?.focus(); ensureStu(entrySchool()).catch(()=>{}); }
@@ -981,11 +998,11 @@ function entryAdmLookup(){
 const tTime = t => t.effMs || t.atMs;
 function txLabel(t){ const d=AD(t.action); const cls=d>0?"t-in":d<0?"t-out":"t-mid"; return `<span class="tag ${cls}">${h(AL(t.action))}</span>`; }
 function canVoid(t){ if(t.status!=="ok" || (t.action==="APEI_OUT" && t.tfrId)) return false; if(isSA()) return true;
-  return role()==="clerk" && t.by===me().uid && !t.tfrId && Date.now()-t.atMs < 15*60e3; }
+  return role()==="clerk" && t.by===me().uid && !t.tfrId && Date.now()-t.atMs < voidMinutes()*60e3; }
 function txTable(rows, actions){
   if(!rows.length) return `<div class="empty">No entries.</div>`;
   return `<table><tr><th>Date</th><th>Entered</th><th>School</th><th>Action</th><th>Class – Sec</th><th>Student</th><th>Father</th><th>G</th><th>Category</th><th>Adm No</th><th>By</th><th>Remarks</th>${actions?"<th></th>":""}</tr>${rows.map(t=>`
-    <tr class="${t.status==="void"?"void":""}"><td>${fmtD(tTime(t))}</td><td class="mute">${fmtDT(t.atMs)}</td><td>${h(t.school)}</td><td>${txLabel(t)}</td><td>${h(t.cl)} - ${h(t.sec)}${t.toSec?` → ${h(t.toSec)}`:""}${t.toSchool?` → ${h(t.toSchool==="__other"?t.ext:t.toSchool)}`:""}${t.fromSchool?` ← ${h(t.fromSchool)}`:""}${t.action==="APEI_IN"&&t.ext?` ← ${h(t.ext)}`:""}</td>
+    <tr class="click ${t.status==="void"?"void":""}" data-act="openTx" data-id="${h(t.id)}" title="Open this student's record"><td>${fmtD(tTime(t))}</td><td class="mute">${fmtDT(t.atMs)}</td><td>${h(t.school)}</td><td>${txLabel(t)}</td><td>${h(t.cl)} - ${h(t.sec)}${t.toSec?` → ${h(t.toSec)}`:""}${t.toSchool?` → ${h(t.toSchool==="__other"?t.ext:t.toSchool)}`:""}${t.fromSchool?` ← ${h(t.fromSchool)}`:""}${t.action==="APEI_IN"&&t.ext?` ← ${h(t.ext)}`:""}</td>
     <td>${h(t.name)}</td><td>${h(t.father)}</td><td>${t.gender==="g"?"G":"B"}</td><td>${h(t.cat)}</td><td>${h(t.admNo)}</td><td>${h(t.byName)}</td><td>${h(t.remarks)}${t.status==="void"?` <span class="tag t-out">void${t.voidReason?": "+h(t.voidReason):""}</span>`:""}</td>
     ${actions?`<td>${canVoid(t)?`<button class="btn s r" data-act="voidTx" data-id="${h(t.id)}">${isSA()?"Void":"Undo"}</button>`:""}</td>`:""}</tr>`).join("")}</table>`;
 }
@@ -1033,6 +1050,7 @@ function buildTxOps(ops, tx){   // shared by fast entry and Excel import
 async function saveEntry(){
   const code=entrySchool(), inp=$("#fCS"), a=$("#fAct").value, k=actDef(a).kind;
   if(!inp.dataset.cl){ toast("Pick a valid Class – Section from the list.",true); inp.focus(); return; }
+  if(isLocked(code)){ toast(LOCK_MSG,true); return; }
   const gender=$("#fGen").value; if(!gender){ toast("Select gender (B / G).",true); $("#fGen").focus(); return; }
   const tx={ school:code, action:a, cl:inp.dataset.cl, sec:inp.dataset.s, gender, cat:$("#fCat").value, name:$("#fName").value.trim(), father:$("#fFather").value.trim(),
     dob:parseDob($("#fDob").value), admNo:$("#fAdm").value.trim(), remarks:$("#fRem").value.trim(), eff:$("#fDate").value };
@@ -1136,7 +1154,7 @@ const logTab = () => ["edits","acc"].includes(S.params.tab) ? S.params.tab : "tx
 const userOpts = sel => [...S.users].filter(u=>u.role!=="superadmin").sort((a,b)=>(a.school+a.name).localeCompare(b.school+b.name)).map(u=>`<option value="${h(u.uid)}" ${sel===u.uid?"selected":""}>${h(u.name)} — ${h(ROLES[u.role]||u.role)}${u.school!=="ALL"?" "+h(u.school):""}</option>`).join("");
 VIEWS.log = {
   shell(){ const p=S.params, t=logTab(), from=p.from||isoDay(Date.now()-6*864e5), to=p.to||isoDay(Date.now());
-    const tabs=`<div class="subtabs">${[["tx","Entries"],["edits","Student record edits"],["acc","Activity by account"]].map(([k,l])=>`<button class="pill ${t===k?"on":""}" data-act="setP" data-p="tab=${k}">${l}</button>`).join("")}</div>`;
+    const tabs=`<div class="subtabs">${[["tx","Entries (admissions, withdrawals, transfers)"],["edits","Changes to student records"],["acc","Activity by account"]].map(([k,l])=>`<button class="pill ${t===k?"on":""}" data-act="setP" data-p="tab=${k}">${l}</button>`).join("")}</div>`;
     return tabs+`<div class="panel"><form data-form="log" class="grid">
     <div class="f"><label for="lgFrom">From</label><input id="lgFrom" type="date" value="${h(from)}"></div>
     <div class="f"><label for="lgTo">To</label><input id="lgTo" type="date" value="${h(to)}"></div>
@@ -1149,7 +1167,7 @@ VIEWS.log = {
     <div class="panel"><div class="scroll" id="lgRows"></div></div>`; },
   regions:{ lgRows(){ const t=logTab();
     if(t==="edits"){ if(!S.editRows) return `<div class="empty">Loading…</div>`; const r=S.editRows; if(!r.length) return `<div class="empty">No student records were edited in these dates.</div>`;
-      return `<p class="hint" style="margin-top:0">${r.length} edits. Every change made to a student's record (by anyone) is listed with the old and new value.</p><table><tr><th>When</th><th>School</th><th>Student</th><th>By</th><th>Field</th><th>From</th><th>To</th></tr>${r.flatMap(e=>(e.changes||[]).map((c,i)=>`<tr><td>${i?"":fmtDT(toMs(e.at))}</td><td>${i?"":h(e.school)}</td><td>${i?"":`<span class="dn" data-act="openStu" data-id="${h(e.stuId)}">${h(e.stuName)}</span>`}</td><td>${i?"":h(e.byName)+` <span class="mute">${h(ROLES[e.role]||"")}</span>`}</td><td>${h(c.l||c.k)}</td><td class="mute">${h(c.from)}</td><td><b>${h(c.to)}</b></td></tr>`)).join("")}</table>`; }
+      const rv=revertedIds(r); return `<p class="hint" style="margin-top:0">${r.length} changes. Every change made to any student's record (by anyone) is listed with the old and new value; click a name to open the record.${canUndoEdits(mySchool())||isSA()?" Undo puts the old values back (and is itself logged).":""}</p><table><tr><th>When</th><th>School</th><th>Student</th><th>By</th><th>Field</th><th>From</th><th>To</th><th></th></tr>${r.flatMap(e=>(e.changes||[]).map((c,i)=>`<tr class="${rv.has(e.id)?"void":""}"><td>${i?"":fmtDT(toMs(e.at))}</td><td>${i?"":h(e.school)}</td><td>${i?"":`<span class="dn" data-act="openStu" data-id="${h(e.stuId)}">${h(e.stuName)}</span>`}</td><td>${i?"":h(e.byName)+` <span class="mute">${h(ROLES[e.role]||"")}</span>`}${!i&&e.revertOf?` <span class="tag t-mid">undo</span>`:""}</td><td>${h(c.l||c.k)}</td><td class="mute">${h(c.from)}</td><td><b>${h(c.to)}</b></td><td>${!i&&canUndoEdits(e.school)&&!e.revertOf&&!rv.has(e.id)?`<button class="btn s r" data-act="revertEdit" data-id="${h(e.id)}">Undo</button>`:!i&&rv.has(e.id)?`<span class="tag t-out">undone</span>`:""}</td></tr>`)).join("")}</table>`; }
     if(t==="acc"){ if(!S.logRows||!S.editRows) return `<div class="empty">Loading…</div>`; return screenTable(accountsModel()); }
     if(!S.logRows) return `<div class="empty">Loading…</div>`; const r=logFiltered();
     return `<p class="hint" style="margin-top:0">${r.length} entries · ${r.filter(t=>t.status==="void").length} voided</p>`+txTable(r,true); } },
@@ -1208,14 +1226,17 @@ function findRows(p){
   return sortStu(idxAll().filter(r=>(!school||r.school===school) && (!grpCodes||grpCodes.includes(r.school)) && (!p.cl||r.cl===p.cl) && (!lvl||lvlOf({cl:r.cl})===lvl) && (!sec||r.sec===sec)
     && (!g||r.gender===g) && (!cat||canonCat(r.cat)===cat) && (!st||r.status===st)
     && q.num.every(d=>[r.admNo,r.fatherCnic,r.motherCnic,r.contact,r.bform].some(v=>digits(v).includes(d)||norm(v).includes(d)))
-    && q.text.every(t=>norm(r.name+" "+r.father+" "+r.admNo).includes(t)))); }
+    && q.text.every(t=>norm(r.name+" "+r.father+" "+r.admNo+" "+r.fatherRank+" "+r.unit+" "+r.serviceNo).includes(t)))); }
+/* best matches first: words that START with what was typed ("Lt" → Lt, Lt Col, Lt Gen before "Altaf") */
+function rankRows(rows, q){ const T=parseQ(q).text; if(!T.length) return rows; const words=r=>(r.name+" "+r.father+" "+r.fatherRank+" "+r.unit).toLowerCase().split(/[^a-z0-9]+/);
+  const sc=r=>{ const W=words(r); return T.reduce((a,t)=>a+(W.some(w=>w===t)?3:W.some(w=>w.startsWith(t))?2:1),0); }; return rows.map(r=>[sc(r),r]).sort((a,b)=>b[0]-a[0]).map(x=>x[1]); }
 
 /* ---------- the search box in the blue band ---------- */
 function wireGlobalSearch(){
   const inp=$("#gq"), list=$("#gqList"); if(!inp) return; let items=[], hi=-1;
-  const draw=()=>{ list.innerHTML=items.map((r,i)=>`<div class="${i===hi?"hi":""}" data-i="${i}"><b>${h(r.name)}${r.status!=="On roll"?` <span class="tag t-out">${h(r.status)}</span>`:""}</b><small>s/o ${h(r.father||"—")} · ${h(r.school)} ${h(r.cl)}-${h(r.sec)} · Adm ${h(r.admNo||"—")}</small></div>`).join("")
+  const draw=()=>{ list.innerHTML=items.map((r,i)=>`<div class="${i===hi?"hi":""}" data-i="${i}"><b>${h(r.name)}${r.status!=="On roll"?` <span class="tag t-out">${h(r.status)}</span>`:""}</b><small>${r.gender==="g"?"d/o":"s/o"} ${h(r.father||"—")}${r.fatherRank?` (${h(r.fatherRank)})`:""} · ${h(r.school)} ${h(r.cl)}-${h(r.sec)} · Adm ${h(r.admNo||"—")}</small></div>`).join("")
       +(inp.value.trim()?`<div data-i="all" class="${hi===items.length?"hi":""}"><b>Show all results for “${h(inp.value.trim())}” ↵</b><small>${items.length?"":"No quick match — press Enter to search with filters"}</small></div>`:""); list.hidden=!inp.value.trim(); };
-  inp.addEventListener("input",()=>{ clearTimeout(S.gqT); S.gqT=setTimeout(()=>{ items=inp.value.trim()?findRows({q:inp.value}).slice(0,8):[]; hi=-1; draw(); },120); });
+  inp.addEventListener("input",()=>{ clearTimeout(S.gqT); S.gqT=setTimeout(()=>{ items=inp.value.trim()?rankRows(findRows({q:inp.value}),inp.value).slice(0,8):[]; hi=-1; draw(); },120); });
   inp.addEventListener("keydown",e=>{ if(e.key==="ArrowDown"){ hi=Math.min(hi+1,items.length); draw(); e.preventDefault(); } else if(e.key==="ArrowUp"){ hi=Math.max(hi-1,-1); draw(); e.preventDefault(); }
     else if(e.key==="Enter"){ e.preventDefault(); const r=items[hi]; list.hidden=true; if(r) go("student",{id:r.id}); else if(inp.value.trim()) go("find",{q:inp.value.trim()}); inp.blur(); }
     else if(e.key==="Escape"){ list.hidden=true; inp.blur(); } });
@@ -1230,8 +1251,8 @@ const FIND_KEYS = {school:"School", grp:"Group", cl:"Class", lvl:"Class", sec:"S
 function findLabel(k,v){ if(k==="g") return v==="g"?"Girls":"Boys"; if(k==="cat") return catLabel(v); if(k==="school") return `${v} — ${S.schools[v]?.name||""}`; return v; }
 VIEWS.find = {
   shell(){ const p=S.params;
-    return `<div class="panel"><div class="ph"><h2>Students${p.q?` matching “${h(p.q)}”`:""}</h2><div class="pills">${expBar("find")}</div></div>
-      <div class="grid"><div class="f wide" style="grid-column:span 2"><label for="fq">Search — name, father, Adm No, CNIC, phone, class (9a, eys1, pre-i b), school code, girls/boys, #5 (category 5), left</label><input id="fq" value="${h(p.q||"")}" data-chg="findQ" placeholder="type and press Enter"></div>
+    return `<div class="panel"><div class="ph"><h2>Students${p.q?` matching “${h(p.q)}”`:""}</h2><div class="pills">${expBar("find")}${formBar("find")}</div></div>
+      <div class="grid"><div class="f wide" style="grid-column:span 2"><label for="fq">Search — name, father, rank (Lt, Maj…), Adm No, CNIC, phone, class (9a, eys1, pre-i b), school code, girls/boys, #5 (category 5), left</label><input id="fq" value="${h(p.q||"")}" data-chg="findQ" data-live="find" placeholder="results update as you type"></div>
         <div class="f"><label for="fSch">School</label><select id="fSch" data-chg="findP" data-k="school"><option value="">All schools</option>${schoolList().map(s=>`<option ${p.school===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select></div>
         <div class="f"><label for="fSt">Status</label><select id="fSt" data-chg="findP" data-k="st"><option value="">Any status</option>${STU_STATUS.map(x=>`<option ${p.st===x?"selected":""}>${x}</option>`).join("")}</select></div>
         <div class="f"><label for="fCat">Category</label><select id="fCat" data-chg="findP" data-k="cat">${catOptions(p.cat,"All categories")}</select></div>
@@ -1245,11 +1266,11 @@ VIEWS.find = {
       for(const c of codes) for(const cl of S.schools[c].classes){ if(p.cl&&cl.cl!==p.cl) continue; if(p.lvl&&lvlOf(cl)!==p.lvl) continue; const st=classStats(c,cl); if(p.sec){ const x=st.secs.find(z=>z.s===p.sec); if(x) str+=p.g?x[p.g]:x.str; } else str+=p.g?st[p.g]:st.str; }
       const n=findRows({...p,st:p.st||"On roll"}).length; if(n>=str) return "";
       return `<div class="note">Strength figure for this selection is <b>${nf(str)}</b>; <b>${nf(n)}</b> of these students are in the data bank so far. The rest appear here as each school fills its register (Students → Import Excel).</div>`; },
-    fList(){ const R=findRows(S.params); S.findRows=R; if(!idxAll().length) return `<div class="empty">The student data bank is empty so far. Schools add students in Students → Register (one by one or Excel import); every new admission is added automatically.</div>`;
+    fList(){ const R=S.params.q?rankRows(findRows(S.params),S.params.q):findRows(S.params); S.findRows=R; if(!idxAll().length) return `<div class="empty">The student data bank is empty so far. Schools add students in Students → Register (one by one or Excel import); every new admission is added automatically.</div>`;
       if(!R.length) return `<div class="empty">No student matches. Try fewer words, or remove a filter above.</div>`;
       const all=S.params.cols==="all", lim=S.findLim||300;
-      return `<p class="hint" style="margin-top:0">${nf(R.length)} student${R.length===1?"":"s"} — click a row to open the full record${R.length>lim?` · showing first ${lim}`:""}.</p><table><tr><th>#</th><th>School</th><th>Class – Sec</th><th>Adm No</th><th>Name</th><th>Father</th><th>G</th><th>Category</th>${all?"<th>Father CNIC</th><th>DOB</th><th>B-Form</th>":""}<th>Contact</th><th>Status</th></tr>
-        ${R.slice(0,lim).map((r,i)=>`<tr class="click" data-act="openStu" data-id="${h(r.id)}"><td class="mute">${i+1}</td><td>${h(r.school)}</td><td>${h(r.cl)} - ${h(r.sec)}</td><td>${h(r.admNo)}</td><td><b>${h(r.name)}</b></td><td>${h(r.father)}</td><td>${gTxt(r.gender)}</td><td>${h(catLabel(r.cat))}</td>${all?`<td>${h(fmtCnic(r.fatherCnic))}</td><td>${h(isoToDmy(r.dob))}</td><td>${h(r.bform)}</td>`:""}<td>${h(r.contact)}</td><td>${r.status==="On roll"?"On roll":`<span class="tag t-out">${h(r.status)}</span>`}</td></tr>`).join("")}</table>
+      return `<p class="hint" style="margin-top:0">${nf(R.length)} student${R.length===1?"":"s"} — click a row to open the full record${R.length>lim?` · showing first ${lim}`:""}.</p><table><tr><th>#</th><th>School</th><th>Class – Sec</th><th>Adm No</th><th>Name</th><th>Father</th><th>G</th><th>Category</th>${all?"<th>Rank / Appt</th><th>Father CNIC</th><th>DOB</th><th>B-Form</th>":""}<th>Contact</th><th>Status</th></tr>
+        ${R.slice(0,lim).map((r,i)=>`<tr class="click" data-act="openStu" data-id="${h(r.id)}"><td class="mute">${i+1}</td><td>${h(r.school)}</td><td>${h(r.cl)} - ${h(r.sec)}</td><td>${h(r.admNo)}</td><td><b>${h(r.name)}</b></td><td>${r.father?`<span class="dn" data-act="go" data-id="find" data-p="${h(qs({q:r.father}))}" title="All children of this father">${h(r.father)}</span>`:""}</td><td>${gTxt(r.gender)}</td><td>${h(catLabel(r.cat))}</td>${all?`<td>${h(r.fatherRank)}</td><td>${h(fmtCnic(r.fatherCnic))}</td><td>${h(isoToDmy(r.dob))}</td><td>${h(r.bform)}</td>`:""}<td>${h(r.contact)}</td><td>${r.status==="On roll"?"On roll":`<span class="tag t-out">${h(r.status)}</span>`}</td></tr>`).join("")}</table>
         ${R.length>lim?`<div class="row" style="justify-content:flex-start"><button class="btn" data-act="findMore">Show all ${nf(R.length)}</button></div>`:""}`; }
   },
   after(){ S.findLim=300; }
@@ -1331,7 +1352,7 @@ function stuPageHtml(){ const sp=S.sp; if(!sp) return ""; if(sp.err) return `<di
   const editBtn = !may||sp.isNew ? "" : ed ? `<span class="tag t-mid">Editing — changes are logged</span>` : direct ? `<button class="btn" data-act="stuEditOn">✎ Edit</button>` : `<button class="btn" data-act="stuEditHint" data-dbl="stuEdit" title="Double-click to edit">✎ Edit (double-click)</button>`;
   return `<div class="panel ${ed?"editing":""}"><div class="sp-head"><div><h2>${sp.isNew?"Add a student to the data bank":h(r.name)}</h2>
       <div class="sub">${h(code)} — ${h(sc?.name||"")} · ${h(r.cl)}-${h(r.sec)} · ${r.status==="On roll"?"On roll":`<span class="tag t-out">${h(r.status)}</span>`}${r.admNo?` · Adm ${h(r.admNo)}`:""}${r.cat?` · ${h(catLabel(r.cat))}`:""}${fee?` · Monthly fee Rs ${nf(fee)}`:""}</div></div>
-      <div class="pills"><button class="btn" data-act="back">← Back</button>${editBtn}${!sp.isNew?expBar("stuOne"):""}${!sp.isNew&&isSA()?`<button class="btn r" data-act="stuDel" data-id="${h(r.id)}">Delete</button>`:""}</div></div>
+      <div class="pills"><button class="btn" data-act="back">← Back</button>${editBtn}${!sp.isNew?expBar("stuOne")+formBar("one"):""}${!sp.isNew&&isSA()?`<button class="btn r" data-act="stuDel" data-id="${h(r.id)}">Delete</button>`:""}</div></div>
     ${sp.isNew?`<div class="note" style="margin-top:10px">Use this for students already on roll. A <b>new admission</b> should be entered on the Entry tab — that adds the student to strength and creates the record by itself.</div>`:""}
     ${!may&&!sp.isNew?`<p class="hint">Read-only for your account${role()==="clerk"?` — this student belongs to ${h(code)}`:""}.</p>`:""}
     ${may&&!ed&&!direct?`<p class="hint">To correct this record, <b>double-click</b> any field (or the Edit button). You will be asked to confirm; every change is kept in the edit log with your name.</p>`:""}
@@ -1340,7 +1361,7 @@ function stuPageHtml(){ const sp=S.sp; if(!sp) return ""; if(sp.err) return `<di
    ${sp.isNew?"":`<div class="two"><div class="panel"><h2>Siblings in APEIs (${sib.sure.length})</h2>
       ${cnicKey(r.fatherCnic)||cnicKey(r.motherCnic)?(sib.sure.length?`<div class="sibs">${sib.sure.map(sibCard).join("")}</div>`:`<p class="mute">No other child with father CNIC ${h(fmtCnic(r.fatherCnic))} in any APEI data bank.</p>`):`<p class="mute">Add the father's CNIC (13 digits) to find brothers and sisters in all campuses.</p>`}
       ${sib.maybe.length?`<h3 style="font-size:14px;margin:12px 0 6px">Possible siblings — same father name and phone, CNIC missing</h3><div class="sibs">${sib.maybe.map(sibCard).join("")}</div>`:""}</div>
-    <div class="panel"><h2>Edit log</h2>${!sp.edits?`<p class="mute">Loading…</p>`:sp.edits.length?`<div class="scroll"><table><tr><th>When</th><th>By</th><th>Field</th><th>From</th><th>To</th></tr>${sp.edits.flatMap(e=>(e.changes||[]).map((c,i)=>`<tr><td>${i?"":fmtDT(toMs(e.at))}</td><td>${i?"":h(e.byName)+` <span class="mute">${h(ROLES[e.role]||e.role||"")}</span>`}</td><td>${h(c.l||c.k)}</td><td class="mute">${h(c.from)}</td><td><b>${h(c.to)}</b></td></tr>`)).join("")}</table></div>`:`<p class="mute">No changes since the record was created.</p>`}</div></div>
+    <div class="panel"><h2>Edit log</h2>${!sp.edits?`<p class="mute">Loading…</p>`:sp.edits.length?`<div class="scroll"><table><tr><th>When</th><th>By</th><th>Field</th><th>From</th><th>To</th></tr>${(()=>{ const rv=revertedIds(sp.edits); return sp.edits.flatMap(e=>(e.changes||[]).map((c,i)=>`<tr class="${rv.has(e.id)?"void":""}"><td>${i?"":fmtDT(toMs(e.at))}</td><td>${i?"":h(e.byName)+` <span class="mute">${h(ROLES[e.role]||e.role||"")}</span>`}${!i&&e.revertOf?` <span class="tag t-mid">undo</span>`:""}</td><td>${h(c.l||c.k)}</td><td class="mute">${h(c.from)}</td><td><b>${h(c.to)}</b>${!i&&canUndoEdits(e.school)&&!e.revertOf&&!rv.has(e.id)?` <button class="btn s r" data-act="revertEdit" data-id="${h(e.id)}">Undo</button>`:""}</td></tr>`)).join(""); })()}</table></div>`:`<p class="mute">No changes since the record was created.</p>`}</div></div>
     ${r.hist?.length?`<div class="panel"><h2>School years in APEIs</h2><div class="scroll"><table><tr><th>Session</th><th>School</th><th>Class – Sec</th><th>Result</th></tr>${r.hist.map(x=>`<tr><td>${h(x.s)}</td><td>${h(x.school)}</td><td>${h(x.cl)}-${h(x.sec)}</td><td>${h(x.res||"")}</td></tr>`).join("")}<tr class="sub"><td>${h(session())}</td><td>${h(r.school)}</td><td>${h(r.cl)}-${h(r.sec)}</td><td>${h(r.status==="On roll"?"current":r.status)}</td></tr></table></div></div>`:""}
     ${sp.form?`<div class="panel"><div class="ph"><h2>Admission form (photo)</h2><span class="hint" style="margin:0">Verified by ${h(r.formVerifiedBy||sp.form.byName||"")} ${h(r.formVerifiedAt||"")}</span></div><img src="${sp.form.img}" alt="Admission form" style="max-width:100%;max-height:70vh;border:1px solid var(--line);border-radius:8px"></div>`:""}
     <div class="panel"><h2>Movement history</h2><div class="scroll">${!sp.hist?`<p class="mute">Loading…</p>`:sp.hist.length?txTable(sp.hist,false):`<p class="mute">No admissions, transfers or withdrawals recorded for this student since go-live.</p>`}</div></div>`}`; }
@@ -1399,7 +1420,7 @@ function todayStatus(day){ day ||= isoDay(Date.now()); const d0=Date.parse(day+"
   const dl=Date.parse(day+"T"+(ST().dailyDeadline||"09:00")), late=Date.now()>dl && day===isoDay(Date.now());
   return schoolList().map(s=>{ const tx=S.recentTx.filter(t=>t.school===s.code && t.atMs>=d0 && t.atMs<d1 && t.status==="ok"); const mk=marks[s.code];
     const state = mk ? "ok" : tx.length ? "part" : (late||day<isoDay(Date.now())) ? "none" : "wait"; return {code:s.code, name:s.name, n:tx.length, mk, state, last:tx[0]?.atMs||0}; }); }
-const stLabel = x => x.state==="ok" ? (x.mk.nil?`Nil return ${fmtT(toMs(x.mk.at))}`:`Done ${fmtT(toMs(x.mk.at))} · ${x.n} entr${x.n===1?"y":"ies"}`) : x.state==="part" ? `${x.n} entr${x.n===1?"y":"ies"} — not confirmed` : x.state==="none" ? "Nothing entered" : "Not yet";
+const stLabel = x => x.state==="ok" ? (x.mk.nil?`Nil return ${fmtT(toMs(x.mk.at))}`:`Done ${fmtT(toMs(x.mk.at))} · ${x.n} entr${x.n===1?"y":"ies"}`) : x.state==="part" ? `${x.n} entr${x.n===1?"y":"ies"} — clerk has not pressed ✓ Done` : x.state==="none" ? "Nothing entered" : "Not yet";
 const stIcon = x => ({ok:"✓",part:"●",none:"✕",wait:"…"}[x.state]);
 function statusStrip(){ const st=todayStatus(), done=st.filter(x=>x.state==="ok").length;
   return `<div class="ph" style="margin-bottom:6px"><h2>Today's entries — ${fmtD(Date.now())}</h2><span class="hint" style="margin:0">${done} of ${st.length} schools confirmed · deadline ${h(ST().dailyDeadline||"09:00")} · click a school to see its entries</span></div>
@@ -1622,13 +1643,14 @@ const EXPORTS = {
     models:[tbl(`${S.schools[code].name.toUpperCase()} (${R.length})`,["#","Class – Sec",...F.map(f=>f.label)],R.map((r,i)=>({c:[String(i+1),`${r.cl}-${r.sec}`,...F.map(f=>f.key==="cat"?catLabel(r.cat):stuVal(r,f))]})))]}; },
   dash: () => ({name:"Dashboard", title:"STRENGTH SUMMARY", sub:"Live", orientation:"landscape", models:[BUILD.schoolwise({title:"SUMMARY - SCHOOL WISE",cols:["n","auth","str","g","b","sd","wait"],opts:{nameMode:"name"}},{codes:schoolList().map(s=>s.code)})[0], schoolModel(dashCode(),["n","inc","auth","str","g","b","sd","wait"],{groupTotals:true,incAuto:true})]})
 };
-function expBar(key, prefix){ const b=[]; if(canDL()) b.push(`<button class="btn s" data-act="exp" data-id="${key}" data-f="xlsx" title="Download as Excel">Excel</button>`);
+const PERSONAL = new Set(["find","stuOne","siblings","tfr","dcKids","feeList","waitlist","stuList","contacts","forms","formsOne","log","edits"]);
+function expBar(key, prefix){ if(PERSONAL.has(key) && !canSD()) return ""; const b=[]; if(canDL()) b.push(`<button class="btn s" data-act="exp" data-id="${key}" data-f="xlsx" title="Download as Excel">Excel</button>`);
   if(canWD()) b.push(`<button class="btn s" data-act="exp" data-id="${key}" data-f="doc" title="Download as Word">Word</button>`);
   if(canPR()) b.push(`<button class="btn s" data-act="exp" data-id="${key}" data-f="pdf" title="Print, or choose “Save as PDF” in the print window">Print / PDF</button>`);
   return b.length ? `${prefix?`<span class="mute" style="font-size:13px">${h(prefix)}</span>`:""}${b.join("")}` : ""; }
 function orgHead(sub){ return `<div class="phead">${ST().logo?`<img src="${h(ST().logo)}" alt="">`:""}<div><h2 style="font-size:calc(var(--fs,11px) + 3px)">${h(ST().org||"")}</h2>${sub?`<p>${h(sub)}</p>`:""}</div><div class="pmeta">Printed: ${fmtDT(Date.now())}<br>by ${h(me().name||"")}</div></div>`; }
 function specHtml(sp, fs){ return `<div class="paper" style="--fs:${fs||10.5}px;min-width:0">${sp.plain?orgHead(sp.sub):printHead(sp.title, sp.sub)}${sp.models.map(t=>tableHtml(t)).join("")}</div>`; }
-async function doExport(key, f){ const fn=EXPORTS[key]; if(!fn) return; let sp=fn(); if(sp instanceof Promise) sp=await sp; if(!sp.models?.length){ toast("Nothing to export.",true); return; }
+async function doExport(key, f){ const fn=EXPORTS[key]; if(!fn) return; if(PERSONAL.has(key) && !canSD()){ toast(SD_MSG,true); return; } let sp=fn(); if(sp instanceof Promise) sp=await sp; if(!sp.models?.length){ toast("Nothing to export.",true); return; }
   const fname=`${String(sp.name||"Export").replace(/[^\w-]+/g,"_")}_${isoDay(Date.now())}`;
   if(f==="xlsx"){ if(!canDL()){ toast(DL_MSG,true); return; } await writeBook(fname+".xlsx", sp.models.map(t=>[t.title||sp.title||"Sheet",tableAoa(t)])); toast("Excel downloaded."); }
   else if(f==="doc"){ if(!canWD()){ toast(WD_MSG,true); return; } wordFile(fname, sp); toast("Word file downloaded."); }
@@ -1643,7 +1665,7 @@ function wordFile(name, sp){ const land=(sp.orientation||"portrait")==="landscap
   const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${h(sp.title||name)}</title>
     <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
     <style>@page Sec{size:${land?"841.9pt 595.3pt;mso-page-orientation:landscape":"595.3pt 841.9pt"};margin:36pt 30pt}div.Sec{page:Sec}body{font-family:Arial;font-size:10pt}h1{font-size:14pt;color:#0b1f4b;margin:0}p.s{color:#444;margin:2pt 0 8pt}</style></head>
-    <body><div class="Sec"><p style="margin:0;font-weight:bold">${h(ST().org||"")}</p>${sp.title?`<h1>${h(sp.title)}</h1>`:""}<p class="s">${h(sp.sub||"")}${sp.sub?" · ":""}Printed ${fmtDT(Date.now())} by ${h(me().name||"")}</p>${sp.models.map(wordTable).join("")}</div></body></html>`;
+    <body><div class="Sec">${sp.html?sp.html:`<p style="margin:0;font-weight:bold">${h(ST().org||"")}</p>${sp.title?`<h1>${h(sp.title)}</h1>`:""}<p class="s">${h(sp.sub||"")}${sp.sub?" · ":""}Printed ${fmtDT(Date.now())} by ${h(me().name||"")}</p>${(sp.models||[]).map(wordTable).join("")}`}</div></body></html>`;
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["﻿",html],{type:"application/msword"})); a.download=name+".doc"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),5000); }
 
 /* =====================================================================
@@ -1703,7 +1725,7 @@ async function impEntries(file){
       if(d>0){ const kk=simCur(o.cl,o.s,gender); sim[kk]++; } if(k==="sec"&&tx.toSec){ const kk=simCur(o.cl,tx.toSec,gender); sim[kk]++; } }
     r.tx=tx; }
   impSet({kind:"entries", region:"eImp", school:code, file:file.name, cols:ENTRY_COLS, rows,
-    commit: async good=>{ const ops=opsNew(); for(const r of good) buildTxOps(ops,{...r.tx}); await DB.apply(ops); toast(`${good.length} entries imported into ${code}.`); } });
+    commit: async good=>{ if(isLocked(code)) throw new Error(LOCK_MSG); const ops=opsNew(); for(const r of good) buildTxOps(ops,{...r.tx}); await DB.apply(ops); toast(`${good.length} entries imported into ${code}.`); } });
 }
 
 /* ---- student data bank ---- */
@@ -2002,6 +2024,130 @@ function aiSetupHtml(){ const c=aiCfg();
    <p class="hint"><b>Privacy:</b> the form picture is sent to Google only to be read; Google does not keep it for training when the key is used through the paid tier — on the free tier Google may use inputs to improve its products, so you may prefer to enable billing on that Google project (cost is well under one rupee per form).</p></div>`; }
 
 /* =====================================================================
+   22) ENTRY STATUS TABLE · UNDO OF RECORD CHANGES · PRINTED ADMISSION FORMS · ONE-TIME UPDATES
+   ===================================================================== */
+
+/* one-time adjustments of saved settings when a new version is first opened by the Super Admin */
+async function migrate(){ if(!isSA()) return; const st=ST(), up={};
+  if(st.stages?.length && !st.stages.some(g=>g.levels.includes("IG-1")) && !st.migr45) up.stages=[...st.stages,{name:"O & A Level (APSIS)",levels:["IG-1","O-II","O-III","AS","A-II"]}];
+  if(!st.migr45) up.migr45=true;
+  if(Object.keys(up).length>1 || up.stages) await saveSettings(up, up.stages?"Consolidation updated: APSIS PG / Nur / KG count as EYS-I / EYS-II / Pre-I, and IG-1 … A-II form an “O & A Level” stage.":"");
+  else if(!st.migr45) await saveSettings(up,""); }
+
+/* ---------- entries by school: today (with the clerk's ✓), yesterday, 3 days, 7 days, 30 days, all time ---------- */
+const DAYMS=864e5;
+function stWins(){ const d0=new Date(); d0.setHours(0,0,0,0); const t0=d0.getTime(), now=Date.now();
+  return [["today","Today",t0,now],["yday","Yesterday",t0-DAYMS,t0-1],["d3","Past 3 days",t0-2*DAYMS,now],["d7","Past 7 days",t0-6*DAYMS,now],["d30","Past 30 days",t0-29*DAYMS,now],["all","All time",0,now]]; }
+async function loadCounts(force){ const C=S.cnt; if(!force && C && Date.now()-C.at<5*60e3) return C; if(S.cntLoading) return S.cntLoading;
+  const W=stWins(), w30=W[4];
+  S.cntLoading=(async()=>{ const out={at:Date.now(),d30:{},all:{}};
+    try{ const rows=await getTx({from:w30[2],to:w30[3]}); for(const t of rows) if(t.status==="ok") out.d30[t.school]=(out.d30[t.school]||0)+1; }catch(e){ out.d30=null; }
+    try{ for(const s of schoolList()) out.all[s.code]=await DB.countTx(s.code); }catch(e){ out.all=null; }
+    S.cnt=out; S.cntLoading=null; fillRegion("dStatus",true); return out; })();
+  return S.cntLoading; }
+function entryPanel(){ const st=todayStatus(), done=st.filter(x=>x.state==="ok").length, W=stWins(), sch=schoolList(); if(!S.cnt) loadCounts();
+  const cnt=(code,w)=>{ if(w[0]==="d30") return S.cnt?.d30 ? (S.cnt.d30[code]||0) : null; if(w[0]==="all") return S.cnt?.all ? (S.cnt.all[code]||0) : null;
+    return S.recentTx.filter(t=>t.school===code && t.status==="ok" && t.atMs>=w[2] && t.atMs<=w[3]).length; };
+  const link=(code,w)=>qs({school:code||"",from:w[0]==="all"?"2020-01-01":isoDay(w[2]),to:isoDay(w[3])});
+  const time=(k,v,lab)=>isSA()?`<label class="mute" style="font-size:13px">${lab} <input type="time" class="in" style="width:auto;min-height:30px;padding:2px 6px" value="${h(v)}" data-chg="stTime" data-k="${k}"></label>`:`<span class="mute" style="font-size:13px">${lab} ${h(v)}</span>`;
+  return `<div class="ph" style="margin-bottom:6px"><h2>Entries by school — ${fmtD(Date.now())}</h2><div class="pills">${time("dailyDeadline",ST().dailyDeadline||"09:00","Deadline")}${time("cutoff",ST().cutoff||"08:00","Daily cutoff")}</div></div>
+   <p class="hint" style="margin:0 0 8px">${done} of ${st.length} schools confirmed today. ✓ = the clerk pressed “Today's entries are complete” (or Nil) on the Entry tab; ● = entries saved but the clerk has not pressed it yet. Click any number to open those entries in the Log.</p>
+   <div class="scroll"><table class="sttab"><tr><th>Period</th>${sch.map(s=>`<th class="n">${h(s.code)}</th>`).join("")}<th class="n">${h(L("total"))}</th></tr>
+    <tr><td><b>Today</b></td>${st.map(x=>`<td class="n"><span class="stchip ${x.state}" data-act="go" data-id="log" data-p="${h(link(x.code,W[0]))}" title="${h(x.name)} — ${h(stLabel(x))}"><i>${stIcon(x)}</i>${x.n}${x.state==="ok"?` <span style="font-weight:500">${x.mk.nil?"Nil":fmtT(toMs(x.mk.at))}</span>`:""}</span></td>`).join("")}<td class="n"><b class="dn" data-act="go" data-id="log" data-p="${h(link("",W[0]))}">${st.reduce((a,x)=>a+x.n,0)}</b></td></tr>
+    ${W.slice(1).map(w=>{ const v=sch.map(s=>cnt(s.code,w)); const tot=v.some(x=>x===null)?null:v.reduce((a,x)=>a+x,0);
+      return `<tr><td>${w[1]}${w[0]==="yday"?` <span class="mute" style="font-size:12px">(✓ = confirmed)</span>`:""}</td>${sch.map((s,i)=>{ const mk=w[0]==="yday"?(S.daily[isoDay(w[2])]||{})[s.code]:null;
+        return `<td class="n">${v[i]===null?`<span class="mute">${S.cnt?"—":"…"}</span>`:`<span class="dn" data-act="go" data-id="log" data-p="${h(link(s.code,w))}">${nf(v[i])}</span>`}${mk?` <span class="pos" title="Confirmed ${h(fmtDT(toMs(mk.at)))}">✓</span>`:""}</td>`; }).join("")}
+        <td class="n"><b>${tot===null?"…":`<span class="dn" data-act="go" data-id="log" data-p="${h(link("",w))}">${nf(tot)}</span>`}</b></td></tr>`; }).join("")}</table></div>`; }
+
+/* ---------- undo a change made to a student's record (Super Admin) ---------- */
+const catFromLabel = s => { const m=String(s||"").match(/^\d+\.\s*(.*)$/); return m?m[1]:String(s||""); };
+async function revertEdit(e){ if(!canUndoEdits(e.school)){ toast("Undoing record changes is not allowed for your account at this time.",true); return; }
+  const r=await DB.getDoc("students",e.stuId); if(!r){ toast("That student record no longer exists.",true); return; }
+  const back={}, skipped=[];
+  for(const c of e.changes||[]){ const now=c.k==="cat"?catLabel(r.cat):String(r[c.k]??""); if(now!==String(c.to??"")){ skipped.push(c.l||c.k); continue; } back[c.k]=c.k==="cat"?catFromLabel(c.from):c.from; }
+  if(!Object.keys(back).length){ toast("Nothing to undo — those fields have been changed again since.",true); return; }
+  const ch=Object.keys(back).map(k=>{ const c=e.changes.find(x=>x.k===k); return {k,l:c.l,from:c.to,to:c.from}; });
+  await DB.apply({set:[{col:"edits",id:newId(),data:{stuId:e.stuId,school:e.school,stuName:e.stuName,admNo:e.admNo||"",changes:ch,revertOf:e.id,at:TS,day:isoDay(Date.now()),by:me().uid,byName:me().name||"",role:role()}}],upd:[{col:"students",id:e.stuId,data:{...back,updatedAt:TS,updatedBy:me().name||""}}],inc:[]});
+  toast(`Change undone for ${e.stuName}.`+(skipped.length?` Not undone (changed again since): ${skipped.join(", ")}.`:""));
+  if(S.view==="log") runLog(); if(S.view==="student") loadStuPage(); }
+const revertedIds = list => new Set((list||[]).map(e=>e.revertOf).filter(Boolean));
+
+/* ---------- printed admission forms (one page per student, class-wise) ---------- */
+function admFormHtml(r){ const sc=S.schools[r.school]||{}, F=(k)=>{ const v=r[k]; if(k==="gender") return v==="g"?"Girl":v==="b"?"Boy":""; if(k==="cat") return catLabel(v); if(["dob","admDate","leftDate"].includes(k)) return isoToDmy(v); return String(v??""); };
+  const cell="border:1px solid #555;padding:5px 7px;font-size:11pt;vertical-align:top", lab=cell+";background:#eef1f7;font-weight:bold;width:22%";
+  const row=(a,ka,b,kb)=>`<tr><td style="${lab}">${a}</td><td style="${cell}">${h(F(ka))}</td>${b?`<td style="${lab}">${b}</td><td style="${cell}">${h(F(kb))}</td>`:`<td colspan="2" style="${cell}"></td>`}</tr>`;
+  const extra=activeFields().filter(f=>f.key.startsWith("x_")).map(f=>[f.label,f.key]);
+  return `<div class="admform" style="font-family:Arial,sans-serif;color:#111;padding:6mm 4mm;page-break-after:always;break-after:page">
+   <table style="width:100%;border-collapse:collapse;margin-bottom:8px"><tr><td style="width:90px">${ST().logo?`<img src="${h(ST().logo)}" alt="" style="height:70px">`:""}</td>
+     <td style="text-align:center"><div style="font-size:15pt;font-weight:bold">${h(sc.name||r.school)}</div><div style="font-size:11pt">${h(ST().org||"")}</div><div style="font-size:14pt;font-weight:bold;margin-top:6px;letter-spacing:1px">STUDENT ADMISSION RECORD</div><div style="font-size:10.5pt">Session ${h(session())}</div></td>
+     <td style="width:100px;text-align:right"><div style="border:1px solid #555;width:90px;height:110px;display:inline-block;font-size:9pt;color:#777;padding-top:45px;text-align:center">Photo</div></td></tr></table>
+   <table style="width:100%;border-collapse:collapse">
+    ${row("Adm / Reg No","admNo","Date of admission","admDate")}${row("Class","cl","Section","sec")}
+    <tr><td style="${lab}">Student name</td><td colspan="3" style="${cell};font-size:13pt;font-weight:bold">${h(F("name"))}</td></tr>
+    ${row("Gender","gender","Date of birth","dob")}${row("B-Form No","bform","Religion","religion")}
+    <tr><td style="${lab}">Father name</td><td colspan="3" style="${cell}">${h(F("father"))}</td></tr>
+    ${row("Father CNIC","fatherCnic","Rank / Appt","fatherRank")}${row("Service / Pak No","serviceNo","Unit / Department","unit")}${row("Mother CNIC","motherCnic","Student category","cat")}
+    <tr><td style="${lab}">Contact numbers</td><td colspan="3" style="${cell}">${h([F("contact"),F("contact2")].filter(Boolean).join(", "))}</td></tr>
+    <tr><td style="${lab}">Address</td><td colspan="3" style="${cell};height:40px">${h(F("address"))}</td></tr>
+    ${row("Previous school","prevSchool","Blood group","blood")}
+    ${extra.map(([l,k])=>`<tr><td style="${lab}">${h(l)}</td><td colspan="3" style="${cell}">${h(F(k))}</td></tr>`).join("")}
+    <tr><td style="${lab}">Remarks</td><td colspan="3" style="${cell};height:60px">${h(F("remarks"))}</td></tr>
+    ${r.status!=="On roll"?`<tr><td style="${lab}">Status</td><td colspan="3" style="${cell}">${h(r.status)} ${h(isoToDmy(r.leftDate))} ${h(r.leftReason||"")}</td></tr>`:""}</table>
+   <p style="font-size:10pt;margin:14px 0 40px">Certified that the above particulars are correct as per the admission form${r.formVerifiedBy?` (form verified by ${h(r.formVerifiedBy)}, ${h(r.formVerifiedAt||"")})`:""}.</p>
+   <table style="width:100%;font-size:10.5pt;text-align:center"><tr><td style="width:33%"><div style="border-top:1px solid #111;margin:0 14px;padding-top:3px">Parent / Guardian</div></td><td style="width:33%"><div style="border-top:1px solid #111;margin:0 14px;padding-top:3px">Admission Clerk</div></td><td><div style="border-top:1px solid #111;margin:0 14px;padding-top:3px">Principal</div></td></tr></table>
+   <p style="font-size:8.5pt;color:#666;margin-top:16px">Printed ${fmtDT(Date.now())} from the APEIs Strength Portal</p></div>`; }
+async function admForms(list, f, name){ if(!canSD()){ toast(SD_MSG,true); return; } if(!list.length){ toast("No students in this list.",true); return; }
+  if(list.length>300 && !confirm(`${list.length} forms — this may take a while to prepare. Continue?`)) return;
+  const html=list.map(admFormHtml).join("");
+  if(f==="doc"){ if(!canWD()){ toast(WD_MSG,true); return; } wordFile(name,{title:"",sub:"",orientation:"portrait",models:[],html}); toast(`${list.length} admission form${list.length>1?"s":""} saved as Word.`); }
+  else printHtml(`<div style="background:#fff">${html}</div>`,{paper:"A4",orientation:"portrait",allow:false}); }
+function formBar(scope){ if(!canSD()) return ""; const b=[]; if(canPR()) b.push(`<button class="btn s" data-act="admForms" data-id="${scope}" data-f="pdf" title="One A4 page per student">Admission forms — Print / PDF</button>`); if(canWD()) b.push(`<button class="btn s" data-act="admForms" data-id="${scope}" data-f="doc">Word</button>`); return b.join(""); }
+
+/* =====================================================================
+   23) DAY LOCK & REQUESTS · NOTIFICATIONS · TIME-LIMITED POWERS
+   After a clerk confirms the day (✓ Done or Nil), the school's entry form is locked for that day.
+   More entries need a request, approved by the Super Admin or DQ Office for a set time. A bell shows what needs attention.
+   ===================================================================== */
+const dayMarkOf = (code, day) => (S.daily[day||isoDay(Date.now())]||{})[code] || null;
+function lockState(code){ const mk=dayMarkOf(code); if(!mk) return {locked:false};
+  const until=toMs(mk.unlockedUntil); if(until && until>Date.now()) return {locked:false, unlocked:true, until, by:mk.unlockBy||""}; return {locked:true, mk}; }
+const isLocked = code => !isSA() && role()==="clerk" && lockState(code).locked;
+const LOCK_MSG = "Today's entries for your school were confirmed, so the form is locked. Press “Request to add more entries” — the DQ Office or Super Admin can open it for you.";
+const myReq = code => S.reqs.filter(r=>r.school===code && r.day===isoDay(Date.now())).sort((a,b)=>b.atMs-a.atMs)[0];
+const canDecide = () => isSA() || role()==="hq";
+
+/* the clerk's status bar on the Entry tab (replaces the earlier one) */
+function myStatusBar2(code){ const x=todayStatus().find(y=>y.code===code); if(!x) return ""; const can=canEnter(code)&&!isSA(), ls=lockState(code), rq=myReq(code);
+  let right="";
+  if(isSA()||canDecide()) right = x.state==="ok" ? `<button class="btn s" data-act="dayUndo">Remove confirmation</button>` : "";
+  else if(can){
+    if(x.state!=="ok") right=`<button class="btn s g" data-act="dayDone" ${x.n?"":"disabled"}>✓ Today's entries are complete</button><button class="btn s" data-act="dayNil" ${x.n?"disabled":""}>Nil — no movement today</button>`;
+    else if(ls.unlocked) right=`<span class="tag t-in">🔓 Opened until ${fmtT(ls.until)}${ls.by?" by "+h(ls.by):""}</span><button class="btn s g" data-act="dayDone">✓ Done again</button>`;
+    else if(rq?.status==="pending") right=`<span class="tag t-mid">⏳ Request sent ${fmtT(rq.atMs)} — waiting for DQ Office / Super Admin</span><button class="btn s" data-act="reqCancel" data-id="${h(rq.id)}">Cancel request</button>`;
+    else right=`${rq?.status==="rejected"?`<span class="tag t-out">Request refused${rq.note?": "+h(rq.note):""}</span>`:""}<span class="tag t-n">🔒 Locked for today</span><button class="btn s p" data-act="reqUnlock">Request to add more entries</button>`; }
+  return `<div class="panel" style="padding:10px 14px"><div class="ph" style="margin:0"><div class="stat"><span class="stchip ${x.state}"><i>${stIcon(x)}</i>Today: ${h(stLabel(x))}</span><span class="hint" style="margin:0">After you confirm, the form locks for the day; more entries need permission.</span></div><div class="pills">${right}</div></div></div>`; }
+function reqDlg(){ modal(`<h3>Request to add more entries today</h3><form data-form="reqUnlock"><div class="f"><label for="rqWhy">Reason (seen by the DQ Office / Super Admin)</label><textarea id="rqWhy" rows="3" required placeholder="e.g. 2 SLCs received after confirmation"></textarea></div>
+  <div class="f"><label for="rqN">About how many more entries?</label><input id="rqN" type="number" min="1" value="1"></div>
+  <div class="row"><button type="button" class="btn" data-act="closeModal">Cancel</button><button class="btn p">Send request</button></div></form>`); }
+
+/* ---------- notifications (the bell) ---------- */
+function notes(){ const out=[], today=isoDay(Date.now()), seen=seenSet();
+  if(canDecide()) for(const r of S.reqs.filter(r=>r.status==="pending")) out.push({id:r.id, urgent:true, html:`<b>${h(r.school)}</b> asks to add more entries${r.n?` (${r.n})`:""} — ${h(r.byName)}, ${fmtT(r.atMs)}<br><span class="mute">${h(r.reason)}</span>`,
+    acts:`<button class="btn s g" data-act="reqOk" data-id="${h(r.id)}" data-m="60">Open 1 hour</button><button class="btn s g" data-act="reqOk" data-id="${h(r.id)}" data-m="eod">Rest of today</button><button class="btn s r" data-act="reqNo" data-id="${h(r.id)}">Refuse</button>`});
+  if(role()==="clerk") for(const r of S.reqs.filter(r=>r.school===mySchool() && r.status!=="pending" && r.day>=isoDay(Date.now()-864e5))) out.push({id:"d_"+r.id, urgent:!seen.has("d_"+r.id), html:r.status==="approved"?`✅ Your request was approved by ${h(r.decidedBy)} — the form is open until ${fmtT(toMs(r.until))}.`:`❌ Your request was refused by ${h(r.decidedBy)}${r.note?": "+h(r.note):""}.`});
+  const inc=S.transfers.filter(t=>t.status==="pending" && (canDecide()||t.to===mySchool())); if(inc.length) out.push({id:"tf", urgent:role()==="clerk", html:`🔁 ${inc.length} inter-APEI transfer${inc.length>1?"s":""} waiting to be accepted`, go:"transfers"});
+  if(canDecide()){ const late=todayStatus().filter(x=>x.state==="none"); if(late.length) out.push({id:"late_"+today, urgent:false, html:`⏰ Past the ${h(ST().dailyDeadline||"09:00")} deadline with nothing entered: ${late.map(x=>h(x.code)).join(", ")}`, go:"dash"}); }
+  return out; }
+const seenSet = () => { try{ return new Set(JSON.parse(localStorage.getItem("apeis_seen")||"[]")); }catch(e){ return new Set(); } };
+function bellPaint(){ const b=$("#bellN"); if(!b) return; const N=notes(), n=N.filter(x=>x.urgent).length; b.textContent=n||""; b.hidden=!n; const L=$("#bellList"); if(L && !L.hidden) L.innerHTML=bellHtml(N); }
+function bellHtml(N){ return N.length ? N.map(x=>`<div class="note-i ${x.urgent?"new":""}" ${x.go?`data-act="go" data-id="${x.go}" role="button"`:""}><div>${x.html}</div>${x.acts?`<div class="pills" style="margin-top:6px">${x.acts}</div>`:""}</div>`).join("") : `<div class="note-i mute">Nothing needs your attention.</div>`; }
+
+/* ---------- time-limited powers: undoing record changes (DQ Office / clerks) ---------- */
+const untilOf = u => toMs(u?.undoUntil)||0;
+const canUndoEdits = school => isSA() || (untilOf(me())>Date.now() && (role()==="hq" || (role()==="clerk" && school===mySchool())));
+const voidMinutes = () => { const u=me().voidMin; return Number(u!=null&&u!==""?u:(ST().voidMinutes??15)); };
+
+/* =====================================================================
    8) REPORTS — designer (tick what to show), presets, print/PDF, Excel, WhatsApp
    ===================================================================== */
 const MCOLS = { date:"Date", school:"School", action:"Action", class:"Class – Sec", name:"Student", father:"Father", gender:"G", cat:"Category", adm:"Adm No", remarks:"Remarks", by:"Entered by" };
@@ -2140,7 +2286,9 @@ function trendSvg(p){
     <text x="${l}" y="${H-8}" font-size="10" fill="#555">${p[0].day}</text><text x="${W-r}" y="${H-8}" font-size="10" fill="#555" text-anchor="end">${p.at(-1).day}</text>
     <text x="${W-r}" y="${Y(p.at(-1).str)-6}" font-size="11" text-anchor="end" fill="#0b1f4b">${h(L("str"))} ${nf(p.at(-1).str)}</text><text x="${W-r}" y="${Y(p.at(-1).auth)+14}" font-size="11" text-anchor="end" fill="#777">${h(L("auth"))} ${nf(p.at(-1).auth)}</text></svg>`;
 }
+const PERSONAL_BLOCKS = new Set(["roll","waitlist","movelist","tfrlist"]);
 async function buildReport(c){
+  if(!canSD() && c.blocks.some(b=>b.on&&PERSONAL_BLOCKS.has(b.key))){ c=clone(c); c.blocks=c.blocks.map(b=>PERSONAL_BLOCKS.has(b.key)?{...b,on:false}:b); }
   const w=periodWin(c.period.kind,c.period.from,c.period.to); const needTx=c.blocks.some(b=>b.on&&["kpis","movement","movelist","category","schoolwise"].includes(b.key));
   const tx=needTx?await getTx(w):[]; const x={codes:cfgCodes(c), w, tx, plabel:periodLabel(c.period.kind,w)};
   if(c.blocks.some(b=>b.on&&b.key==="feedef")) await loadFeeRets().catch(()=>[]);
@@ -2366,12 +2514,14 @@ const SETUP = {
       <div class="f"><label for="uSch">School</label><select id="uSch"><option value="ALL">ALL (Super Admin / HQ / Senior)</option>${schoolList(true).map(s=>`<option>${h(s.code)}</option>`).join("")}</select></div>
       <button class="btn p">Create</button></form>
       <p class="hint">Senior / Viewer sees the Dashboard and Reports only and cannot change anything — give this to your Commandant with the QR code. Usernames without "@" become name@${h(LOGIN_DOMAIN)}.</p></div>
-      <div class="panel"><h2>All users</h2><div class="scroll"><table><tr><th>Name</th><th>Login</th><th>Role</th><th>School</th>${PERMS.map(p=>`<th>${p[1]}</th>`).join("")}<th>Active</th></tr>${Lu.map(u=>`<tr><td><input class="in" style="max-width:220px" value="${h(u.name)}" data-uf="name" data-id="${h(u.uid)}" aria-label="Name of ${h(u.email)}"></td><td>${h(u.email)}</td>
+      <div class="panel"><h2>All users</h2><div class="scroll"><table><tr><th>Name</th><th>Login</th><th>Role</th><th>School</th>${PERMS.map(p=>`<th>${p[1]}</th>`).join("")}<th>Undo own entry (min)</th><th>Undo record changes</th><th>Active</th></tr>${Lu.map(u=>`<tr><td><input class="in" style="max-width:220px" value="${h(u.name)}" data-uf="name" data-id="${h(u.uid)}" aria-label="Name of ${h(u.email)}"></td><td>${h(u.email)}</td>
        <td><select class="in" data-uf="role" data-id="${h(u.uid)}" ${u.uid===me().uid?"disabled":""}>${Object.entries(ROLES).map(([k,v])=>`<option value="${k}" ${u.role===k?"selected":""}>${v}</option>`).join("")}</select></td>
        <td><select class="in" data-uf="school" data-id="${h(u.uid)}" ${u.uid===me().uid?"disabled":""}><option ${u.school==="ALL"?"selected":""}>ALL</option>${schoolList(true).map(s=>`<option ${u.school===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select></td>
        ${PERMS.map(p=>p[0]).map(k=>`<td>${u.role==="superadmin"?`<span class="mute">always</span>`:`<select class="in" data-uf="${k}" data-id="${h(u.uid)}"><option value="" ${!u[k]?"selected":""}>Role default (${permDef(u.role,k)?"allowed":"blocked"})</option><option value="yes" ${u[k]==="yes"?"selected":""}>Allowed</option><option value="no" ${u[k]==="no"?"selected":""}>Blocked</option></select>`}</td>`).join("")}
+       <td>${u.role==="clerk"?`<input class="in num" type="number" min="0" placeholder="${h(ST().voidMinutes??15)}" value="${h(u.voidMin??"")}" data-uu="voidMin" data-id="${h(u.uid)}" title="Blank = the general setting">`:`<span class="mute">—</span>`}</td>
+       <td>${u.role==="superadmin"?`<span class="mute">always</span>`:["hq","clerk"].includes(u.role)?`<select class="in" data-uu="undoUntil" data-id="${h(u.uid)}"><option value="">${untilOf(u)>Date.now()?(untilOf(u)>Date.parse("2099-01-01")?"Allowed (until revoked)":"Allowed until "+fmtDT(untilOf(u))):"Not allowed"}</option><option value="m15">Allow for 15 minutes</option><option value="m30">Allow for 30 minutes</option><option value="m60">Allow for 1 hour</option><option value="m120">Allow for 2 hours</option><option value="m240">Allow for 4 hours</option><option value="custom">Allow for … minutes (type)</option><option value="d1">Allow for 1 day</option><option value="d7">Allow for 7 days</option><option value="d30">Allow for 30 days</option><option value="forever">Allow until I revoke</option><option value="0">Not allowed</option></select>`:`<span class="mute">—</span>`}</td>
        <td><input type="checkbox" data-uf="active" data-id="${h(u.uid)}" ${u.active?"checked":""} ${u.uid===me().uid?"disabled":""} style="width:20px;height:20px"></td></tr>`).join("")}</table></div>
-       <div class="panel" style="margin-top:12px"><h2>Excel, Word, print & WhatsApp — role defaults</h2><p class="hint" style="margin-top:0">What each role may do unless a user above is set to Allowed or Blocked. Blank forms (Excel templates for import) are always available. Super Admin can always download and print.</p>
+       <div class="panel" style="margin-top:12px"><h2>Excel, Word, print & WhatsApp — role defaults</h2><p class="hint" style="margin-top:0"><b>Students' personal data</b> covers every list or page with names, parents, CNICs, phone numbers, addresses and admission forms — it is <b>off</b> for everyone until you tick it here or allow a person above; it needs the Excel / Word / Print switch as well. Strength figures and summaries are not personal. What each role may do unless a user above is set to Allowed or Blocked. Blank forms (Excel templates for import) are always available. Super Admin can always download and print.</p>
        <form data-form="permDefaults"><table><tr><th>Role</th>${PERMS.map(p=>`<th>${p[1]}</th>`).join("")}</tr>${DL_ROLES.map(r=>`<tr><td>${h(ROLES[r])}</td>${PERMS.map(p=>p[0]).map(k=>`<td><input type="checkbox" name="${r}_${k}" ${permDef(r,k)?"checked":""} style="width:20px;height:20px"></td>`).join("")}</tr>`).join("")}</table><div class="row"><button class="btn p">Save role defaults</button></div></form>
        <p class="hint">A change takes effect the next time that person opens or refreshes the portal. Note: anything a person can see on screen could still be copied by hand or photographed — these switches stop downloads and printing from the portal, not viewing.</p></div>
        <p class="hint">Edit a name and press Tab or click elsewhere to save; it shows at the top of that person's screen and on their new log entries (older entries keep the name they were saved with). To remove someone, untick Active — their past entries stay in the log.</p></div>`; },
@@ -2385,6 +2535,7 @@ const SETUP = {
       <div class="f"><label for="sStart">Session start date</label><input id="sStart" type="date" value="${h(st.sessionStart||"2026-04-01")}"></div>
       <div class="f"><label for="sCut">Daily cutoff time</label><input id="sCut" type="time" value="${h(st.cutoff||"08:00")}"></div>
       <div class="f"><label for="sPer">Default movement period</label><select id="sPer">${Object.entries(PERIODS).filter(([k])=>k!=="custom").map(([k,v])=>`<option value="${k}" ${(st.defaultPeriod||"cutoff")===k?"selected":""}>${v}</option>`).join("")}</select></div>
+      <div class="f"><label for="sVoid" title="How long a clerk may undo his own entry">Clerk can undo own entry (minutes)</label><input id="sVoid" type="number" min="0" max="1440" value="${h(st.voidMinutes??15)}"></div>
       <div class="f"><label for="sIdle" title="0 = never">Auto sign-out (idle minutes)</label><input id="sIdle" type="number" min="0" max="480" value="${h(ST().idleMinutes??30)}"></div>
       <div class="f wide" style="grid-column:1/-1"><label for="sFoot">Default report footer</label><input id="sFoot" value="${h(st.reportFooter||"")}" placeholder="e.g. Prepared by DQ Office, APEIs Peshawar"></div>
       <button class="btn p">Save</button></form>
@@ -2488,7 +2639,7 @@ function themeForm(form){ const u=form==="uiDefault"?{theme:"oxford",mode:"auto"
     <div class="f"><label>Text size</label><select name="size">${[["s","Small"],["m","Normal"],["l","Large"]].map(([k,l])=>`<option value="${k}" ${u.size===k?"selected":""}>${l}</option>`).join("")}</select></div>
     <div class="f"><label>Spacing</label><select name="density">${[["normal","Comfortable"],["compact","Compact (more rows on screen)"]].map(([k,l])=>`<option value="${k}" ${u.density===k?"selected":""}>${l}</option>`).join("")}</select></div>
     </div><div class="actrow"><button class="btn p">${form==="uiDefault"?"Save as default for everyone":"Apply"}</button></div></form>`; }
-function permDef(r,k){ const d=(ST().permDefaults||{})[r]; return d ? d[k]!==false : true; }
+function permDef(r,k){ const v=(ST().permDefaults||{})[r]?.[k]; return v===undefined ? !PERM_OFF.has(k) : v!==false; }
 
 /* =====================================================================
    13) STUDENT DATA BANK — one record per student, filled gradually.
@@ -2523,12 +2674,12 @@ function stuRegHtml(){ const code=stuSchool(); if(!code) return `<div class="pan
     const sc=S.schools[code];
     return `<div class="panel"><div class="ph"><h2>Student data bank — ${h(code)} ${h(sc.name)}</h2>
       <div class="pills">${mySchool()?"":`<select class="in" style="width:auto" data-chg="stuSchool">${schoolList().map(s=>`<option value="${h(s.code)}" ${s.code===code?"selected":""}>${h(s.code)}</option>`).join("")}</select>`}
-      ${ed?`<button class="btn" data-act="formDlg">📷 Read admission form</button><button class="btn p" data-act="go" data-id="student" data-p="new=1&school=${h(code)}">+ Add student</button><button class="btn" data-act="tplStudents">Excel template</button><label class="btn">Import Excel <input type="file" accept=".xlsx,.xls,.csv" data-chg="impStudents" hidden></label>`:""}${canDL()?`<button class="btn" data-act="stuExport">Export Excel</button>`:""}</div></div>
+      ${ed?`<button class="btn" data-act="formDlg">📷 Read admission form</button><button class="btn p" data-act="go" data-id="student" data-p="new=1&school=${h(code)}">+ Add student</button><button class="btn" data-act="tplStudents">Excel template</button><label class="btn">Import Excel <input type="file" accept=".xlsx,.xls,.csv" data-chg="impStudents" hidden></label>`:""}${canDL()&&canSD()?`<button class="btn" data-act="stuExport">Export Excel</button>`:""}</div></div>
       <div class="grid"><div class="f"><label for="sQ">Search name, father, Adm No, B-Form, contact</label><input id="sQ" data-sf="q" value="${h(S.stuQ||"")}" placeholder="type to search…"></div>
         <div class="f"><label for="sCl">${h(L("cl"))}</label><select id="sCl" data-sf="cl"><option value="">All classes</option>${sc.classes.map(c=>`<option ${S.stuCl===c.cl?"selected":""}>${h(c.cl)}</option>`).join("")}</select></div>
         <div class="f"><label for="sSt">Status</label><select id="sSt" data-sf="st">${["On roll","All",...STU_STATUS.slice(1)].map(x=>`<option ${(S.stuSt||"On roll")===x?"selected":""}>${x}</option>`).join("")}</select></div>
         <div class="f"><label for="sCat">Category</label><select id="sCat" data-sf="cat">${catOptions(S.stuCat,"All categories")}</select></div></div>
-      <div class="row" style="justify-content:flex-start;margin-top:6px"><span class="hint" style="margin:0">This list (uses the filters above):</span>${expBar("stuList")}</div>
+      <div class="row" style="justify-content:flex-start;margin-top:6px"><span class="hint" style="margin:0">This list (uses the filters above):</span>${expBar("stuList")}${formBar("list")}</div>
       <div id="sImp"></div><div class="scroll" id="sList" style="margin-top:10px"></div></div>
       <div class="panel"><div class="ph"><h2>Register completeness — ${h(code)}</h2>${isSA()?`<button class="btn" data-act="regRebuild">Use the register as the source of strength…</button>`:""}</div>
         <p class="hint" style="margin-top:0">Strength comes from the entries; this shows how many of those students are already in the data bank. Fill it school by school with the Excel import — nothing here changes strength.</p><div class="scroll" id="sReg"></div></div>`;}
@@ -2837,6 +2988,23 @@ const ACT = {
   demoReset: () => ask("Reset demo data?","All test entries will be deleted.","Reset",async()=>Local.reset()),
   /* ---- v4: navigation ---- */
   back: () => goBack(),
+  bell: () => { const L=$("#bellList"); L.hidden=!L.hidden; if(!L.hidden){ const N=notes(); L.innerHTML=`<div class="umenu-who">Notifications</div>`+bellHtml(N); try{ const s=seenSet(); N.filter(x=>x.id.startsWith("d_")).forEach(x=>s.add(x.id)); localStorage.setItem("apeis_seen",JSON.stringify([...s].slice(-200))); }catch(e){} setTimeout(bellPaint,1500); } },
+  reqUnlock: () => reqDlg(),
+  reqCancel: async el => { await DB.apply({set:[],inc:[],upd:[{col:"requests",id:el.dataset.id,data:{status:"cancelled",decidedAt:TS}}]}); toast("Request cancelled."); },
+  reqOk: async el => { if(!canDecide()) return; const r=S.reqs.find(x=>x.id===el.dataset.id); if(!r) return; const e=new Date(); e.setHours(23,59,0,0); const until=el.dataset.m==="eod"?e.getTime():Date.now()+Number(el.dataset.m)*60e3;
+    await DB.apply({set:[{col:"daily",id:r.day,data:{day:r.day,s:{[r.school]:{unlockedUntil:until,unlockBy:me().name||""}}},merge:"deep"}],upd:[{col:"requests",id:r.id,data:{status:"approved",until,decidedBy:me().name||"",decidedAt:TS}}],inc:[]});
+    toast(`${r.school} can add entries until ${fmtT(until)}.`); bellPaint(); },
+  reqNo: el => { const r=S.reqs.find(x=>x.id===el.dataset.id); if(!r) return; ask("Refuse this request?",`${h(r.school)}: “${h(r.reason)}”`,"Refuse",async note=>{ await DB.apply({set:[],inc:[],upd:[{col:"requests",id:r.id,data:{status:"rejected",note,decidedBy:me().name||"",decidedAt:TS}}]}); toast("Request refused."); bellPaint(); },true); },
+  revertEdit: el => { const e=[...(S.editRows||[]),...(S.sp?.edits||[])].find(x=>x.id===el.dataset.id); if(!e) return;
+    ask("Undo this change?",`${h(e.stuName)}: ${(e.changes||[]).map(c=>`${h(c.l||c.k)} back to “${h(c.from)}”`).join(", ")}. The undo is also recorded in the log.`,"Undo change",()=>revertEdit(e)); },
+  admForms: async el => { const sc=el.dataset.id; let list=[];
+    if(sc==="one") list=[S.sp.rec]; else if(sc==="list"){ await ensureStu(stuSchool()); list=stuFiltered(stuSchool()); }
+    else { const R=S.findRows||findRows(S.params), codes=[...new Set(R.map(r=>r.school))]; await Promise.all(codes.map(c=>ensureStu(c).catch(()=>[]))); const all=new Map(codes.flatMap(c=>stuOf(c)||[]).map(r=>[r.id,r])); list=R.map(r=>all.get(r.id)).filter(Boolean); }
+    await admForms(list, el.dataset.f, `Admission_forms_${list.length===1?norm(list[0].name):sc}`); },
+  openTx: async (el,e) => { if(e.target.closest("button")) return; const t=[...S.recentTx,...(S.logRows||[]),...(S.drillTx||[]),...(S.sp?.hist||[])].find(x=>x.id===el.dataset.id); if(!t) return;
+    if(!canSeeStudents()){ toast(`${AL(t.action)} — ${t.name}, ${t.school} ${t.cl}-${t.sec}`); return; }
+    let id=t.studentId; if(id && !idxFind(id) && !(await DB.getDoc("students",id).catch(()=>null))) id=null;
+    if(id) go("student",{id}); else { const r=idxAll().find(x=>x.school===t.school && ((t.admNo && norm(x.admNo)===norm(t.admNo)) || norm(x.name)===norm(t.name))); r ? go("student",{id:r.id}) : go("find",{q:t.admNo||t.name}); } },
   vcf: () => vcf(), formDlg: () => formDlg(),
   aiOff: () => ask("Switch off form reading?","Clerks will no longer be able to read forms from photos.","Switch off",async()=>{ await DB.apply({set:[{col:"secrets",id:"ai",data:{key:"",model:aiCfg().model||""}}],upd:[],inc:[]}); S.ai=null; await loadAi(); fillRegion("stBody",true); toast("Form reading switched off."); }),
   aiSaveGo: async () => { const key=$("#aiKey").value.trim()||aiCfg().key, model=$("#aiModel").value.trim()||"gemini-flash-latest"; if(!key){ toast("Paste the API key first.",true); return; }
@@ -2867,9 +3035,9 @@ const ACT = {
   exp: el => doExport(el.dataset.id, el.dataset.f),
   impGo, impCancel: () => { const r=S.imp?.region; S.imp=null; if(r) fillRegion(r,true); }, impAll: () => { S.impAll=true; fillRegion(S.imp.region,true); }, impErrXlsx,
   /* ---- daily status ---- */
-  dayDone: async () => { const code=entrySchool(), x=todayStatus().find(y=>y.code===code); await dayMark(code,{at:TS,by:me().uid,name:me().name||"",nil:false,n:x?.n||0}); toast("Thank you — today's entries are marked complete."); fillRegion("eStat",true); },
+  dayDone: async () => { const code=entrySchool(), x=todayStatus().find(y=>y.code===code); await dayMark(code,{at:TS,by:me().uid,name:me().name||"",nil:false,n:x?.n||0,unlockedUntil:DEL}); toast("Thank you — today's entries are marked complete."); fillRegion("eStat",true); },
   dayNil: () => ask("Nil return for today?","No admission, withdrawal or transfer happened today in "+h(entrySchool())+". The DQ Office will see “Nil”.","Yes, Nil today",async()=>{ await dayMark(entrySchool(),{at:TS,by:me().uid,name:me().name||"",nil:true,n:0}); toast("Nil return recorded."); fillRegion("eStat",true); }),
-  dayUndo: async () => { await dayMark(entrySchool(),DEL); toast("Confirmation removed — confirm again when you are done."); fillRegion("eStat",true); },
+  dayUndo: async () => { if(!canDecide()){ toast("Only the DQ Office or Super Admin can remove a confirmation.",true); return; } await dayMark(entrySchool(),DEL); toast("Confirmation removed — confirm again when you are done."); fillRegion("eStat",true); },
   /* ---- transfer requests ---- */
   tplTfr: async () => { const X=extraFields("tfrFields"); await writeBook("Transfer_requests_template.xlsx",[["Requests",[[...TFR_COLS.map(c=>c[1]),...X.map(f=>f.label)],[isoToDmy(isoDay(Date.now())),"Example Student (delete this row)","Father Name","IV","B","1","0300-1234567",schoolList()[0].code,schoolList()[1]?.code||"","","",""]]],
       ["Valid values",[["Class","","School codes","","Category no.","Category"],...Array.from({length:Math.max(allLevels().length,schoolList().length,cats().length)},(_,i)=>[allLevels()[i]||"","",schoolList()[i]?`${schoolList()[i].code} — ${schoolList()[i].name}`:"","",cats()[i]?String(i+1):"",cats()[i]||""])]],
@@ -2904,6 +3072,7 @@ const ACT = {
 };
 const CHG = {
   findQ: el => setParams({q:el.value.trim()}),
+  stTime: async el => { if(!isSA()||!el.value) return; await saveSettings({[el.dataset.k]:el.value},el.dataset.k==="cutoff"?`Daily cutoff set to ${el.value}.`:`Entry deadline set to ${el.value}.`); },
   findP: el => setParams({[el.dataset.k]:el.value}),
   setPsel: el => { if(S.view==="fees"&&["school","day"].includes(el.dataset.k)) S.fd=null; setParams({[el.dataset.k]:el.value}); },
   setPck: el => setParams({[el.dataset.k]:el.checked?"1":""}),
@@ -2933,6 +3102,7 @@ const CHG = {
   acceptCl: el => { const t=S.transfers.find(x=>x.id===el.closest("form").dataset.id); const c=S.schools[t.to].classes.find(x=>x.cl===el.value); $("#aSec").innerHTML=secOpts(t.to,c); }
 };
 document.addEventListener("input", e => { const el=e.target;
+  if(el.dataset.live==="find"){ clearTimeout(S.fqT); S.fqT=setTimeout(()=>{ S.params={...S.params,q:el.value.trim()}; if(!S.params.q) delete S.params.q; history.replaceState(null,"",hashFor("find",S.params)); if(S.navStack.length) S.navStack[S.navStack.length-1]=location.hash; fillRegion("fList",true); fillRegion("fCover",true); },180); return; }
   if(el.dataset.sf){ const k=el.dataset.sf; if(k==="q"){ S.stuQ=el.value; clearTimeout(S.sfT); S.sfT=setTimeout(()=>{ S.stuLimit=200; fillRegion("sList",true); },200); } return; } if(el.dataset.rp && (el.tagName==="TEXTAREA"||el.type==="text"||!el.type)) setRp(el); if(el.dataset.wa!==undefined){ S.waLast=el; clearTimeout(S.waT); S.waT=setTimeout(waPreview,250); } });
 document.addEventListener("focusin", e => { if(e.target.dataset?.wa!==undefined) S.waLast=e.target; });
 document.addEventListener("change", async e => {
@@ -2942,6 +3112,11 @@ document.addEventListener("change", async e => {
   if(el.dataset.rp){ if(!(el.tagName==="TEXTAREA"||el.type==="text")) setRp(el); return; }
   try{
     if(el.dataset.wf){ const w=S.waiting.find(x=>x.id===el.dataset.id); if(!w||!canWait(el.dataset.wf,w)) return; await DB.apply({set:[],inc:[],upd:[{col:"waiting",id:w.id,data:{[el.dataset.wf]:el.value,updatedAt:TS,updatedBy:me().name||""}}]}); toast("Saved."); return; }
+    if(el.dataset.uu && isSA()){ const v=el.value, k=el.dataset.uu; let val;
+      if(k==="voidMin") val = v==="" ? DEL : Math.max(0,Math.round(Number(v)||0));
+      else if(v==="custom"){ const m=Math.round(Number(prompt("Allow undoing record changes for how many minutes?","45"))||0); if(m<=0){ fillRegion("stBody",true); return; } val=Date.now()+m*60e3; }
+      else val = v==="0" ? DEL : v==="forever" ? Date.parse("2099-12-31T23:59") : v.startsWith("m") ? Date.now()+Number(v.slice(1))*60e3 : Date.now()+Number(v.replace("d",""))*864e5;
+      await DB.apply({set:[],inc:[],upd:[{col:"users",id:el.dataset.id,data:{[k]:val}}]}); toast(k==="voidMin"?"Undo window updated.":v==="0"?"Permission to undo record changes removed.":"Permission to undo record changes granted."); fillRegion("stBody",true); return; }
     if(el.dataset.uf && isSA()){ const f=el.dataset.uf; let v=el.type==="checkbox"?el.checked:el.value; if(f==="name"){ v=v.trim(); if(!v){ toast("Name cannot be blank.",true); el.value=(S.users.find(u=>u.uid===el.dataset.id)||{}).name||""; return; } }
       await DB.apply({set:[],inc:[],upd:[{col:"users",id:el.dataset.id,data:{[f]:v}}]});
       if(el.dataset.id===me().uid && f==="name"){ S.user={...S.user,name:v}; boot(); toast("Your name is updated."); return; }
@@ -2961,6 +3136,7 @@ document.addEventListener("change", async e => {
   }catch(err){ toast(err.message,true); }
 });
 document.addEventListener("click", e => {
+  const bl=$("#bellList"); if(bl && !bl.hidden && !e.target.closest("#bellList") && !e.target.closest("[data-act=bell]")) bl.hidden=true;
   const um=$("#umenu"); if(um && !um.hidden && !e.target.closest(".umenu")) um.hidden=true; else if(um && e.target.closest("#umenu [data-act]")) um.hidden=true;
   const el=e.target.closest("[data-act]"); if(!el || !ACT[el.dataset.act]) return;
   if((el.tagName==="A" && el.dataset.act!=="waEdit") || el.tagName==="BUTTON") e.preventDefault();
@@ -2991,6 +3167,7 @@ const FORMS = {
     ops.upd.push({col:"transfers",id:t.id,data:{status:"accepted",inTx:inId,toCl:cl,toSec:sec,accBy:me().name||"",accAt:TS}}); await DB.apply(ops); closeModal(); toast(`${t.name} joined ${t.to} ${cl}-${sec}.`); },
   log: () => { const p={from:$("#lgFrom").value,to:$("#lgTo").value,school:$("#lgSch").value,act:$("#lgAct")?.value,by:$("#lgBy")?.value,q:$("#lgQ")?.value.trim(),sa:$("#lgNoSA")&&!$("#lgNoSA").checked?"1":""}; history.replaceState(null,"",hashFor("log",{...S.params,...p})); S.params={...S.params,...p}; runLog(); },
   promoGo: () => promoGo(),
+  reqUnlock: async () => { const code=entrySchool(), why=$("#rqWhy").value.trim(); if(!why) return; await DB.apply({set:[{col:"requests",id:newId(),data:{type:"unlock",school:code,day:isoDay(Date.now()),reason:why,n:Number($("#rqN").value)||0,status:"pending",at:TS,by:me().uid,byName:me().name||""}}],upd:[],inc:[]}); closeModal(); toast("Request sent — you will see the answer under 🔔 and on this page."); },
   formOk: (f, how) => formOk(f, how||"entry"),
   tfrAdd: async () => { const d={appDate:isSA()?$("#taDate").value:isoDay(Date.now()),name:$("#taName").value.trim(),father:$("#taFather").value.trim(),cl:$("#taCl").value,gender:$("#taGen").value,cat:$("#taCat").value,contact:$("#taCon").value.trim(),curSchool:$("#taCur").value,curExt:$("#taCur").value==="__other"?$("#taExt").value.trim():"",choice1:$("#taC1").value,choice2:$("#taC2").value,admNo:$("#taAdm").value.trim(),remarks:$("#taRem").value.trim(),status:"Pending",x:Object.fromEntries(extraFields("tfrFields").map(f=>[f.key,$("#tx_"+f.key)?.value||""]))};
     if(!d.name) return; if(d.choice1===d.curSchool){ toast("1st choice is the same as the present school.",true); return; } d.backdated=d.appDate<isoDay(Date.now());
@@ -3022,7 +3199,7 @@ const FORMS = {
   addUser: async () => { const u={name:$("#uName").value.trim(),email:$("#uEmail").value.trim(),password:$("#uPw")?.value,role:$("#uRole").value,school:$("#uSch").value};
     if(["clerk","principal"].includes(u.role)&&u.school==="ALL"){ toast("Pick the school for a clerk or principal.",true); return; }
     try{ await DB.createUser(u); toast(`Login created: ${asEmail(u.email)}`+(DEMO?"":` · password ${u.password} — share it privately.`)); fillRegion("stBody",true); }catch(e){ toast("Could not create: "+(e.code||e.message),true); } },
-  general: async () => { await saveSettings({orgShort:$("#sShort").value.trim()||"APEIs PSC",dailyDeadline:$("#sDl").value||"09:00",genderCodes:{b:$("#sGb").value.trim()||"1",g:$("#sGg").value.trim()||"2"},idleMinutes:Math.max(0,Number($("#sIdle").value)||0),org:$("#sOrg").value.trim(),sessionStart:$("#sStart").value,cutoff:$("#sCut").value,defaultPeriod:$("#sPer").value,reportFooter:$("#sFoot").value.trim()},"Settings saved."); boot(); },
+  general: async () => { await saveSettings({voidMinutes:Math.max(0,Math.round(Number($("#sVoid").value)||0)),orgShort:$("#sShort").value.trim()||"APEIs PSC",dailyDeadline:$("#sDl").value||"09:00",genderCodes:{b:$("#sGb").value.trim()||"1",g:$("#sGg").value.trim()||"2"},idleMinutes:Math.max(0,Number($("#sIdle").value)||0),org:$("#sOrg").value.trim(),sessionStart:$("#sStart").value,cutoff:$("#sCut").value,defaultPeriod:$("#sPer").value,reportFooter:$("#sFoot").value.trim()},"Settings saved."); boot(); },
   labels: async f => { const fd=new FormData(f), lab={}; for(const k of Object.keys(DEFAULT_LABELS)){ const v=String(fd.get(k)||"").trim(); if(v && v!==DEFAULT_LABELS[k]) lab[k]=v; } await saveSettings({labels:lab},"Labels saved."); },
   actions: async f => { const fd=new FormData(f); const A=actions().map((a,i)=>({...a,label:String(fd.get("l_"+i)||a.label).trim()||a.label,kind:fd.get("k_"+i)||a.kind,on:fd.get("o_"+i)==="on"}));
     const nc=String(fd.get("newcode")||"").trim().toUpperCase().replace(/[^A-Z0-9_]/g,""), nl=String(fd.get("newlabel")||"").trim();
