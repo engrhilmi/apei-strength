@@ -224,6 +224,13 @@ main table th.asc::after{content:" ▲";font-size:.75em}main table th.desc::afte
 /* the tab you are on stands out */
 nav a.on{background:rgba(255,255,255,.18);border-bottom:3px solid #f59e0b!important;border-radius:8px 8px 0 0}
 .subtabs .pill.on{background:#f59e0b!important;border-color:#f59e0b!important;color:#111!important;box-shadow:0 0 0 3px rgba(245,158,11,.25)}
+.kpi.kg5{border-top:3px solid #b91c1c;background:linear-gradient(#fef2f2,#fff)}.kpi.kg6{border-top:3px solid #be123c;background:linear-gradient(#fff1f2,#fff)}.dark .kpi.kg5,.dark .kpi.kg6{background:none}
+.stiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-bottom:14px}
+.sgrp{background:var(--panel,#fff);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.sgrp h4{margin:0;padding:8px 12px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:var(--c)}
+.stile{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;border:0;border-top:1px solid var(--line);background:none;padding:9px 12px;cursor:pointer;font:inherit;color:inherit}
+.stile:hover{background:color-mix(in srgb,var(--c) 8%,transparent)}.stile.on{background:color-mix(in srgb,var(--c) 14%,transparent);box-shadow:inset 4px 0 0 var(--c)}
+.stile .ic{font-size:20px;line-height:1;width:26px;text-align:center}.stile b{display:block;font-size:14px;color:var(--c)}.stile small{display:block;color:var(--mute,#64748b);font-size:12px;margin-top:1px}
 </style>
 </head>
 <body>
@@ -290,7 +297,7 @@ const DEFAULT_STU_FIELDS = [
   {key:"address",label:"Address"},{key:"religion",label:"Religion"},{key:"blood",label:"Blood Group"},{key:"prevSchool",label:"Previous School"},
   {key:"leftDate",label:"Date Left",type:"date"},{key:"leftReason",label:"Reason Left"},{key:"remarks",label:"Remarks"},
   {key:"medHist",label:"Medical history / conditions",med:1},{key:"allergies",label:"Allergies",med:1},{key:"surgeries",label:"Surgeries / hospital stays",med:1},{key:"disability",label:"Disability / special needs",med:1},
-  {key:"eyes",label:"Eyesight",med:1},{key:"height",label:"Height (cm)",med:1},{key:"weight",label:"Weight (kg)",med:1},{key:"medDate",label:"Last health check",type:"date",med:1},{key:"medNote",label:"Doctor / nurse remarks",med:1}];
+  {key:"eyes",label:"Eyesight",med:1},{key:"height",label:"Height (cm)",med:1},{key:"weight",label:"Weight (kg)",med:1},{key:"medDate",label:"Last health check",type:"date",med:1},{key:"vacc",label:"Vaccination (EPI)",med:1},{key:"medication",label:"Regular medicine",med:1},{key:"hearing",label:"Hearing",med:1},{key:"dental",label:"Teeth / dental",med:1},{key:"emergency",label:"Emergency contact",med:1},{key:"medNote",label:"Doctor / nurse remarks",med:1}];
 const STU_STATUS = ["On roll","Left","Transferred out","Passed out"];
 const DEFAULT_WAIT_ST = [{name:"Waiting",count:true},{name:"Test Taken",count:true},{name:"Granted",count:true},{name:"Not Responding",count:false},{name:"Admitted",count:false},{name:"Cancelled",count:false}];
 const DEFAULT_LABELS = { cl:"Cl", sec:"Sec", inc:"Inc Sec", auth:"Auth", str:"Current Str", g:"Girls", b:"Boys", sd:"Sur/ Dft", w:"Waiting List",
@@ -412,7 +419,7 @@ function cur(code, cl, sec){
   const d=(STR()[code]||{}).d||{}; const x=SCH()[code]?.classes.find(c=>c.cl===cl)?.secs.find(z=>z.s===sec) || {g:0,b:0};
   return { g:(x.g||0)+(d[K(cl,sec,"g")]||0), b:(x.b||0)+(d[K(cl,sec,"b")]||0) };
 }
-const manualWait = (code, cl) => Number(((S.strength[code]||{}).w||{})[cl] ?? 0) || 0;
+const manualWait = (code, cl) => ST().waitTyped===false ? 0 : Number(((S.strength[code]||{}).w||{})[cl] ?? 0) || 0;
 function waitCount(code, cl){ if(S.asOf) return Number(((S.asOf.strength[code]||{}).w||{})[cl])||0;   // past date: from that day's snapshot
   return manualWait(code,cl) + S.waiting.filter(w=>w.school===code && w.cl===cl && waitCounted(w.status)).length; }
 /* category counts per class = typed/imported category figures (c.cat) + every movement since, by category */
@@ -507,9 +514,10 @@ async function withAsOf(day, fn){ if(!day) return fn(); const st=await asOfState
    Writes = "ops" {set:[], upd:[], inc:[]} applied atomically.
    ===================================================================== */
 function opsNew(){ return { set:[], upd:[], inc:[] }; }
-const DEL = { __del:true };                       // "remove this key" inside a deep-merge write
+const DEL = { __del:true };
+const INC = n => ({ __inc:n });                        // "add n to this number" inside a write                       // "remove this key" inside a deep-merge write
 const isPlain = o => o && typeof o==="object" && !Array.isArray(o) && o!==TS && o!==DEL && !(typeof o.toMillis==="function");
-function deepMerge(a, b, fix){ const o=isPlain(a)?{...a}:{}; for(const [k,v] of Object.entries(b)){ if(v===DEL) delete o[k]; else if(isPlain(v)) o[k]=deepMerge(o[k],v,fix); else o[k]=fix(v); } return o; }
+function deepMerge(a, b, fix){ const o=isPlain(a)?{...a}:{}; for(const [k,v] of Object.entries(b)){ if(v===DEL) delete o[k]; else if(isPlain(v)&&"__inc" in v) o[k]=(Number(o[k])||0)+v.__inc; else if(isPlain(v)) o[k]=deepMerge(o[k],v,fix); else o[k]=fix(v); } return o; }
 /* sync light: counts writes not yet confirmed by the server */
 const SYNC = { pending:0, last:Date.now(), err:"", online:navigator.onLine };
 function syncPaint(){ const el=document.getElementById("syncDot"); if(!el) return; const off=!navigator.onLine;
@@ -535,7 +543,7 @@ function fsFail(e){ const msg=String(e?.message||e||""); if(!/INTERNAL ASSERTION
 addEventListener("unhandledrejection", e=>fsFail(e.reason)); addEventListener("error", e=>fsFail(e.error||e.message));
 setTimeout(()=>{ try{ sessionStorage.removeItem("apeis_fsfail"); }catch(x){} }, 10*60e3);
 /* every student write also updates that school's small search index (stuIdx/{school}.i.{id}) — 6 small documents instead of thousands of reads */
-const IDX_F = ["admNo","name","father","cl","sec","gender","cat","status","fatherCnic","contact","dob","bform","motherCnic","contact2","fatherRank","unit","serviceNo","cv","pType","mother","guardian","guardianRel","guardianCnic","dup","dupOk","eyes","height","weight","allergies","disability"];
+const IDX_F = ["admNo","name","father","cl","sec","gender","cat","status","fatherCnic","contact","dob","bform","motherCnic","contact2","fatherRank","unit","serviceNo","cv","pType","mother","guardian","guardianRel","guardianCnic","dup","dupOk","eyes","height","weight","allergies","disability","ver","medDate","vacc","medication"];
 const IDX_SEP = "\u001f";
 const idxArr = r => IDX_F.map(k=>r[k]===DEL||r[k]==null?"":String(r[k]).replace(/\u001f/g," ")).join(IDX_SEP);
 const idxObj = (id, school, a) => { if(typeof a==="string") a=a.split(IDX_SEP); const o={id,school}; IDX_F.forEach((k,i)=>o[k]=(a&&a[i])||""); if(o.contact) o.contact=fmtPhones(o.contact); if(o.contact2) o.contact2=fmtPhones(o.contact2); return o; };
@@ -680,7 +688,7 @@ const Fire = {
     const m=this.m, u=this.auth.currentUser;
     await m.reauthenticateWithCredential(u, m.EmailAuthProvider.credential(u.email, oldPw));
     await m.updatePassword(u, newPw); toast("Password changed."); return true; },
-  conv(o){ const r={}; for(const [k,v] of Object.entries(o)) r[k] = v===TS ? this.m.serverTimestamp() : v===DEL ? this.m.deleteField() : isPlain(v) ? this.conv(v) : v; return r; },
+  conv(o){ const r={}; for(const [k,v] of Object.entries(o)) r[k] = v===TS ? this.m.serverTimestamp() : v===DEL ? this.m.deleteField() : isPlain(v)&&"__inc" in v ? this.m.increment(v.__inc) : isPlain(v) ? this.conv(v) : v; return r; },
   async apply(ops, quiet){
     addIdxOps(ops); patchStuCache(ops); const m=this.m, db=this.db; let b=m.writeBatch(db), n=0; const batches=[b];
     const step=()=>{ if(++n>=400){ b=m.writeBatch(db); batches.push(b); n=0; } };
@@ -791,11 +799,11 @@ function applyRoute(force){
   const hs=location.hash||"#"+v, st=S.navStack;
   if(st.length>1 && st[st.length-2]===hs) st.pop(); else if(st.at(-1)!==hs) st.push(hs); if(st.length>60) st.shift();
   const same = v===S.view && JSON.stringify(r.p)===JSON.stringify(S.params);
-  S.view=v; S.params=r.p; if(same && !force) return; renderView(); window.scrollTo(0,0);
+  S.view=v; S.params=r.p; if(same && !force) return; renderView(); window.scrollTo(0,0); actLog(v);
 }
 function goBack(){ if(S.navStack.length>1) history.back(); else go(homeView()); }
 
-function boot(){
+function boot(){ setTimeout(actLogin,1200);
   const app=$("#app"); applyTheme();
   if(!S.ready){ app.innerHTML=`<div class="login"><div class="panel">Loading…</div></div>`; return; }
   if(!S.user){ app.innerHTML = loginHtml(); return; }
@@ -951,6 +959,7 @@ function kpiHtml(codes, w, rows, kind){
     ${K(`data-act="go" data-id="drill" data-p="m=cat"`,h(L("kCats")),nf(Object.values(catTotals(codes)).reduce((a,v)=>a+v,0)),`${cats().length} categories · click for boxes`,"","kg3")}
     ${canSeeStudents()?K(`data-act="go" data-id="students" data-p="tab=chk"`,h(L("kDb")),`${(nOn/(t.str||1)*100).toFixed(1)}%`,`${nf(nOn)} of ${nf(t.str)} students entered`,"","kg3"):""}
     ${K(`data-act="drill" data-m="status"`,h(L("kToday")),`${done}/${st.length}`,"schools confirmed",done===st.length?"pos":"neg","kg3")}
+    ${extraKpis()}
     ${K(`data-act="go" data-id="daycare"`,h(L("kDc")),nf(dc.str),`of ${nf(dc.cap)} places · ${nf(Math.max(0,dc.cap-dc.str))} vacant`,"","kg4")}</div>`;
 }
 function classTable(code, st, interactive){ const cx=cl=>interactive?{school:code,cl}:null;
@@ -1007,7 +1016,7 @@ VIEWS.entry = {
       </form></div>
       <div class="two">
         <div class="panel"><h2>Selected class — live sections</h2><div class="scroll" id="eCls"></div></div>
-        <div class="panel"><div class="ph"><h2>${h(L("w"))} — class-wise</h2><button class="btn s p" data-act="saveWaitCounts">Save counts</button></div>
+        ${ST().waitTyped===false?`<div class="panel"><h2>${h(L("w"))}</h2><p class="hint">The waiting list is counted from the applicants entered by name in the <b>Applicants</b> tab.</p><button class="btn" data-act="go" data-id="waiting">Open Applicants</button></div>`:""}<div class="panel" ${ST().waitTyped===false?"hidden":""}><div class="ph"><h2>${h(L("w"))} — class-wise</h2><button class="btn s p" data-act="saveWaitCounts">Save counts</button></div>
           <p class="hint" style="margin-top:0">Type today's waiting count for each class and press Save. Applicants added by name (Applicants tab) are counted on top.</p><div class="scroll" id="eWait"></div></div>
       </div>
       <div class="panel"><details ${S.imp?"open":""}><summary><h2 style="display:inline">Import entries from Excel</h2> <span class="hint">— for when entries were kept in a sheet</span></summary>
@@ -1167,7 +1176,7 @@ VIEWS.waiting = {
     return tabs+`<div class="note">Optional. The class-wise waiting count is typed on the Entry tab. Use this page when you want applicants by name (test, marks, DQ remarks); every applicant with a counted status is added to that class's waiting count.</div>
      <div class="panel"><div class="ph"><h2>Applicants by name</h2><div class="pills">${(isSA()||role()==="hq")?`<select class="in" style="width:auto" data-chg="waitSchool"><option value="ALL">All schools</option>${schoolList().map(s=>`<option value="${h(s.code)}" ${s.code===code?"selected":""}>${h(s.code)}</option>`).join("")}</select>`:""}
       <select class="in" style="width:auto" data-chg="waitStatus"><option value="active">Counted statuses</option><option value="all" ${S.waitStatus==="all"?"selected":""}>All statuses</option>${waitSts().map(s=>`<option ${S.waitStatus===s.name?"selected":""}>${h(s.name)}</option>`).join("")}</select></div></div>
-     ${canAdd?`<form data-form="wait" class="entry" autocomplete="off" style="margin-bottom:12px"><div class="grid">
+     ${canAdd?pasteBox("new")+`<form data-form="wait" class="entry" autocomplete="off" style="margin-bottom:12px"><div class="grid">
        <div class="f"><label for="wDate">Appl date</label><input id="wDate" type="date" value="${isoDay(Date.now())}" max="${isoDay(Date.now())}" ${isSA()?"":"disabled title=\"Today's date is put in automatically; only the Super Admin can change it\""}></div>
        <div class="f"><label for="wCl">${h(L("cl"))}</label><select id="wCl">${S.schools[addSchool].classes.map(c=>`<option>${h(c.cl)}</option>`).join("")}</select></div>
        <div class="f"><label for="wName">Student name</label><input id="wName" required></div>
@@ -1203,18 +1212,19 @@ VIEWS.waiting = {
 };
 
 /* ---------- Log: entries · record edits · activity by account ---------- */
-const logTab = () => ["edits","acc"].includes(S.params.tab) || (S.params.tab==="rev"&&canDecide()) ? S.params.tab : "tx";
+const logTab = () => ["edits","acc"].includes(S.params.tab) || (["rev","act","sys"].includes(S.params.tab)&&canDecide()) ? S.params.tab : "tx";
 const LOG_PRESETS = [["today","Today",0,0],["yday","Yesterday",1,1],["d7","7 days",6,0],["d30","30 days",29,0],["month","This month",-1,0],["all","All",-2,0]];
 const userOpts = sel => [...S.users].filter(u=>u.role!=="superadmin"&&!u.replacedBy).sort((a,b)=>(a.school+a.name).localeCompare(b.school+b.name)).map(u=>`<option value="${h(u.uid)}" ${sel===u.uid?"selected":""}>${h(u.name)} — ${h(ROLES[u.role]||u.role)}${u.school!=="ALL"?" "+h(u.school):""}</option>`).join("");
 VIEWS.log = {
   shell(){ const p=S.params, t=logTab(), from=p.from||isoDay(Date.now()-6*864e5), to=p.to||isoDay(Date.now());
-    const tabs=`<div class="subtabs">${[["tx","Entries (admissions, withdrawals, transfers)"],...(canDecide()?[["rev",`Review entries${reviewCount()?` (${reviewCount()})`:""}`]]:[]),["edits","Changes to student records"],["acc","Activity by account"]].map(([k,l])=>`<button class="pill ${t===k?"on":""}" data-act="setP" data-p="tab=${k}">${l}</button>`).join("")}</div>`;
+    const tabs=`<div class="subtabs">${[["tx","Entries (admissions, withdrawals, transfers)"],...(canDecide()?[["rev",`Review entries${reviewCount()?` (${reviewCount()})`:""}`]]:[]),["edits","Changes to student records"],["acc","Activity by account"],...(canDecide()?[["act","👁 User logins & page views"],["sys","⚙ System changes"]]:[])].map(([k,l])=>`<button class="pill ${t===k?"on":""}" data-act="setP" data-p="tab=${k}">${l}</button>`).join("")}</div>`;
     return tabs+`<div class="panel"><div class="pills" style="margin-bottom:8px"><span class="mute" style="font-size:13px">Dates:</span>${LOG_PRESETS.map(([k,l])=>`<button class="pill" data-act="logPreset" data-id="${k}">${l}</button>`).join("")}<span style="flex:1"></span>${expBar(t==="tx"||t==="rev"?"log":t==="edits"?"edits":"accounts")}</div>
     <form data-form="log" class="grid">
     <div class="f"><label for="lgFrom">From</label><input id="lgFrom" type="date" value="${h(from)}" data-chg="logAuto"></div>
     <div class="f"><label for="lgTo">To</label><input id="lgTo" type="date" value="${h(to)}" data-chg="logAuto"></div>
     <div class="f"><label for="lgSch">School</label><select id="lgSch" data-chg="logAuto"><option value="">All</option>${schoolList().map(s=>`<option ${s.code===(p.school??mySchool())?"selected":""}>${h(s.code)}</option>`).join("")}</select></div>
     ${t==="rev"?`<div class="f"><label for="lgRv">Show</label><select id="lgRv" data-chg="logAuto"><option value="">Waiting for a decision</option><option value="dec" ${p.rv==="dec"?"selected":""}>Decided (approved / rejected)</option><option value="all" ${p.rv==="all"?"selected":""}>All entries</option></select></div>`:""}
+    ${t==="tx"?`<div class="f"><label for="lgSt">Status</label><select id="lgSt" data-chg="logAuto"><option value="">All entries</option>${[["ok","Counted"],["void","Voided only"],["rejected","Rejected only"],["pending","Waiting for approval"]].map(([k,l])=>`<option value="${k}" ${p.st===k?"selected":""}>${l}</option>`).join("")}</select></div>`:""}
     ${t==="tx"?`<div class="f"><label for="lgAct">Action</label><select id="lgAct" data-chg="logAuto"><option value="">All</option>${actions().map(a=>`<option value="${h(a.code)}" ${p.act===a.code?"selected":""}>${h(a.label)}</option>`).join("")}</select></div>`:""}
     ${t!=="acc"&&isSA()?`<div class="f"><label for="lgBy">Entered by (account)</label><select id="lgBy" data-chg="logAuto"><option value="">All accounts</option>${userOpts(p.by)}</select></div>`:""}
     ${t!=="acc"?`<div class="f"><label for="lgQ">Search name / adm no</label><input id="lgQ" value="${h(p.q||"")}" data-chg="logAuto"></div>`:""}
@@ -1225,6 +1235,8 @@ VIEWS.log = {
     if(t==="edits"){ if(!S.editRows) return `<div class="empty">Loading…</div>`; const r=S.editRows; if(!r.length) return `<div class="empty">No student records were edited in these dates.</div>`;
       const rv=revertedIds(r); return `<p class="hint" style="margin-top:0">${r.length} changes. Every change made to any student's record (by anyone) is listed with the old and new value; click a name to open the record.${canUndoEdits(mySchool())||isSA()?" Undo puts the old values back (and is itself logged).":""}</p><table><tr><th>#</th><th>When</th><th>School</th><th>Student</th><th>By</th><th>Field</th><th>From</th><th>To</th><th></th></tr>${r.flatMap((e,ei)=>(e.changes||[]).map((c,i)=>`<tr class="${rv.has(e.id)?"void":""}"><td class="mute">${i?"":ei+1}</td><td>${i?"":fmtDT(toMs(e.at))}</td><td>${i?"":h(e.school)}</td><td>${i?"":`<span class="dn" data-act="openStu" data-id="${h(e.stuId)}">${h(e.stuName)}</span>`}</td><td>${i?"":h(e.byName)+` <span class="mute">${h(ROLES[e.role]||"")}</span>`}${!i&&e.revertOf?` <span class="tag t-mid">undo</span>`:""}</td><td>${h(c.l||c.k)}</td><td class="mute">${h(c.from)}</td><td><b>${h(c.to)}</b></td><td>${!i&&canUndoEdits(e.school)&&!e.revertOf&&!rv.has(e.id)?`<button class="btn s r" data-act="revertEdit" data-id="${h(e.id)}">Undo</button>`:!i&&rv.has(e.id)?`<span class="tag t-out">undone</span>`:""}</td></tr>`)).join("")}</table>`; }
     if(t==="acc"){ if(!S.logRows||!S.editRows) return `<div class="empty">Loading…</div>`; return screenTable(accountsModel()); }
+    if(t==="act") return actHtml();
+    if(t==="sys") return sysHtml();
     if(!S.logRows) return `<div class="empty">Loading…</div>`; const r=logFiltered(), sel=isSA()||role()==="hq";
     if(t==="rev") return reviewHtml(r);
     return `<div class="ph" style="margin-bottom:6px"><p class="hint" style="margin:0">${r.length} entries · ${r.filter(t=>t.status==="void").length} voided${sel?" · tick entries (or the box in the heading for all) to void several at once":""}</p>${sel?`<button class="btn s r" data-act="bulkVoid">Void selected</button>`:""}</div>`+txTable(r,true,sel); } },
@@ -1232,14 +1244,15 @@ VIEWS.log = {
 };
 function logFiltered(){ const sch=$("#lgSch")?.value, act=$("#lgAct")?.value, by=$("#lgBy")?.value, noSA=$("#lgNoSA")?.checked, q=norm($("#lgQ")?.value||""), sa=new Set(S.users.filter(u=>u.role==="superadmin").map(u=>u.uid));
   const byU=by?S.users.find(u=>u.uid===by):null, bys=new Set(by?[by,...(byU?.prevUids||[])]:[]);
-  const rv=$("#lgRv")?.value; const tab=logTab();
-  return (S.logRows||[]).filter(t=>(tab!=="rev"||rv==="all"||(rv==="dec"?(!!t.approvedBy||t.status==="rejected"||t.rev===true):(t.status==="pending"||(t.status==="ok"&&t.rev===false))))&&(!sch||t.school===sch)&&(!act||t.action===act)&&(!by||bys.has(t.by))&&(!noSA||!sa.has(t.by)||!isSA())&&(!q||norm(t.name+t.admNo+t.father).includes(q))); }
+  const rv=$("#lgRv")?.value; const tab=logTab(), stF=$("#lgSt")?.value||"";
+  return (S.logRows||[]).filter(t=>(!stF||tab!=="tx"||t.status===stF)&&(tab!=="rev"||rv==="all"||(rv==="dec"?(!!t.approvedBy||t.status==="rejected"||t.rev===true):(t.status==="pending"||(t.status==="ok"&&t.rev===false))))&&(!sch||t.school===sch)&&(!act||t.action===act)&&(!by||bys.has(t.by))&&(!noSA||!sa.has(t.by)||!isSA())&&(!q||norm(t.name+t.admNo+t.father).includes(q))); }
 function accountsModel(){ const sch=$("#lgSch")?.value, U=S.users.length?S.users.filter(u=>u.role!=="superadmin"):[...new Map((S.logRows||[]).map(t=>[t.by,{uid:t.by,name:t.byName,role:"",school:t.school}])).values()];
   const rows=U.filter(u=>(!sch||u.school===sch)&&!u.replacedBy).map(u=>{ const ids=new Set([u.uid,...(u.prevUids||[])]); const T=(S.logRows||[]).filter(t=>ids.has(t.by)), E=(S.editRows||[]).filter(e=>ids.has(e.by)), last=Math.max(0,...T.map(t=>t.atMs),...E.map(e=>toMs(e.at)));
     return {c:[u.name||"",ROLES[u.role]||u.role||"",u.school||"",num(T.filter(t=>t.status==="ok").length,"n"),num(T.filter(t=>t.status==="void").length,"n"),num(E.length,"n"),last?fmtDT(last):"—",u.active===false?"inactive":""]}; });
   return tbl("ACTIVITY BY ACCOUNT (Super Admin not listed)",["Account","Role","School","Entries","Voided","Record edits","Last activity",""],rows); }
 async function runLog(){ const f=$("#lgFrom"), t=$("#lgTo"); if(!f) return; const from=new Date(f.value+"T00:00").getTime(), to=new Date(t.value+"T23:59:59").getTime(); const tab=logTab();
-  try{ if(tab!=="edits"){ S.logRows=await DB.fetchTx(from-8*864e5,to); S.logRows=S.logRows.filter(x=>tTime(x)>=from&&tTime(x)<=to).sort((a,b)=>tTime(b)-tTime(a)); }
+  try{ if(tab==="act"||tab==="sys"){ await (tab==="act"?actLoad(f.value,t.value):sysLoad(f.value,t.value)); fillRegion("lgRows",true); return; }
+    if(tab!=="edits"){ S.logRows=await DB.fetchTx(from-8*864e5,to); S.logRows=S.logRows.filter(x=>tTime(x)>=from&&tTime(x)<=to).sort((a,b)=>tTime(b)-tTime(a)); }
     if(tab!=="tx"){ const sch=$("#lgSch")?.value, by=$("#lgBy")?.value, q=norm($("#lgQ")?.value||""); const E=await DB.query("edits","day",">=",f.value);
       S.editRows=E.filter(e=>e.day<=t.value&&(!sch||e.school===sch)&&(!by||e.by===by)&&(!q||norm(e.stuName+e.admNo).includes(q))).sort((a,b)=>toMs(b.at)-toMs(a.at)); } }
   catch(e){ toast("Log not loaded: "+e.message,true); S.logRows ||= []; S.editRows ||= []; } fillRegion("lgRows",true); }
@@ -1314,6 +1327,7 @@ VIEWS.find = {
       <div class="grid"><div class="f wide" style="grid-column:span 2"><label for="fq">Search — name, father, rank (Lt, Maj…), Adm No, CNIC, phone, class (9a, eys1, pre-i b), school code, girls/boys, #5 (category 5), left</label><input id="fq" value="${h(p.q||"")}" data-chg="findQ" data-live="find" placeholder="results update as you type"></div>
         <div class="f"><label for="fSch">School</label><select id="fSch" data-chg="findP" data-k="school"><option value="">All schools</option>${schoolList().map(s=>`<option ${p.school===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select></div>
         <div class="f"><label for="fSt">Status</label><select id="fSt" data-chg="findP" data-k="st"><option value="">Any status</option>${STU_STATUS.map(x=>`<option ${p.st===x?"selected":""}>${x}</option>`).join("")}</select></div>
+        <div class="f"><label for="fG">Girls / Boys</label><select id="fG" data-chg="findP" data-k="g"><option value="">Girls and boys</option><option value="g" ${p.g==="g"?"selected":""}>Girls only</option><option value="b" ${p.g==="b"?"selected":""}>Boys only</option></select></div>
         <div class="f"><label for="fCat">Category</label><select id="fCat" data-chg="findP" data-k="cat">${catOptions(p.cat,"All categories")}</select></div>
         <div class="f"><label for="fCols">Columns</label><select id="fCols" data-chg="findP" data-k="cols"><option value="">Main details</option><option value="all" ${p.cols==="all"?"selected":""}>All details</option></select></div></div>
       ${p.q?(()=>{ const q=parseQ(p.q), u=[q.school&&"school "+q.school,q.lvl&&"class "+q.lvl,q.sec&&"section "+q.sec,q.g&&(q.g==="g"?"girls":"boys"),q.cat&&catLabel(q.cat),q.st,...q.num.map(n=>"number "+n),...q.text.map(t=>"“"+t+"”")].filter(Boolean); return u.length?`<p class="hint" style="margin:6px 0 0">Understood as: ${u.map(h).join(" · ")}</p>`:""; })():""}
@@ -1322,9 +1336,12 @@ VIEWS.find = {
   regions:{
     fCover(){ const p=S.params; if(!(p.school||p.cl||p.lvl||p.grp||p.all)||p.q) return "";
       const codes=p.school?[p.school]:p.grp?schoolList().filter(s=>s.grp===p.grp).map(s=>s.code):schoolList().map(s=>s.code); let str=0;
-      for(const c of codes) for(const cl of S.schools[c].classes){ if(p.cl&&cl.cl!==p.cl) continue; if(p.lvl&&lvlOf(cl)!==p.lvl) continue; const st=classStats(c,cl); if(p.sec){ const x=st.secs.find(z=>z.s===p.sec); if(x) str+=p.g?x[p.g]:x.str; } else str+=p.g?st[p.g]:st.str; }
+      const cat=p.cat?canonCat(p.cat):"";
+      for(const c of codes) for(const cl of S.schools[c].classes){ if(p.cl&&cl.cl!==p.cl) continue; if(p.lvl&&lvlOf(cl)!==p.lvl) continue;
+        if(cat){ for(const x of cl.secs){ if(p.sec&&x.s!==p.sec) continue; str+=secSummary(c,cl,x).cat?.[cat]||0; } continue; }
+        const st=classStats(c,cl); if(p.sec){ const x=st.secs.find(z=>z.s===p.sec); if(x) str+=p.g?x[p.g]:x.str; } else str+=p.g?st[p.g]:st.str; }
       const n=findRows({...p,st:p.st||"On roll"}).length; if(n>=str) return "";
-      return `<div class="note">Strength figure for this selection is <b>${nf(str)}</b>; <b>${nf(n)}</b> of these students are in the data bank so far. The rest appear here as each school fills its register (Students → Import Excel).</div>`; },
+      return `<div class="note">Strength figure for this selection${cat?` (category ${h(catLabel(cat))}${p.g?", girls and boys together — the summary has no girls/boys split per category":""})`:""} is <b>${nf(str)}</b>; <b>${nf(n)}</b> of these students are in the data bank so far. The rest appear here as each school fills its register (Students → Import Excel).</div>`; },
     fList(){ const R=S.params.q?rankRows(findRows(S.params),S.params.q):findRows(S.params); S.findRows=R; if(!idxAll().length) return `<div class="empty">The student data bank is empty so far. Schools add students in Students → Register (one by one or Excel import); every new admission is added automatically.</div>`;
       if(!R.length) return `<div class="empty">No student matches. Try fewer words, or remove a filter above.</div>`;
       const all=S.params.cols==="all"||!!S.params.sec, lim=S.findLim||300; const sibN=r=>{ const k=cnicKey(r.fatherCnic); return k?idxAll().filter(x=>x.id!==r.id&&cnicKey(x.fatherCnic)===k):[]; };
@@ -1339,7 +1356,7 @@ function findModels(){ const R=S.findRows||findRows(S.params), all=S.params.cols
     models:[tbl(`STUDENTS (${R.length})`,["#","School","Class – Sec","Adm No","Name","Father","G","Category",...(all?["Father CNIC","DOB","B-Form"]:[]),"Contact","Status"],R.map((r,i)=>({c:[String(i+1),r.school,`${r.cl}-${r.sec}`,r.admNo,r.name,r.father,gTxt(r.gender),catLabel(r.cat),...(all?[fmtCnic(r.fatherCnic),isoToDmy(r.dob),r.bform]:[]),r.contact,r.status]})))]}; }
 
 /* ---------- Drill: what a clicked figure is made of ---------- */
-const DRILL_T = { cat:"Categories", str:"Strength", g:"Girls", b:"Boys", auth:"Authorised seats", n:"Sections", inc:"Sections added this session", sd:"Surplus / deficit", wait:"Waiting list", net:"Movement", status:"Today's entries" };
+const DRILL_T = { cat:"Categories", str:"Strength", g:"Girls", b:"Boys", auth:"Authorised seats", n:"Sections", inc:"Sections added this session", sd:"Surplus / deficit", wait:"Waiting list", net:"Movement", status:"Today's entries", fee:"Fee defaulters" };
 function scopeCodes(p){ return p.school?[p.school]:p.grp?schoolList().filter(s=>s.grp===p.grp).map(s=>s.code):schoolList().map(s=>s.code); }
 VIEWS.drill = {
   shell(){ const p=S.params, m=p.m||"str";
@@ -1366,6 +1383,7 @@ function drillHtml(){ const p=S.params, m=p.m||"str"; if(m==="cat") return catBo
     return `<p class="hint" style="margin-top:0">${R.length} entries ${h(periodLabel(dashPeriod(),w))}${p.school?" in "+h(p.school):""}. Change the period on the Dashboard, or use Log for any dates.</p>`+txTable(R,false); }
   if(m==="status") return statusDetail();
   if(m==="wait") return waitDrillHtml();
+  if(m==="fee") return feeDrillHtml();
   const [t]=drillModels(); const cols=t.head.length-1;
   const link=(r,i,c)=>{ if(!r.k || i===0) return null; const key=m==="wait"?null:["n","auth","str","g","b","sd"][i-1]; if(!key) return null; return dAttr(key,r.k); };
   return `<table><caption class="scap">${h(t.title)}</caption><tr>${t.head.map((x,i)=>`<th class="${i?"n":""}">${h(x)}</th>`).join("")}</tr>${t.rows.map(r=>`<tr class="${r.cls||""}">${r.c.map((c,i)=>{ const a=link(r,i,c); const v=typeof c==="object"&&c?c:null;
@@ -1416,12 +1434,13 @@ function stuPageHtml(){ const sp=S.sp; if(!sp) return ""; if(sp.err) return `<di
   return `<div class="panel ${ed?"editing":""}"><div class="sp-head" style="align-items:flex-start">${phBox}<div style="flex:1"><h2>${sp.isNew?"Add a student to the data bank":h(r.name)}</h2>
       <div class="sub">${h(code)} — ${h(sc?.name||"")} · ${h(r.cl)}-${h(r.sec)} · ${r.status==="On roll"?"On roll":`<span class="tag t-out">${h(r.status)}</span>`}${r.admNo?` · Adm ${h(r.admNo)}`:""}${r.cat?` · ${h(catLabel(r.cat))}`:""}${fee?` · Monthly fee Rs ${nf(fee)}`:""}</div></div>
       <div class="pills"><button class="btn" data-act="back">← Back</button>${editBtn}${!sp.isNew?expBar("stuOne")+formBar("one"):""}${!sp.isNew&&canDecide()?`<button class="btn r" data-act="stuDel" data-id="${h(r.id)}" title="Moves the record to Trash; it can be restored">🗑 Move to Trash</button>`:""}</div></div>
-      ${r.cv&&!sp.isNew?`<div class="note" style="border-color:#d97706">⚠ <b>Category to re-verify.</b> This school's categories came in against the old list. Check the category${may?` — correct it with ✎ Edit, or if it is already right press <button class="btn s g" data-act="cvOk" data-id="${h(r.id)}">✓ Category is correct</button>`:""}.</div>`:""}
+      ${!sp.isNew?verBox(r,may):""}${r.cv&&!sp.isNew?`<div class="note" style="border-color:#d97706">⚠ <b>Category to re-verify.</b> This school's categories came in against the old list. Check the category${may?` — correct it with ✎ Edit, or if it is already right press <button class="btn s g" data-act="cvOk" data-id="${h(r.id)}">✓ Category is correct</button>`:""}.</div>`:""}
     ${sp.isNew?`<div class="note" style="margin-top:10px">Use this for students already on roll. A <b>new admission</b> should be entered on the Entry tab — that adds the student to strength and creates the record by itself.</div>`:""}
     ${!may&&!sp.isNew?`<p class="hint">Read-only for your account${role()==="clerk"?` — this student belongs to ${h(code)}`:""}.</p>`:""}
     ${may&&!ed&&!direct?`<p class="hint">To correct this record, <b>double-click</b> any field (or the Edit button). You will be asked to confirm; every change is kept in the edit log with your name.</p>`:""}
     <form data-form="stuSave" data-id="${h(r.id||"")}" autocomplete="off" style="margin-top:12px"><div class="fgrid ${may&&!ed?"locked":""}" ${may&&!ed?`data-dbl="stuEdit"`:""}>${activeFields().filter(f=>!f.med).map(f=>`<div class="f" ${["remarks","address"].includes(f.key)?'style="grid-column:1/-1"':""}><label for="sf_${f.key}">${h(f.label)}${f.req?" *":""}</label>${stuFieldInput(f,r,ed,code)}</div>`).join("")}</div>${medCardHtml(r,ed,code,may)}
     ${ed?`<div class="row">${sp.isNew?"":`<button type="button" class="btn" data-act="stuEditOff">Cancel</button>`}<button class="btn p">${sp.isNew?"Add to data bank":"Save changes"}</button></div>`:""}</form></div>
+   ${sp.isNew?"":feePayHtml(r)}
    ${sp.isNew?"":`<div class="two"><div class="panel"><h2>Siblings in APEIs (${sib.sure.length})</h2>
       ${cnicKey(r.fatherCnic)||cnicKey(r.motherCnic)?(sib.sure.length?`<div class="sibs">${sib.sure.map(sibCard).join("")}</div>`:`<p class="mute">No other child with father CNIC ${h(fmtCnic(r.fatherCnic))} in any APEI data bank.</p>`):`<p class="mute">Add the father's CNIC (13 digits) to find brothers and sisters in all campuses.</p>`}
       ${sib.maybe.length?`<h3 style="font-size:14px;margin:12px 0 6px">Possible siblings — same father name and phone, CNIC missing</h3><div class="sibs">${sib.maybe.map(sibCard).join("")}</div>`:""}</div>
@@ -1513,7 +1532,7 @@ function tfrList(p){ p ||= S.params; const L0=S.tfrapps.filter(t=>t.session===se
   R.forEach(t=>t.rank=ranked.get(t.id)||""); return R; }
 const canTfr = t => isSA() || role()==="hq" || (role()==="clerk" && [t.choice1,t.choice2,t.school,t.curSchool].includes(mySchool()));
 function tfrFormHtml(){ const X=extraFields("tfrFields"), today=isoDay(Date.now());
-  return `<div class="pills" style="margin-bottom:8px"><button type="button" class="btn" data-act="tfrPaste">📋 Paste parent's WhatsApp message</button><button type="button" class="btn s" data-act="tfrFormat">Format message for parents</button></div><form data-form="tfrAdd" class="entry" autocomplete="off" style="margin-bottom:12px"><div class="grid">
+  return `${pasteBox("tfr")}<form data-form="tfrAdd" class="entry" autocomplete="off" style="margin-bottom:12px"><div class="grid">
     <div class="f"><label for="taDate">Date of application</label><input id="taDate" type="date" value="${today}" max="${today}" ${isSA()?"":"disabled title=\"Only the Super Admin can enter an earlier date\""}></div>
     <div class="f"><label for="taName">Student name *</label><input id="taName" required></div>
     <div class="f"><label for="taFather">Father name</label><input id="taFather"></div>
@@ -1608,9 +1627,9 @@ const retOn = (code, day) => (S.feeRets||[]).filter(r=>r.school===code && r.day<
 function retSum(rows){ const s={m1:0,m2:0,m3:0,m4:0,m5:0,amt:0}; for(const r of Object.values(rows||{})){ const m=Math.max(1,Number(r.m)||1); s["m"+Math.min(5,m)]++; s.amt+=Number(r.amt)||0; } return s; }
 const retTotal = s => (s.m1||0)+(s.m2||0)+(s.m3||0)+(s.m4||0)+(s.m5||0);
 VIEWS.fees = {
-  shell(){ const tab=feeTab(); const T=[["ret","Defaulters return"],["rep","Report (print-ready)"],["str","Fee structure"]].filter(([k])=>k!=="ret"||role()!=="viewer");
+  shell(){ const tab=feeTab(); const T=[["ret","Defaulters return"],["rep","Report (print-ready)"],["pay","💳 Payments received"],["str","Fee structure"]].filter(([k])=>k!=="ret"||role()!=="viewer");
     return `<div class="subtabs">${T.map(([k,l])=>`<button class="pill ${tab===k?"on":""}" data-act="setP" data-p="tab=${k}">${l}</button>`).join("")}</div><div id="feBody"><div class="panel">Loading fee returns…</div></div>`; },
-  regions:{ feBody(){ if(!S.feeRets) return `<div class="panel">Loading fee returns…</div>`; const t=feeTab(); return t==="str"?feeStructHtml():t==="rep"?feeRepHtml():feeRetHtml(); } },
+  regions:{ feBody(){ if(!S.feeRets) return `<div class="panel">Loading fee returns…</div>`; const t=feeTab(); return t==="str"?feeStructHtml():t==="rep"?feeRepHtml():t==="pay"?feePayList():feeRetHtml(); } },
   post(id){ if(id==="feBody") wireFeeSearch(); },
   after(){ loadFeeRets().then(()=>{ if(S.view==="fees"){ if(feeTab()==="ret") feeDraftInit(); fillRegion("feBody",true); } }).catch(e=>toast("Fee returns not loaded: "+e.message,true)); }
 };
@@ -2373,7 +2392,7 @@ async function loadBaseTx(force){ if(!force && S.baseTx && Date.now()-S.baseTx.a
 function secSummary(code, c, x){ const v=cur(code,c.cl,x.s), cat={...(x.cat||{})};
   for(const t of (S.baseTx?.rows||[])){ if(!t.cat || t.atMs<baseStartMs()) continue; for(const [sc,cl,sec,n] of effects(t)) if(sc===code && cl===c.cl && sec===x.s){ const k=canonCat(t.cat); cat[k]=(cat[k]||0)+n; if(!cat[k]) delete cat[k]; } }
   const canon={}; for(const [k,n] of Object.entries(cat)){ const ck=canonCat(k); canon[ck]=(canon[ck]||0)+n; }
-  return {g:v.g, b:v.b, n:v.g+v.b, cat:canon, hasCat:!!x.cat}; }
+  return {g:v.g, b:v.b, n:v.g+v.b, cat:canon, hasCat:!!x.cat, est:!!x.est}; }
 const chkScope = () => { const p=S.params, code=mySchool()||p.ckSch||""; return {code, label:code?`${code} — ${S.schools[code]?.name||""}`:"All schools"}; };
 const reqFields = () => activeFields().filter(f=>f.req);
 const stuInc = r => !!r.cv || reqFields().some(f=>!String(r[f.key]??"").trim());
@@ -2396,25 +2415,43 @@ function chkShell(){ const p=S.params;
 async function chkLoad(){ await Promise.all([loadBaseTx().catch(()=>[]), ...schoolList().map(s=>ensureStu(s.code).catch(()=>[]))]); fillRegion("chkBody",true); }
 function progRows(){ const dl=ST().dbDeadline||{}; return schoolList().map(s=>{ const R=(stuOf(s.code)||[]).filter(r=>r.status==="On roll"), st=schoolStats(s.code).str, inc=R.filter(r=>stuInc(r)).length;
   const pf=st?R.length/st*100:0, pc=R.length?(R.length-inc)/R.length*100:0, d=dl[s.code]||"", left=d?Math.ceil((Date.parse(d+"T23:59")-Date.now())/864e5):null;
-  const full=R.filter(stuFull).length; return {s, st, n:R.length, inc, full, pfull:R.length?full/R.length*100:0, cv:R.filter(r=>r.cv).length, pf, pc, d, left, done:pf>=99.5&&inc===0}; }); }
+  const full=R.filter(stuFull).length; return {s, st, n:R.length, inc, full, ver:R.filter(r=>r.ver).length, pfull:R.length?full/R.length*100:0, cv:R.filter(r=>r.cv).length, pf, pc, d, left, done:pf>=99.5&&inc===0}; }); }
 function progHtml(){ const P=progRows();
-  return `<h3 style="margin:4px 0 8px;font-size:16px">Progress & deadlines</h3><div class="scroll"><table><tr><th>School</th><th class="n">Strength</th><th class="n">In data bank</th><th style="min-width:160px">Filled</th><th class="n">Required fields filled</th><th class="n">Every field filled</th><th class="n">Category to re-verify</th><th>Deadline</th><th>Status</th></tr>
-   ${P.map(x=>`<tr><td><b>${h(x.s.code)}</b> <span class="mute">${h(x.s.name)}</span></td><td class="n">${nf(x.st)}</td><td class="n">${nf(x.n)}</td><td><div class="bar" style="margin:0"><i style="width:${Math.min(100,x.pf).toFixed(1)}%" class="${x.pf<50?"over":""}"></i></div><span class="mini">${x.pf.toFixed(1)}%</span></td><td class="n">${x.n?x.pc.toFixed(1)+"%":"–"}</td><td class="n">${x.n?`<b class="${x.pfull<100?"neg":"pos"}">${x.pfull.toFixed(1)}%</b> <span class="mute">(${nf(x.full)})</span>`:"–"}</td><td class="n">${x.cv?`<span class="dn neg" data-act="go" data-id="find" data-p="${h(qs({school:x.s.code,cv:"1",st:"On roll"}))}">${nf(x.cv)}</span>`:""}</td>
+  return `<h3 style="margin:4px 0 8px;font-size:16px">Progress & deadlines</h3><div class="scroll"><table><tr><th>School</th><th class="n">Strength</th><th class="n">In data bank</th><th style="min-width:160px">Filled</th><th class="n">Required fields filled</th><th class="n">Every field filled</th><th class="n">Verified</th><th class="n">Category to re-verify</th><th>Deadline</th><th>Status</th></tr>
+   ${P.map(x=>`<tr><td><b>${h(x.s.code)}</b> <span class="mute">${h(x.s.name)}</span></td><td class="n">${nf(x.st)}</td><td class="n">${nf(x.n)}</td><td><div class="bar" style="margin:0"><i style="width:${Math.min(100,x.pf).toFixed(1)}%" class="${x.pf<50?"over":""}"></i></div><span class="mini">${x.pf.toFixed(1)}%</span></td><td class="n">${x.n?x.pc.toFixed(1)+"%":"–"}</td><td class="n">${x.n?`<b class="${x.pfull<100?"neg":"pos"}">${x.pfull.toFixed(1)}%</b> <span class="mute">(${nf(x.full)})</span>`:"–"}</td><td class="n">${x.n?`${(x.ver/x.n*100).toFixed(1)}% <span class="mute">(${nf(x.ver)})</span>`:"–"}</td><td class="n">${x.cv?`<span class="dn neg" data-act="go" data-id="find" data-p="${h(qs({school:x.s.code,cv:"1",st:"On roll"}))}">${nf(x.cv)}</span>`:""}</td>
      <td>${isSA()||role()==="hq"?`<input type="date" class="in" style="width:auto;min-height:30px" value="${h(x.d)}" data-chg="dbDeadline" data-k="${h(x.s.code)}">`:x.d?fmtD(Date.parse(x.d+"T12:00")):"—"}</td>
      <td>${x.done?`<span class="tag t-in">✓ complete</span>`:x.d?(x.left<0?`<span class="tag t-out">overdue ${-x.left} day${x.left===-1?"":"s"}</span>`:`<span class="tag t-mid">${x.left} day${x.left===1?"":"s"} left</span>`):`<span class="mute">no deadline</span>`}</td></tr>`).join("")}</table></div>`; }
+const missingOf = r => fullFields(r).filter(k=>!MED_KEYS.has(k)&&!String(r[k]??"").trim()).map(k=>stuFields().find(f=>f.key===k)?.label||k);
+const CKL = {all:["All students in the data bank",()=>true],inc:["Required field missing",r=>stuInc(r)],part:["Some fields still empty",r=>!stuFull(r)],unver:["Not yet verified (double-checked)",r=>!r.ver],ver:["Verified",r=>!!r.ver]};
 function chkHtml(){ if(!schoolList().every(s=>stuOf(s.code))) return `<p class="mute">Loading the data bank…</p>`;
   const R=chkRows(), p=S.params, T=R.reduce((a,r)=>{ a.sm+=r.sm.n; a.n+=r.n; a.inc+=r.inc; a.ok+=r.ok?1:0; return a; },{sm:0,n:0,inc:0,ok:0});
-  const ALL=schoolList().flatMap(s=>(stuOf(s.code)||[]).filter(r=>r.status==="On roll"&&(!chkScope().code||r.school===chkScope().code))), FULL=ALL.filter(stuFull).length;
-  const pctF=T.sm?Math.round(T.n/T.sm*1000)/10:0, pctC=T.n?Math.round((T.n-T.inc)/T.n*1000)/10:0, show=p.ckShow==="all"?R:R.filter(r=>!r.ok), open=p.ckOpen;
-  const det=r=>{ const keys=[...new Set([...Object.keys(r.sm.cat),...Object.keys(r.bc)])].sort((a,b)=>(catNo(a)||99)-(catNo(b)||99));
-    return `<tr><td colspan="9" style="background:var(--soft);white-space:normal"><div class="pills" style="margin-bottom:6px">${keys.map(k=>{ const a=r.sm.cat[k]||0, b=r.bc[k]||0; return `<span class="fchip ${a!==b?"neg":""}" title="summary ${a} · data bank ${b}">${h(catLabel(k)||k)}: <b>${a}</b> / ${b}</span>`; }).join("")||`<span class="mute">No category figures.</span>`}</div>
-      <span class="mute">summary / data bank.</span> <button class="btn s" data-act="go" data-id="find" data-p="${h(qs({school:r.school,cl:r.cl,sec:r.sec,st:"On roll"}))}">Open the ${r.n} students of ${h(r.cl)}-${h(r.sec)}</button>${r.inc?` <span class="neg">${r.inc} record(s) miss a required field.</span>`:""}</td></tr>`; };
-  return (mySchool()?"":progHtml())+`<h3 style="margin:14px 0 8px;font-size:16px">${mySchool()?"":"Section by section"}</h3><div class="kpis"><div class="kpi"><span>Summary strength</span><b>${nf(T.sm)}</b></div><div class="kpi"><span>In the data bank</span><b>${nf(T.n)}</b><i>${pctF}% of strength filled</i></div>
-     <div class="kpi"><span>Required fields filled</span><b>${nf(T.n-T.inc)}</b><i>${pctC}% have every required field and a verified category</i></div><div class="kpi"><span>Every field filled</span><b class="${FULL===ALL.length?"pos":"neg"}">${nf(FULL)}</b><i>${ALL.length?(FULL/ALL.length*100).toFixed(1):"0"}% of records — the goal is 100%</i></div>
+  const ALL=schoolList().flatMap(s=>(stuOf(s.code)||[]).filter(r=>r.status==="On roll"&&(!chkScope().code||r.school===chkScope().code))), FULL=ALL.filter(stuFull).length, VER=ALL.filter(r=>r.ver).length;
+  const pc=(a,b)=>b?(a/b*100).toFixed(1):"0", show=p.ckShow==="all"?R:R.filter(r=>!r.ok), open=S.ckOpen, L1=p.ckList;
+  const K=(k,lab,val,sub,cls)=>`<div class="kpi click ${L1===k?"kg3":""}" data-act="ckList" data-id="${k}" role="button" tabindex="0" title="Click for the list of these students"><span>${lab}</span><b class="${cls||""}">${val}</b><i>${sub}</i></div>`;
+  const list = L1&&CKL[L1] ? (()=>{ const X=sortStu(ALL.filter(CKL[L1][1])); return `<div class="panel" style="border:2px solid #7c3aed"><div class="ph"><h3 style="margin:0">${h(CKL[L1][0])} — ${nf(X.length)} students</h3><div class="pills">${L1==="unver"&&X.length?`<button class="btn s g" data-act="ckVerAll">✓ Mark all ${nf(Math.min(X.length,500))} shown as verified</button>`:""}<button class="btn s" data-act="ckList" data-id="">Close list ✕</button></div></div>
+     <p class="hint" style="margin-top:0">Click a student to open the full record and correct it.${L1==="unver"?" Verify only after checking the record against the school register / admission form.":""}</p>
+     <div class="scroll" style="max-height:520px;overflow:auto"><table><tr><th>#</th><th>School</th><th>Class – Sec</th><th>Adm No</th><th>Name</th><th>Father / Guardian</th><th>G/B</th><th>Category</th><th>Missing</th><th>Verified</th></tr>
+     ${X.slice(0,1500).map((r,i)=>`<tr class="click" data-act="openStu" data-id="${h(r.id)}"><td class="mute">${i+1}</td><td>${h(r.school)}</td><td>${h(r.cl)}-${h(r.sec)}</td><td>${h(r.admNo)}</td><td><b>${h(r.name)}</b></td><td>${h(parentOf(r))}</td><td>${gTxt(r.gender)}</td><td>${h(catLabel(r.cat))}</td><td class="neg" style="white-space:normal;min-width:180px">${r.cv?"Category to re-verify; ":""}${h(missingOf(r).join(", "))}</td><td>${r.ver?`<span class="pos">✓ ${h(String(r.ver).split("|")[0])}</span>`:""}</td></tr>`).join("")}</table>${X.length>1500?`<p class="hint">First 1,500 shown — choose one school above.</p>`:""}</div></div>`; })() : "";
+  const det=r=>{ const keys=[...new Set([...Object.keys(r.sm.cat),...Object.keys(r.bc)])].sort((a,b)=>(catNo(a)||99)-(catNo(b)||99)), B=sortStu((stuOf(r.school)||[]).filter(x=>x.status==="On roll"&&x.cl===r.cl&&x.sec===r.sec)), may=canEditStu({school:r.school});
+    return `<tr id="ckDet"><td colspan="9" style="background:var(--soft);white-space:normal"><div class="pills" style="margin-bottom:6px">${keys.map(k=>{ const a=r.sm.cat[k]||0, b=r.bc[k]||0; return `<span class="fchip ${a!==b?"neg":""}" title="summary ${a} · data bank ${b}">${h(catLabel(k)||k)}: <b>${a}</b> / ${b}</span>`; }).join("")||`<span class="mute">No category figures.</span>`}</div>
+      <p class="mute" style="margin:0 0 6px">Chips: summary / data bank. ${r.bg!==r.sm.g?`<b class="neg">Girls: summary ${r.sm.g}, data bank ${r.bg}.</b> `:""}${r.sm.est?`The girls/boys split of this section is an <b>estimate</b> from the category sheet — if the data bank is right, correct it in Setup → Opening strength.`:""}</p>
+      <form data-form="ckSec" data-k="${h(r.school+"|"+r.cl+"|"+r.sec)}"><div class="scroll" style="max-height:460px;overflow:auto"><table class="nosort"><tr><th>#</th><th>Adm No</th><th>Name</th><th>Father / Guardian</th><th>G/B</th><th>Category</th><th>Missing</th><th>✓ Verified</th></tr>
+      ${B.map((x,i)=>`<tr><td class="mute">${i+1}</td><td>${h(x.admNo)}</td><td><span class="dn" data-act="openStu" data-id="${h(x.id)}">${h(x.name)}</span></td><td>${h(parentOf(x))}</td>
+        <td>${may?`<select class="in" style="width:auto;min-height:28px;padding:1px 4px" data-q="${h(x.id)}" data-f="gender"><option value="b" ${x.gender!=="g"?"selected":""}>B</option><option value="g" ${x.gender==="g"?"selected":""}>G</option></select>`:gTxt(x.gender)}</td>
+        <td>${may?`<select class="in" style="width:auto;max-width:230px;min-height:28px;padding:1px 4px" data-q="${h(x.id)}" data-f="cat">${catOptions(x.cat,"—")}</select>`:h(catLabel(x.cat))}</td>
+        <td class="neg mini" style="white-space:normal;min-width:140px">${x.cv?"category to re-verify; ":""}${h(missingOf(x).join(", "))}</td>
+        <td style="text-align:center">${may?`<input type="checkbox" data-q="${h(x.id)}" data-f="ver" ${x.ver?"checked":""} style="width:18px;height:18px" title="${x.ver?h("Verified by "+String(x.ver).replace("|"," on ")):"Tick after checking this record"}">`:(x.ver?"✓":"")}</td></tr>`).join("")||`<tr><td colspan="8" class="mute">No students of this section in the data bank yet.</td></tr>`}</table></div>
+      ${may&&B.length?`<div class="row" style="justify-content:flex-start;margin-top:6px"><button class="btn p">Save changes to this section</button><button type="button" class="btn s" data-act="ckTickAll">Tick all as verified</button><span class="mute mini">Gender and category changes are kept in the edit log. Strength figures are not changed.</span></div>`:""}</form></td></tr>`; };
+  return (mySchool()?"":progHtml())+`<h3 style="margin:14px 0 8px;font-size:16px">${mySchool()?"Your school":"Section by section"} <span class="mute" style="font-weight:400;font-size:13px">— click any box for the list of students</span></h3><div class="kpis">
+     ${K("all","In the data bank",nf(T.n),`${pc(T.n,T.sm)}% of strength ${nf(T.sm)}`)}
+     ${K("inc","Required fields filled",nf(T.n-T.inc),`${pc(T.n-T.inc,T.n)}% · click for the ${nf(T.inc)} missing`,T.inc?"neg":"pos")}
+     ${K("part","Every field filled",nf(FULL),`${pc(FULL,ALL.length)}% — goal 100% · click for the rest`,FULL===ALL.length?"pos":"neg")}
+     ${K("unver","Verified (double-checked)",nf(VER),`${pc(VER,ALL.length)}% · click for the ${nf(ALL.length-VER)} still to check`,VER===ALL.length&&VER?"pos":"neg")}
      <div class="kpi"><span>Sections complete</span><b class="${T.ok===R.length?"pos":"neg"}">${T.ok}/${R.length}</b><i>data bank = summary (total, girls/boys, categories)</i></div></div>
-    <p class="hint">A section is <b>complete</b> when the students entered in the data bank are exactly the section's strength: same total, same girls and boys, same number in every category. Girls/boys of co-ed sections came from the category sheet as <b>estimates</b> (marked “est”) — correct them in <b>Setup → Opening strength</b>.</p>
+    ${list}
+    <p class="hint"><b>How to work:</b> ① clerks enter every student (Register → Import / Add); ② fill every field; ③ check each record once more against the register and tick <b>✓ Verified</b> (here per section, or on the student's page). A section is <b>complete</b> when its data bank matches its strength exactly — click a red row: its students open right there, change gender or category in place and save.</p>
     <div class="scroll">${show.length?`<table><tr><th>School</th><th>Class – Sec</th><th class="n">Summary</th><th class="n">Data bank</th><th class="n">Diff</th><th class="n">Girls (sum / bank)</th><th class="n">Boys (sum / bank)</th><th class="n">Categories differing</th><th class="n">Incomplete</th></tr>
-      ${show.map(r=>{ const k=r.school+"|"+r.cl+"|"+r.sec; return `<tr class="click ${r.ok?"":"bad"}" data-act="setP" data-p="${h(qs({ckOpen:open===k?"":k}))}"><td>${h(r.school)}</td><td><b>${h(r.cl)} - ${h(r.sec)}</b> <span class="mute">${open===k?"▾":"▸"}</span></td><td class="n">${r.sm.n}</td><td class="n">${r.n}</td><td class="n">${sg(r.n-r.sm.n)}</td>
+      ${show.map(r=>{ const k=r.school+"|"+r.cl+"|"+r.sec; return `<tr class="click ${r.ok?"":"bad"}" data-act="ckOpen" data-id="${h(k)}"><td>${h(r.school)}</td><td><b>${h(r.cl)} - ${h(r.sec)}</b> <span class="mute">${open===k?"▾":"▸"}</span>${r.sm.est?` <span class="tag t-mid" title="girls/boys estimated">est</span>`:""}</td><td class="n">${r.sm.n}</td><td class="n">${r.n}</td><td class="n">${sg(r.n-r.sm.n)}</td>
         <td class="n ${r.bg!==r.sm.g?"neg":""}">${r.sm.g} / ${r.bg}</td><td class="n ${r.bb!==r.sm.b?"neg":""}">${r.sm.b} / ${r.bb}</td><td class="n ${r.bad.length?"neg":""}">${r.sm.hasCat?r.bad.length:"–"}</td><td class="n ${r.inc?"neg":""}">${r.inc||""}</td></tr>${open===k?det(r):""}`; }).join("")}</table>`:`<div class="empty">Every section matches. ✓</div>`}</div>`; }
 function chkModel(){ const R=chkRows(); return tbl("DATA BANK CHECK",["School","Class – Sec","Summary","Data bank","Diff","Girls summary","Girls bank","Boys summary","Boys bank","Categories differing","Incomplete records","Match"],
   R.map(r=>({c:[r.school,`${r.cl}-${r.sec}`,num(r.sm.n,"n"),num(r.n,"n"),num(r.n-r.sm.n,"sd"),num(r.sm.g,"n"),num(r.bg,"n"),num(r.sm.b,"n"),num(r.bb,"n"),r.bad.map(k=>`${catLabel(k)}: ${r.sm.cat[k]||0}/${r.bc[k]||0}`).join("; "),num(r.inc,"n"),r.ok?"✓":"✕"]}))); }
@@ -2607,7 +2644,7 @@ new MutationObserver(()=>{ clearTimeout(window.__rsT); window.__rsT=setTimeout((
 EXTRA_ACT.tz = el => { const d=+el.dataset.d; let v=d===0?1:Math.round((tzNow()+d*0.1)*10)/10; v=Math.min(1.6,Math.max(0.7,v)); try{ localStorage.setItem("apeis_tz",v); }catch(e){} tzApply(); };
 
 /* ---------- v4.12: duplicates, health card, transfer-request messages, credit line, phone app ---------- */
-const MED_KEYS = new Set(["medHist","allergies","surgeries","disability","eyes","height","weight","medDate","medNote"]);
+const MED_KEYS = new Set(["medHist","allergies","surgeries","disability","eyes","height","weight","medDate","medNote","vacc","medication","hearing","dental","emergency"]);
 /* duplicates: same name + same father/mother/guardian CNIC = surely the same child; same name + same father (or mother) name = probably */
 function dupOf(rec, exceptId){ const n=norm(rec.name); if(!n) return []; const keys=[rec.fatherCnic,rec.motherCnic,rec.guardianCnic].map(cnicKey).filter(Boolean), pn=[rec.father,rec.mother,rec.guardian].map(norm).filter(Boolean), out=[];
   for(const x of idxAll()){ if(x.id===exceptId||x.status!=="On roll"||norm(x.name)!==n) continue;
@@ -2632,10 +2669,10 @@ function dupGroups(){ if(dupMemo.src===S.idx) return dupMemo.g; const R=idxAll()
   const g=[...G.values()].filter(v=>v.length>1 && !v.every(r=>r.dupOk)).map(v=>({kids:sortStu(v), sure:v.some(r=>level[r.id]==="sure"), flagged:v.some(r=>r.dup&&!r.dupOk)})).sort((a,b)=>(b.flagged-a.flagged)||(b.sure-a.sure));
   dupMemo={src:S.idx,g}; return g; }
 function dupHtml(){ const G=dupGroups();
-  return `<div class="ph"><h2>Duplicate check — whole data bank</h2></div><p class="hint" style="margin-top:0">Every student on roll in all schools is compared. <b>Sure</b> = same name and the same father / mother / guardian CNIC, or the same Adm No in one school. <b>Probable</b> = same name and the same father / mother name. <b>Flagged</b> = a clerk was warned and saved anyway. Open the records; move the extra one to Trash, or press “Not a duplicate” so the group stops showing.</p>
+  return `<div class="ph"><h2>Duplicate check — whole data bank</h2>${canDecide()&&G.some(g=>g.sure)?`<button class="btn r" data-act="dupTrashAll">🗑 Move all extra copies (Sure) to Trash</button>`:""}</div><p class="hint" style="margin-top:0">Every student on roll in all schools is compared. <b>Sure</b> = same name and the same father / mother / guardian CNIC, or the same Adm No in one school. <b>Probable</b> = same name and the same father / mother name. <b>Flagged</b> = a clerk was warned and saved anyway. Open the records; move the extra one to Trash, or press “Not a duplicate” so the group stops showing.</p>
    ${G.length?`<div class="scroll"><table><tr><th>#</th><th>How sure</th><th>Name</th><th>Father / Guardian</th><th>Records (click to open)</th><th></th></tr>${G.map((g,i)=>`<tr><td class="mute">${i+1}</td><td>${g.flagged?`<span class="tag t-out">flagged by clerk</span> `:""}${g.sure?`<span class="tag t-out">Sure</span>`:`<span class="tag t-mid">Probable</span>`}</td><td><b>${h(g.kids[0].name)}</b></td><td>${h(parentOf(g.kids[0]))}</td>
      <td style="white-space:normal">${g.kids.map(x=>`<span class="fchip dn" data-act="openStu" data-id="${h(x.id)}">${h(x.school)} ${h(x.cl)}-${h(x.sec)} · Adm ${h(x.admNo||"—")}${x.fatherCnic?" · "+h(fmtCnic(x.fatherCnic)):""}</span>`).join(" ")}</td>
-     <td>${canDecide()||g.kids.every(x=>x.school===mySchool())?`<button class="btn s" data-act="dupNot" data-id="${h(g.kids.map(x=>x.id).join(","))}">Not a duplicate</button>`:""}</td></tr>`).join("")}</table></div>`:`<div class="empty">No duplicates found. ✓</div>`}`; }
+     <td>${canDecide()||g.kids.every(x=>x.school===mySchool())?`<button class="btn s" data-act="dupNot" data-id="${h(g.kids.map(x=>x.id).join(","))}">Not a duplicate</button>`:""}${canDecide()?` <button class="btn s r" data-act="dupTrashOne" data-id="${h(g.kids.map(x=>x.id).join(","))}">Keep one, trash rest</button>`:""}</td></tr>`).join("")}</table></div>`:`<div class="empty">No duplicates found. ✓</div>`}`; }
 
 /* ---------- health ---------- */
 const bmiOf = r => { const hgt=Number(String(r.height||"").replace(/[^\d.]/g,"")), w=Number(String(r.weight||"").replace(/[^\d.]/g,"")); return hgt>50&&w>5 ? Math.round(w/((hgt/100)**2)*10)/10 : null; };
@@ -2651,12 +2688,13 @@ function medPrint(){ const r=S.sp?.rec; if(!r) return; if(!canSD()){ toast(SD_MS
     ${F.map(f=>`<tr><th style="text-align:left">${h(f.label)}</th><td>${h(f.type==="date"?isoToDmy(r[f.key]):r[f.key]||"")}</td></tr>`).join("")}<tr><th style="text-align:left">BMI</th><td>${b?b+" kg/m² (read on the WHO BMI-for-age chart)":""}</td></tr></table>
     <p style="margin-top:30px">Checked by: ____________________ &nbsp; Date: ____________ &nbsp; Parent's signature: ____________________</p></div>`,{paper:"A4",orientation:"portrait"}); }
 function healthHtml(){ const p=S.params, R=idxAll().filter(r=>r.status==="On roll"&&(!p.hSch||r.school===p.hSch)), has=k=>R.filter(r=>String(r[k]||"").trim()&&!/^none$/i.test(String(r[k]).trim()));
+  const due=R.filter(r=>!r.medDate||Date.parse(r.medDate)<Date.now()-365*864e5), vac=R.filter(r=>/incomplete|not|due|partial/i.test(r.vacc||"")), med=has("medication");
   const spec=R.filter(r=>/spectacles/i.test(r.eyes||"")), weak=R.filter(r=>/^weak/i.test(r.eyes||"")), hw=R.filter(r=>bmiOf(r)), al=has("allergies"), dis=has("disability");
-  const show=p.hShow||"weak", L2={weak:["Weak eyesight",weak],spec:["Wear spectacles",spec],al:["Allergies",al],dis:["Disability / special needs",dis],bmi:["Height & weight recorded",hw],none:["No health details yet",R.filter(r=>!r.eyes&&!r.height&&!r.weight)]}[show]||["",[]];
+  const show=p.hShow||"weak", L2={weak:["Weak eyesight",weak],spec:["Wear spectacles",spec],al:["Allergies",al],dis:["Disability / special needs",dis],bmi:["Height & weight recorded",hw],due:["Health check due (none in 12 months)",due],vac:["Vaccination incomplete",vac],med:["On regular medicine",med],none:["No health details yet",R.filter(r=>!r.eyes&&!r.height&&!r.weight)]}[show]||["",[]];
   const K=(k,lab,n)=>`<div class="kpi click ${show===k?"kg3":""}" data-act="setP" data-p="hShow=${k}"><span>${lab}</span><b>${nf(n)}</b><i>${R.length?(n/R.length*100).toFixed(1):"0"}% of ${nf(R.length)}</i></div>`;
   return `<div class="ph"><h2>Health of students</h2><select class="in" style="width:auto" data-chg="setPsel" data-k="hSch"><option value="">All schools</option>${schoolList().map(s=>`<option ${p.hSch===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select></div>
    <p class="hint" style="margin-top:0">Filled on each student's page (❤ Medical card) or by Excel import with columns Eyesight, Height (cm), Weight (kg), Allergies, Disability… Use it to guide students and parents on eyesight and fitness.</p>
-   <div class="kpis">${K("weak","Weak eyesight",weak.length)}${K("spec","Wear spectacles",spec.length)}${K("al","Allergies",al.length)}${K("dis","Disability / special needs",dis.length)}${K("bmi","Height & weight recorded",hw.length)}${K("none","No health details yet",L2&&show==="none"?L2[1].length:R.filter(r=>!r.eyes&&!r.height&&!r.weight).length)}</div>
+   <div class="kpis">${K("weak","Weak eyesight",weak.length)}${K("spec","Wear spectacles",spec.length)}${K("al","Allergies",al.length)}${K("dis","Disability / special needs",dis.length)}${K("bmi","Height & weight recorded",hw.length)}${K("due","Health check due",due.length)}${K("vac","Vaccination incomplete",vac.length)}${K("med","On regular medicine",med.length)}${K("none","No health details yet",L2&&show==="none"?L2[1].length:R.filter(r=>!r.eyes&&!r.height&&!r.weight).length)}</div>
    <h3 style="font-size:15px;margin:12px 0 6px">${h(L2[0])} (${L2[1].length})</h3>
    ${L2[1].length?`<div class="scroll"><table><tr><th>#</th><th>School</th><th>Class – Sec</th><th>Adm No</th><th>Name</th><th>G/B</th><th>Eyesight</th><th class="n">Height</th><th class="n">Weight</th><th class="n">BMI</th><th>Allergies</th><th>Disability</th></tr>${sortStu(L2[1]).slice(0,800).map((r,i)=>`<tr class="click" data-act="openStu" data-id="${h(r.id)}"><td class="mute">${i+1}</td><td>${h(r.school)}</td><td>${h(r.cl)}-${h(r.sec)}</td><td>${h(r.admNo)}</td><td><b>${h(r.name)}</b></td><td>${gTxt(r.gender)}</td><td>${h(r.eyes)}</td><td class="n">${h(r.height)}</td><td class="n">${h(r.weight)}</td><td class="n">${bmiOf(r)??""}</td><td>${h(r.allergies)}</td><td>${h(r.disability)}</td></tr>`).join("")}</table></div>`:`<div class="empty">None.</div>`}`; }
 
@@ -2717,6 +2755,132 @@ Object.assign(EXTRA_ACT,{
     <div class="row"><button class="btn" data-act="closeModal">Close</button><a class="btn" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(TFR_MSG)}">Open in WhatsApp</a><button class="btn p" data-act="tfrFormatCopy">Copy</button></div>`),
   tfrFormatCopy: async () => { try{ await navigator.clipboard.writeText($("#tfMsg").value); toast("Copied."); }catch(e){ $("#tfMsg").select(); toast("Press Ctrl+C to copy."); } },
 });
+
+/* ---------- v4.13: activity log, system-changes log, data check actions, fee KPIs & payments, health extras ---------- */
+/* who opened which page, how often (one small document per user per day) */
+let actLast={v:"",t:0};
+function actLogin(){ try{ const k="apeis_act_"+me().uid; if(sessionStorage.getItem(k)) return; sessionStorage.setItem(k,"1"); actLast={v:"",t:0}; actLog("login"); }catch(e){} }
+function actLog(v){ try{ if(DEMO&&!S.user) return; const u=me(); if(!u?.uid||!v) return; const now=Date.now(); if(actLast.v===v&&now-actLast.t<30e3) return; actLast={v,t:now};
+  const d=new Date(), day=isoDay(now), hr=String(d.getHours()).padStart(2,"0"), data={uid:u.uid,name:u.name||"",role:role(),school:u.school||"",day,lastMs:now,last:TS,hours:{[hr]:INC(1)},views:{[v]:INC(1)}};
+  if(v==="login") data.logins=INC(1);
+  DB.apply({set:[{col:"activity",id:u.uid+"_"+day,data,merge:"deep"}],upd:[],inc:[],noIdx:true,quiet:1},true).catch(()=>{}); }catch(e){} }
+async function actLoad(from,to){ const A=await DB.query("activity","day",">=",from); S.actRows=A.filter(a=>a.day<=to); }
+const VIEW_N = {dash:"Dashboard",entry:"Entry",students:"Students",waiting:"Applicants",transfers:"Transfers",daycare:"Day Care",fees:"Fees",log:"Log",reports:"Reports",setup:"Setup",find:"Search",student:"Student record",drill:"Drill-down",login:"Sign-in"};
+function actHtml(){ if(!S.actRows) return `<div class="empty">Loading…</div>`; const A=S.actRows.filter(a=>(!$("#lgSch")?.value||a.school===$("#lgSch").value)&&(isSA()||a.role!=="superadmin")), p=S.params;
+  const U=new Map(); for(const a of A){ const x=U.get(a.uid)||{uid:a.uid,name:a.name,role:a.role,school:a.school,days:0,logins:0,views:0,dash:0,last:0}; x.days++; x.logins+=a.logins||0; const v=Object.entries(a.views||{}).filter(([k])=>k!=="login"); x.views+=v.reduce((q,[,n])=>q+n,0); x.dash+=a.views?.dash||0; x.last=Math.max(x.last,a.lastMs||0); U.set(a.uid,x); }
+  const rows=[...U.values()].sort((a,b)=>b.last-a.last), sel=p.actU&&U.get(p.actU);
+  const never=S.users.filter(u=>u.active!==false&&!u.replacedBy&&u.role!=="superadmin"&&!U.has(u.uid));
+  return `<p class="hint" style="margin-top:0">Every sign-in and every page opened is counted (each user, each day). Pick the dates above. Click a user for the day-by-day record.</p>
+   <table><tr><th>#</th><th>User</th><th>Role</th><th>School</th><th class="n">Days active</th><th class="n">Sign-ins</th><th class="n">Dashboard views</th><th class="n">All pages</th><th>Last seen</th></tr>
+   ${rows.map((x,i)=>`<tr class="click ${p.actU===x.uid?"sel":""}" data-act="setP" data-p="actU=${h(p.actU===x.uid?"":x.uid)}"><td class="mute">${i+1}</td><td><b>${h(x.name)}</b></td><td>${h(ROLES[x.role]||x.role)}</td><td>${h(x.school)}</td><td class="n">${x.days}</td><td class="n">${x.logins}</td><td class="n">${x.dash}</td><td class="n">${x.views}</td><td>${fmtDT(x.last)}</td></tr>`).join("")||`<tr><td colspan="9" class="mute">No activity in these dates.</td></tr>`}</table>
+   ${never.length?`<p class="hint"><b>Not seen in these dates:</b> ${never.map(u=>h(u.name)+(u.school!=="ALL"?" ("+h(u.school)+")":"")).join(", ")}</p>`:""}
+   ${sel?`<h3 style="font-size:15px;margin:14px 0 6px">${h(sel.name)} — day by day</h3><table><tr><th>Date</th><th class="n">Sign-ins</th><th>Pages opened</th><th>Active hours</th><th>Last seen</th></tr>
+     ${A.filter(a=>a.uid===sel.uid).sort((a,b)=>b.day.localeCompare(a.day)).map(a=>`<tr><td>${fmtD(Date.parse(a.day+"T12:00"))}</td><td class="n">${a.logins||0}</td><td style="white-space:normal">${Object.entries(a.views||{}).filter(([k])=>k!=="login").sort((x,y)=>y[1]-x[1]).map(([k,n])=>`${h(VIEW_N[k]||k)} ${n}`).join(" · ")}</td><td>${Object.keys(a.hours||{}).sort().map(x=>x+":00").join(", ")}</td><td>${fmtT(a.lastMs)}</td></tr>`).join("")}</table>`:""}`; }
+
+/* system changes: settings, users, Trash, duplicates… */
+function audit(what, detail){ try{ const u=me(); DB.apply({set:[{col:"audit",id:newId(),data:{what,detail:String(detail||"").slice(0,500),at:TS,atMs:Date.now(),day:isoDay(Date.now()),by:u.uid,byName:u.name||"",role:role()}}],upd:[],inc:[],noIdx:true},true).catch(()=>{}); }catch(e){} }
+async function sysLoad(from,to){ const A=await DB.query("audit","day",">=",from); S.sysRows=A.filter(a=>a.day<=to).sort((a,b)=>(b.atMs||0)-(a.atMs||0)); }
+function sysHtml(){ if(!S.sysRows) return `<div class="empty">Loading…</div>`; const q=norm($("#lgQ")?.value||""), by=$("#lgBy")?.value, R=S.sysRows.filter(a=>(!by||a.by===by)&&(!q||norm(a.what+a.detail+a.byName).includes(q)));
+  return `<p class="hint" style="margin-top:0">${R.length} changes: settings, users and permissions, Trash, duplicate decisions, category re-verification, phone tidy-up, imports of the category sheet.</p>
+   <table><tr><th>#</th><th>When</th><th>By</th><th>What</th><th>Details</th></tr>${R.map((a,i)=>`<tr><td class="mute">${i+1}</td><td>${fmtDT(a.atMs)}</td><td>${h(a.byName)} <span class="mute">${h(ROLES[a.role]||"")}</span></td><td><b>${h(a.what)}</b></td><td style="white-space:normal">${h(a.detail)}</td></tr>`).join("")||`<tr><td colspan="5" class="mute">Nothing in these dates.</td></tr>`}</table>`; }
+
+/* ---------- data check: open a section in place, quick corrections, verification ---------- */
+const verTag = () => `${me().name||""}|${isoDay(Date.now())}`;
+function verBox(r, may){ if(!r?.id) return ""; return r.ver ? `<div class="note" style="border-color:#16a34a">✓ <b>Verified</b> by ${h(String(r.ver).split("|")[0])} on ${h(fmtD(Date.parse((String(r.ver).split("|")[1]||isoDay(Date.now()))+"T12:00")))}.${may?` <button class="btn s" data-act="stuVer" data-id="0">Undo verification</button>`:""}</div>`
+  : may ? `<div class="note">This record is <b>not yet verified</b>. After checking every field against the school register / admission form: <button class="btn s g" data-act="stuVer" data-id="1">✓ Mark as verified</button></div>` : ""; }
+async function ckSecSave(f){ const [code]=f.dataset.k.split("|"); const B=stuOf(code)||[], ops=opsNew(), logs=[]; let n=0;
+  const by={}; for(const el of f.querySelectorAll("[data-q]")) (by[el.dataset.q] ||= {})[el.dataset.f]=el.type==="checkbox"?el.checked:el.value;
+  for(const [id,v] of Object.entries(by)){ const r=B.find(x=>x.id===id); if(!r||!canEditStu(r)) continue; const d={}, ch=[];
+    if(v.gender!==undefined && v.gender!==(r.gender==="g"?"g":"b")){ d.gender=v.gender; ch.push({k:"gender",l:"Gender",from:r.gender==="g"?"G":"B",to:v.gender==="g"?"G":"B"}); }
+    if(v.cat!==undefined && v.cat && canonCat(v.cat)!==canonCat(r.cat)){ d.cat=v.cat; ch.push({k:"cat",l:"Category",from:catLabel(r.cat),to:catLabel(v.cat)}); if(r.cv) d.cv=DEL; }
+    if(v.ver!==undefined && v.ver!==!!r.ver){ d.ver=v.ver?verTag():DEL; ch.push({k:"ver",l:"Verified",from:r.ver?"yes":"no",to:v.ver?"yes":"no"}); }
+    if(!ch.length) continue; n++; ops.upd.push({col:"students",id,data:{...d,updatedAt:TS,updatedBy:me().name||""}});
+    ops.set.push({col:"edits",id:newId(),data:{stuId:id,school:code,stuName:r.name,admNo:r.admNo||"",changes:ch,at:TS,day:isoDay(Date.now()),by:me().uid,byName:me().name||"",role:role()}}); }
+  if(!n){ toast("Nothing was changed."); return; } await DB.apply(ops); await ensureStu(code,true); toast(`${n} record${n>1?"s":""} updated.`); fillRegion("chkBody",true); setTimeout(()=>$("#ckDet")?.scrollIntoView({block:"nearest"}),60); }
+async function ckVerAll(){ const p=S.params, code=chkScope().code; const X=schoolList().flatMap(s=>(stuOf(s.code)||[]).filter(r=>r.status==="On roll"&&!r.ver&&(!code||r.school===code)&&canEditStu(r))).slice(0,500);
+  if(!X.length){ toast("Nothing to verify that you may change.",true); return; }
+  ask(`Mark ${X.length} records as verified?`,`Do this only if these records have been checked against the register. Your name and today's date are recorded on each.`,"Mark verified",async()=>{ const ops=opsNew(); for(const r of X) ops.upd.push({col:"students",id:r.id,data:{ver:verTag()}}); await DB.apply(ops); for(const c of new Set(X.map(r=>r.school))) await ensureStu(c,true); audit("Bulk verification",`${X.length} records`); fillRegion("chkBody",true); toast("Marked as verified."); }); }
+
+/* ---------- duplicates: move every extra copy to Trash ---------- */
+const filled = r => stuFields().filter(f=>String(r[f.key]??"").trim()).length;
+async function dupTrash(groups){ const ops=opsNew(); let n=0; const names=[];
+  for(const g of groups){ const full=[]; for(const x of g.kids){ const L2=await ensureStu(x.school); const r=L2.find(y=>y.id===x.id); if(r) full.push(r); }
+    if(full.length<2) continue; full.sort((a,b)=>(!!b.ver-!!a.ver)||(filled(b)-filled(a))||(toMs(a.createdAt)-toMs(b.createdAt)));
+    for(const r of full.slice(1)){ const o=stuToTrash(r,"duplicate of "+(full[0].admNo||full[0].name)); ops.set.push(...o.set); (ops.del||=[]).push(...(o.del||[])); n++; names.push(r.name); } }
+  if(!n){ toast("Nothing to move."); return; } await DB.apply(ops); for(const c of schoolList()) if(S.stu[c.code]) await ensureStu(c.code,true); S.trash=null; audit("Duplicates moved to Trash",`${n}: ${names.slice(0,20).join(", ")}${n>20?"…":""}`); toast(`${n} extra cop${n>1?"ies":"y"} moved to Trash — restore from Students → Trash if needed.`); fillRegion("dupBody",true); }
+
+/* ---------- dashboard: fees and health boxes; fee drill-down to the defaulter ---------- */
+function feeTot(){ if(!S.feeRets){ if(!S.feeLoading){ S.feeLoading=1; loadFeeRets().then(()=>fillRegion("dKpi",true)).catch(()=>{}); } return null; } const day=isoDay(Date.now()); let str=0,tot=0,amt=0,n=0;
+  for(const s of schoolList()){ const x=feeRow(s.code,day); if(!x) continue; n++; str+=x.str; tot+=x.tot; amt+=x.amt; } return {str,tot,amt,n,pct:str?tot/str*100:0}; }
+function extraKpis(){ const F=feeTot(), H=idxAll().filter(r=>r.status==="On roll"), eyes=H.filter(r=>/^weak/i.test(r.eyes||"")).length, hd=H.filter(r=>r.eyes||r.height||r.weight).length;
+  const K=(go,lab,val,sub,cls,g)=>`<div class="kpi click ${g}" role="button" tabindex="0" ${go}><span>${lab}</span><b class="${cls||""}">${val}</b><i>${sub}</i></div>`;
+  return (F?K(`data-act="go" data-id="drill" data-p="m=fee"`,"Fee defaulters",nf(F.tot),`${F.pct.toFixed(1)}% of ${nf(F.str)} · paid ${(100-F.pct).toFixed(1)}%${F.n<schoolList().length?` · ${F.n}/${schoolList().length} schools returned`:""}`,F.tot?"neg":"pos","kg5"):K(`data-act="go" data-id="fees"`,"Fee defaulters","…","loading returns","","kg5"))
+   +(canSeeStudents()&&canSD()?K(`data-act="go" data-id="students" data-p="tab=health"`,"Health",`${nf(eyes)}`,`weak eyesight · ${H.length?(hd/H.length*100).toFixed(1):"0"}% have health details`,"","kg6"):""); }
+function feeDrillHtml(){ if(!S.feeRets){ loadFeeRets().then(()=>fillRegion("drBody",true)); return `<p class="mute">Loading fee returns…</p>`; } const p=S.params, day=isoDay(Date.now());
+  if(!p.school){ let T={str:0,tot:0,amt:0}; const R=schoolList().map(s=>({s,x:feeRow(s.code,day)}));
+    return `<p class="hint" style="margin-top:0">Each school's latest defaulters return. Click a school.</p><table><tr><th>School</th><th class="n">Strength</th><th class="n">Defaulters</th><th class="n">%</th><th class="n">Paid</th><th class="n">Paid %</th><th class="n">Amount due</th><th>Return of</th></tr>
+     ${R.map(({s,x})=>{ if(!x) return `<tr><td>${h(s.code)} — ${h(s.name)}</td><td colspan="7" class="mute">no return yet</td></tr>`; T.str+=x.str; T.tot+=x.tot; T.amt+=x.amt; return `<tr class="click" data-act="setP" data-p="school=${h(s.code)}"><td><b>${h(s.code)}</b> — ${h(s.name)}</td><td class="n">${nf(x.str)}</td><td class="n neg">${nf(x.tot)}</td><td class="n">${x.pct.toFixed(2)}%</td><td class="n">${nf(x.str-x.tot)}</td><td class="n">${(100-x.pct).toFixed(2)}%</td><td class="n">${nf(x.amt)}</td><td>${fmtD(Date.parse(x.r.day+"T12:00"))}</td></tr>`; }).join("")}
+     <tr class="tot"><td>${h(L("gtotal"))}</td><td class="n">${nf(T.str)}</td><td class="n">${nf(T.tot)}</td><td class="n">${T.str?(T.tot/T.str*100).toFixed(2):"0"}%</td><td class="n">${nf(T.str-T.tot)}</td><td class="n">${T.str?(100-T.tot/T.str*100).toFixed(2):"0"}%</td><td class="n">${nf(T.amt)}</td><td></td></tr></table>`; }
+  const x=feeRow(p.school,day); if(!x) return `<p class="mute">No fee return from ${h(p.school)} yet.</p>`;
+  if(x.r.mode!=="list") return `<p>${h(p.school)} sent a <b>summary</b> return (numbers only, no names): ${nf(x.tot)} defaulters of ${nf(x.str)}. Ask the school to send the return as a list of students to see names here.</p>`;
+  const rows=Object.values(x.r.rows||{}); const byCl={}; for(const r of rows) (byCl[r.cl] ||= []).push(r);
+  if(!p.cl) return `<p class="hint" style="margin-top:0">${h(S.schools[p.school]?.name||p.school)} — return of ${fmtD(Date.parse(x.r.day+"T12:00"))}. Click a class.</p><table><tr><th>${h(L("cl"))}</th><th class="n">Strength</th><th class="n">Defaulters</th><th class="n">%</th><th class="n">Amount</th></tr>
+     ${(S.schools[p.school]?.classes||[]).filter(c=>byCl[c.cl]).map(c=>{ const st=schoolStats(p.school).classes.find(k=>k.cl===c.cl)?.str||0, n=byCl[c.cl].length; return `<tr class="click" data-act="setP" data-p="cl=${h(c.cl)}"><td><b>${h(c.cl)}</b></td><td class="n">${nf(st)}</td><td class="n neg">${n}</td><td class="n">${st?(n/st*100).toFixed(1):"–"}%</td><td class="n">${nf(byCl[c.cl].reduce((a,r)=>a+(Number(r.amt)||0),0))}</td></tr>`; }).join("")}</table>`;
+  const L2=(byCl[p.cl]||[]).sort((a,b)=>(a.sec+a.name).localeCompare(b.sec+b.name));
+  return `<p class="hint" style="margin-top:0">${h(p.school)} · ${h(p.cl)} — ${L2.length} defaulters. Click a student for the record and the fee payment history.</p><table><tr><th>#</th><th>Sec</th><th>Adm No</th><th>Name</th><th>Category</th><th class="n">Months</th><th class="n">Amount</th></tr>
+    ${L2.map((r,i)=>{ const s=idxAll().find(y=>y.school===p.school&&norm(y.admNo)===norm(r.adm)); return `<tr ${s?`class="click" data-act="openStu" data-id="${h(s.id)}"`:""}><td class="mute">${i+1}</td><td>${h(r.sec)}</td><td>${h(r.adm)}</td><td><b>${h(r.name)}</b></td><td>${h(catLabel(r.cat))}</td><td class="n">${h(r.months)}</td><td class="n">${nf(r.amt)}</td></tr>`; }).join("")}</table>`; }
+
+/* ---------- fee payments per student, with the paid slip ---------- */
+function feePayHtml(r){ if(!r?.id) return ""; const sp=S.sp; if(sp.pays===undefined){ sp.pays=null; DB.query("feePay","stuId","==",r.id).then(x=>{ if(S.sp===sp){ sp.pays=x.sort((a,b)=>String(b.date).localeCompare(a.date)); fillRegion("spBody",true); } }).catch(()=>{ sp.pays=[]; }); }
+  const may=canEnter(r.school)||canDecide();
+  return `<div class="panel"><h2>💳 Fee payments</h2>${sp.pays===null?`<p class="mute">Loading…</p>`:sp.pays.length?`<table><tr><th>#</th><th>Paid on</th><th>For month(s)</th><th class="n">Amount</th><th>Receipt No</th><th>Slip</th><th>Entered by</th></tr>${sp.pays.map((p,i)=>`<tr><td class="mute">${i+1}</td><td>${fmtD(Date.parse(p.date+"T12:00"))}</td><td>${h(p.months)}</td><td class="n">${nf(p.amount)}</td><td>${h(p.receipt||"")}</td><td>${p.slip?`<button class="btn s" data-act="slipView" data-id="${h(p.id)}">View slip</button>`:""}</td><td class="mute">${h(p.byName||"")}</td></tr>`).join("")}</table>`:`<p class="mute">No payments recorded yet.</p>`}
+   ${may?`<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:700">+ Record a payment</summary><form data-form="feePay" class="grid" style="margin-top:6px">
+     <div class="f"><label for="fpDate">Paid on</label><input id="fpDate" type="date" value="${isoDay(Date.now())}" max="${isoDay(Date.now())}" required></div>
+     <div class="f"><label for="fpMon">For month(s)</label><input id="fpMon" placeholder="e.g. Oct–Nov 2026" required></div>
+     <div class="f"><label for="fpAmt">Amount (Rs)</label><input id="fpAmt" inputmode="numeric" value="${h(feeOfStu(r)||"")}" required></div>
+     <div class="f"><label for="fpRec">Receipt / challan No</label><input id="fpRec"></div>
+     <div class="f"><label for="fpSlip">Paid slip (photo)</label><input id="fpSlip" type="file" accept="image/*" capture="environment"></div>
+     <button class="btn p" style="min-height:40px">Save payment</button></form></details>`:""}</div>`; }
+async function feePaySave(){ const r=S.sp?.rec; if(!r) return; const amt=Number(String($("#fpAmt").value).replace(/[^\d.]/g,"")); if(!amt){ toast("Enter the amount.",true); return; }
+  const id=newId(), ops=opsNew(), file=$("#fpSlip").files?.[0]; let img=null; if(file){ try{ img=await shrinkImage(file,1400,0.7); }catch(e){ toast(e.message,true); return; } }
+  ops.set.push({col:"feePay",id,data:{stuId:r.id,school:r.school,admNo:r.admNo||"",name:r.name,cl:r.cl,sec:r.sec,date:$("#fpDate").value,months:$("#fpMon").value.trim(),amount:amt,receipt:$("#fpRec").value.trim(),slip:!!img,at:TS,by:me().uid,byName:me().name||""}});
+  if(img) ops.set.push({col:"feeSlip",id,data:{img,stuId:r.id,school:r.school}});
+  await DB.apply(ops); S.sp.pays=undefined; toast("Payment recorded."); fillRegion("spBody",true); }
+function feePayList(){ const p=S.params, from=p.pf||isoDay(Date.now()-29*864e5), to=p.pt||isoDay(Date.now()); if(!S.payRows||S.payKey!==from+to){ S.payKey=from+to; S.payRows=null; DB.query("feePay","date",">=",from).then(x=>{ S.payRows=x.filter(y=>y.date<=to).sort((a,b)=>String(b.date).localeCompare(a.date)); fillRegion("feBody",true); }).catch(e=>{ S.payRows=[]; toast(e.message,true); }); }
+  const sch=mySchool()||p.ps||"", R=(S.payRows||[]).filter(x=>!sch||x.school===sch);
+  return `<div class="panel"><div class="ph"><h2>Fee payments received</h2><div class="pills"><label class="mute">From</label><input type="date" class="in" style="width:auto" value="${h(from)}" data-chg="setPsel" data-k="pf"><label class="mute">To</label><input type="date" class="in" style="width:auto" value="${h(to)}" data-chg="setPsel" data-k="pt">${mySchool()?"":`<select class="in" style="width:auto" data-chg="setPsel" data-k="ps"><option value="">All schools</option>${schoolList().map(s=>`<option ${p.ps===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select>`}</div></div>
+   <p class="hint" style="margin-top:0">Payments are recorded on each student's page (💳 Fee payments), with the photo of the paid slip.</p>
+   ${!S.payRows?`<p class="mute">Loading…</p>`:R.length?`<div class="scroll"><table><tr><th>#</th><th>Paid on</th><th>School</th><th>Class – Sec</th><th>Adm No</th><th>Name</th><th>For month(s)</th><th class="n">Amount</th><th>Receipt</th><th>Slip</th></tr>${R.map((x,i)=>`<tr class="click" data-act="openStu" data-id="${h(x.stuId)}"><td class="mute">${i+1}</td><td>${fmtD(Date.parse(x.date+"T12:00"))}</td><td>${h(x.school)}</td><td>${h(x.cl)}-${h(x.sec)}</td><td>${h(x.admNo)}</td><td><b>${h(x.name)}</b></td><td>${h(x.months)}</td><td class="n">${nf(x.amount)}</td><td>${h(x.receipt||"")}</td><td>${x.slip?`<button class="btn s" data-act="slipView" data-id="${h(x.id)}">View</button>`:""}</td></tr>`).join("")}<tr class="tot"><td colspan="7">${h(L("total"))} (${R.length})</td><td class="n">${nf(R.reduce((a,x)=>a+(Number(x.amount)||0),0))}</td><td colspan="2"></td></tr></table></div>`:`<div class="empty">No payments in these dates.</div>`}</div>`; }
+
+/* ---------- applicants: a box to paste the parent's message straight into the form ---------- */
+const pasteBox = kind => `<div class="panel" style="border:2px dashed #0f766e;margin-bottom:10px"><div class="ph" style="margin:0 0 6px"><h3 style="margin:0;font-size:15px">📋 Paste the parent's message (WhatsApp / SMS / email)</h3><button type="button" class="btn s" data-act="tfrFormat">Format message for parents</button></div>
+  <textarea id="pb_${kind}" rows="4" style="width:100%" placeholder="Paste here, then press “Fill the form below”. Check every field before saving."></textarea>
+  <div class="row" style="justify-content:flex-start;margin-top:6px"><button type="button" class="btn p s" data-act="pasteFill" data-id="${kind}">Fill the form below</button><span class="mute mini">Reads the format message exactly; free-form messages are read by AI when Form reading is switched on in Setup.</span></div></div>`;
+async function pasteFill(kind){ const t=$("#pb_"+kind)?.value||""; if(!t.trim()){ toast("Paste the message first.",true); return; }
+  if(kind==="tfr"){ const tp=document.createElement("textarea"); tp.id="tpText"; tp.value=t; tp.hidden=true; document.body.appendChild(tp); try{ await tfrPasteGo(); }finally{ tp.remove(); } return; }
+  let o=tfrParseText(t); if(Object.keys(o).length<4){ try{ const a=await aiText(`Extract a new-admission application from this message from a parent in Pakistan (English, Urdu or Roman Urdu). Return ONLY JSON with keys name, father, cl (class applied for, like EYS-I, Pre-I, I…XII), gender ("B" or "G"), cat (father's rank/category in words), contact (all phone numbers, comma separated), dob (dd-mm-yyyy), reason. Empty string if missing.\nMessage:\n${t}`); if(a) o={...a,...Object.fromEntries(Object.entries(o).filter(([,v])=>v))}; }catch(e){ toast("AI could not read it: "+e.message,true); } }
+  const set=(id,v)=>{ const el=$("#"+id); if(el&&v) el.value=v; };
+  set("wName",o.name); set("wFather",o.father); set("wCon",o.contact?fmtPhones(o.contact):""); set("wDob",o.dob); set("wRem",o.reason);
+  if(o.gender) set("wGen",/^g|girl|f/i.test(o.gender)?"g":"b");
+  if(o.cat){ const c=cats().find(c=>norm(c)===norm(o.cat))||cats().find(c=>norm(o.cat).includes(norm(c))||norm(c).includes(norm(o.cat))); if(c) set("wCat",c); else set("wUnit",o.cat); }
+  if(o.cl){ const el=$("#wCl"); const v=[...(el?.options||[])].map(x=>x.value).find(l=>norm(l)===norm(lvlOf({cl:String(o.cl).replace(/^class\s*/i,"")}))||norm(l)===norm(o.cl)); if(v) el.value=v; }
+  $("#wName")?.focus(); toast("Form filled — check each field, add the Registration No, then Add."); }
+
+Object.assign(EXTRA_ACT,{
+  ckOpen: el => { const k=el.dataset.id; S.ckOpen=S.ckOpen===k?"":k; fillRegion("chkBody",true); setTimeout(()=>{ const d=$("#ckDet"); if(d) d.previousElementSibling?.scrollIntoView({block:"start",behavior:"smooth"}); },60); },
+  ckList: el => { setParams({ckList:el.dataset.id||""}); },
+  ckVerAll: () => ckVerAll(),
+  ckTickAll: el => { el.closest("form").querySelectorAll('[data-f="ver"]').forEach(x=>x.checked=true); toast("All ticked — press Save changes to keep."); },
+  stuVer: async el => { const r=S.sp?.rec; if(!r) return; const on=el.dataset.id==="1"; const ops=opsNew(); ops.upd.push({col:"students",id:r.id,data:{ver:on?verTag():DEL}});
+    ops.set.push({col:"edits",id:newId(),data:{stuId:r.id,school:r.school,stuName:r.name,admNo:r.admNo||"",changes:[{k:"ver",l:"Verified",from:on?"no":"yes",to:on?"yes":"no"}],at:TS,day:isoDay(Date.now()),by:me().uid,byName:me().name||"",role:role()}});
+    await DB.apply(ops); if(on) r.ver=verTag(); else delete r.ver; const L2=S.stu[r.school]?.rows.find(x=>x.id===r.id); if(L2){ if(on) L2.ver=r.ver; else delete L2.ver; } toast(on?"Marked as verified.":"Verification removed."); fillRegion("spBody",true); },
+  dupTrashAll: () => { const G=dupGroups().filter(g=>g.sure); if(!G.length){ toast("No sure duplicates.",true); return; } ask(`Move the extra copies of ${G.length} sure duplicate groups to Trash?`,`In each group the most complete record (verified first, then most fields filled, then the oldest) is kept; the others go to <b>Trash</b>, from where they can be restored. “Probable” groups are not touched — check those one by one.`,"Move to Trash",()=>dupTrash(G)); },
+  dupTrashOne: el => { const ids=el.dataset.id.split(","), g=dupGroups().find(g=>g.kids.some(k=>ids.includes(k.id))); if(!g) return; ask("Keep one, move the others to Trash?",`The most complete record of <b>${h(g.kids[0].name)}</b> is kept; ${g.kids.length-1} other${g.kids.length>2?"s":""} go to Trash.`,"Move to Trash",()=>dupTrash([g])); },
+  slipView: async el => { try{ const d=await DB.getDoc("feeSlip",el.dataset.id); if(!d?.img){ toast("Slip not found.",true); return; } modal(`<h3>Paid slip</h3><img src="${d.img}" alt="Paid slip" style="max-width:100%;max-height:70vh;border:1px solid var(--line)"><div class="row"><button class="btn" data-act="closeModal">Close</button></div>`,"wide"); }catch(e){ toast(e.message,true); } },
+  pasteFill: el => pasteFill(el.dataset.id),
+});
+const EXTRA_FORMS = { ckSec: f => ckSecSave(f), feePay: () => feePaySave(),
+  waitOpt: async () => { await saveSettings({waitTyped:$("#sWt").value!=="off"},"Waiting list setting saved."); } };
 
 /* =====================================================================
    8) REPORTS — designer (tick what to show), presets, print/PDF, Excel, WhatsApp
@@ -3036,17 +3200,20 @@ const WA_HELP = [["{org}","Organisation name"],["{date} {time}","Today's date / 
    9) SETUP (Super Admin only) — everything is editable here
    ===================================================================== */
 const SETUP_GROUPS = [["Schools & strength","#1d4ed8",["schools","opening","catopen","stages","session"]],["People & access","#0f766e",["users","ai"]],["Lists & fields","#7c3aed",["cats","actions","stufields","appfields","fees"]],["Words & look","#be185d",["labels","general"]],["Reports & sharing","#b45309",["presets","wa","live"]],["Safety","#475569",["data"]]];
+const SETUP_INFO = { schools:["🏫","Schools, classes, sections, seats"], opening:["📊","Starting figures · replace from sheet"], catopen:["🏷","Category figures per section"], stages:["🧮","How classes add up (EYS, Primary…)"], session:["🎓","Promotion to the next session"],
+  users:["👥","Logins, roles, permissions, passwords"], ai:["🤖","Reading forms & parents' messages"], cats:["🔢","The numbered category list"], actions:["⚙","Admission, withdrawal… entry types"], stufields:["🧾","Columns of the student record"], appfields:["📝","Extra columns for applicants"], fees:["💰","Monthly fee by category & class"],
+  labels:["🔤","Change any word in the portal"], general:["🎨","Name, deadlines, colours, credit line"], presets:["🖨","Saved report layouts"], wa:["💬","WhatsApp message wording"], live:["📱","QR code for your senior"], data:["🛡","Backup, search index, clean-ups"] };
 const SETUP_TABS = [["schools","Schools & sections"],["opening","Opening strength"],["users","Users & permissions"],["general","General & appearance"],["cats","Categories"],["catopen","Category figures"],["actions","Actions & statuses"],
   ["stufields","Student fields"],["appfields","Applicant columns"],["labels","Labels & terms"],["stages","Consolidation"],["fees","Fees"],["wa","WhatsApp templates"],["presets","Report presets"],["live","Senior's QR code"],["data","Backup & data"],["ai","Form reading (AI)"],["session","New session & promotion"]];
 VIEWS.setup = {
-  shell:()=>{ const name=Object.fromEntries(SETUP_TABS); return `<div class="stgroups">${SETUP_GROUPS.map(([g,c,keys])=>`<div class="stg" style="--c:${c}"><h4>${h(g)}</h4>${keys.filter(k=>name[k]).map(k=>`<button class="pill ${S.setupTab===k?"on":""}" data-act="setupTab" data-id="${k}">${h(name[k])}</button>`).join("")}</div>`).join("")}</div><div id="stBody"></div>`; },
+  shell:()=>{ const name=Object.fromEntries(SETUP_TABS); return `<div class="stiles">${SETUP_GROUPS.map(([g,c,keys])=>`<div class="sgrp" style="--c:${c}"><h4>${h(g)}</h4>${keys.filter(k=>name[k]).map(k=>`<button class="stile ${S.setupTab===k?"on":""}" data-act="setupTab" data-id="${k}"><span class="ic">${SETUP_INFO[k]?.[0]||"•"}</span><span><b>${h(name[k])}</b><small>${h(SETUP_INFO[k]?.[1]||"")}</small></span></button>`).join("")}</div>`).join("")}</div><div id="stBody"></div>`; },
   regions:{ stBody(){ return (SETUP[S.setupTab]||SETUP.schools)(); } },
   post(id){ if(S.setupTab==="session") wireRepSearch(); },
   after(){ if(S.setupTab==="wa") waPreview(); }
 };
 const setupSchool = () => S.setupSchool && S.schools[S.setupSchool] ? S.setupSchool : schoolList(true)[0]?.code;
 const schoolPick = act => `<div class="pills" style="margin-bottom:10px">${schoolList(true).map(s=>`<button class="pill ${s.code===setupSchool()?"on":""}" data-act="${act}" data-id="${h(s.code)}">${h(s.code)}${s.active===false?" (hidden)":""}</button>`).join("")}</div>`;
-const saveSettings = async (d, msg) => { await DB.apply({set:[{col:"settings",id:"app",data:d,merge:true}],upd:[],inc:[]}); toast(msg||"Saved."); };
+const saveSettings = async (d, msg) => { await DB.apply({set:[{col:"settings",id:"app",data:d,merge:true}],upd:[],inc:[]}); toast(msg||"Saved."); const k=Object.keys(d).filter(x=>!/^idx|^migr/.test(x)); if(k.length) audit("Settings changed", k.join(", ")); };
 const SETUP = {
   schools(){ const code=setupSchool(), sc=S.schools[code]; if(!sc) return "";
     return `<div class="panel"><h2>Schools</h2>${schoolPick("setupSchool")}
@@ -3100,12 +3267,12 @@ const SETUP = {
        <td>${u.role==="clerk"?`<input class="in num" type="number" min="0" placeholder="${h(ST().voidMinutes??15)}" value="${h(u.voidMin??"")}" data-uu="voidMin" data-id="${h(u.uid)}" title="Blank = the general setting">`:`<span class="mute">—</span>`}</td>
        <td>${u.role==="superadmin"?`<span class="mute">always</span>`:["hq","clerk"].includes(u.role)?`<select class="in" data-uu="undoUntil" data-id="${h(u.uid)}"><option value="">${untilOf(u)>Date.now()?(untilOf(u)>Date.parse("2099-01-01")?"Allowed (until revoked)":"Allowed until "+fmtDT(untilOf(u))):"Not allowed"}</option><option value="m15">Allow for 15 minutes</option><option value="m30">Allow for 30 minutes</option><option value="m60">Allow for 1 hour</option><option value="m120">Allow for 2 hours</option><option value="m240">Allow for 4 hours</option><option value="custom">Allow for … minutes (type)</option><option value="d1">Allow for 1 day</option><option value="d7">Allow for 7 days</option><option value="d30">Allow for 30 days</option><option value="forever">Allow until I revoke</option><option value="0">Not allowed</option></select>`:`<span class="mute">—</span>`}</td>
        <td><input type="checkbox" data-uf="active" data-id="${h(u.uid)}" ${u.active?"checked":""} ${u.uid===me().uid?"disabled":""} style="width:20px;height:20px"></td>
-       <td>${u.uid===me().uid||u.replacedBy?(u.replacedBy?`<span class="mute">replaced</span>`:""):`<button class="btn s" data-act="pwReset" data-id="${h(u.uid)}">Reset…</button> <button class="btn s r" data-act="userDel" data-id="${h(u.uid)}">Delete</button>`}</td></tr>`).join("")}</table></div>
+       <td>${u.uid===me().uid||u.replacedBy?(u.replacedBy?`<span class="mute">replaced</span> <button class="btn s r" data-act="userDel" data-id="${h(u.uid)}">Delete</button>`:""):`<button class="btn s" data-act="pwReset" data-id="${h(u.uid)}">Reset…</button> <button class="btn s r" data-act="userDel" data-id="${h(u.uid)}">Delete</button>`}</td></tr>`).join("")}</table></div>
        <div class="panel" style="margin-top:12px"><h2>Excel, Word, print & WhatsApp — role defaults</h2><p class="hint" style="margin-top:0"><b>Students' personal data</b> covers every list or page with names, parents, CNICs, phone numbers, addresses and admission forms — it is <b>off</b> for everyone until you tick it here or allow a person above; it needs the Excel / Word / Print switch as well. Strength figures and summaries are not personal. What each role may do unless a user above is set to Allowed or Blocked. Blank forms (Excel templates for import) are always available. Super Admin can always download and print.</p>
        <form data-form="permDefaults"><table><tr><th>Role</th>${PERMS.map(p=>`<th>${p[1]}</th>`).join("")}</tr>${DL_ROLES.map(r=>`<tr><td>${h(ROLES[r])}</td>${PERMS.map(p=>p[0]).map(k=>`<td><input type="checkbox" name="${r}_${k}" ${permDef(r,k)?"checked":""} style="width:20px;height:20px"></td>`).join("")}</tr>`).join("")}</table><div class="row"><button class="btn p">Save role defaults</button></div></form>
        <p class="hint">A change takes effect the next time that person opens or refreshes the portal. Note: anything a person can see on screen could still be copied by hand or photographed — these switches stop downloads and printing from the portal, not viewing.</p></div>
        <p class="hint">Edit a name and press Tab or click elsewhere to save; it shows at the top of that person's screen and on their new log entries (older entries keep the name they were saved with). To remove someone, untick Active — their past entries stay in the log.</p></div>`; },
-  general(){ const st=ST(); return `<div class="panel"><h2>Ownership / credit line</h2><p class="hint" style="margin-top:0">Shown at the foot of every page and every printout, e.g. “Designed & developed by …, Regional Director APEIs Peshawar Region”.</p><form data-form="credit" class="row" style="justify-content:flex-start"><input class="in" id="sCredit" style="flex:1;min-width:260px" value="${h(st.credit||"")}" placeholder="Designed & developed by …"><button class="btn p">Save</button></form></div><div class="panel"><h2>General</h2><form data-form="general" class="grid">
+  general(){ const st=ST(); return `<div class="panel"><h2>Waiting list</h2><form data-form="waitOpt" class="row" style="justify-content:flex-start"><select class="in" id="sWt" style="width:auto"><option value="on" ${st.waitTyped===false?"":"selected"}>Clerks type a class-wise count on the Entry tab, plus applicants by name</option><option value="off" ${st.waitTyped===false?"selected":""}>Only applicants entered by name (Applicants tab) — no typed counts</option></select><button class="btn p">Save</button></form><p class="hint">Use the second choice once every school enters its applicants by name; the typed counts are then ignored everywhere.</p></div><div class="panel"><h2>Ownership / credit line</h2><p class="hint" style="margin-top:0">Shown at the foot of every page and every printout, e.g. “Designed & developed by …, Regional Director APEIs Peshawar Region”.</p><form data-form="credit" class="row" style="justify-content:flex-start"><input class="in" id="sCredit" style="flex:1;min-width:260px" value="${h(st.credit||"")}" placeholder="Designed & developed by …"><button class="btn p">Save</button></form></div><div class="panel"><h2>General</h2><form data-form="general" class="grid">
       <div class="f wide" style="grid-column:span 2"><label for="sOrg">Organisation name</label><input id="sOrg" value="${h(st.org||"")}"></div>
       <div class="f"><label for="sShort">Short name (report titles)</label><input id="sShort" value="${h(orgShort())}"></div>
       <div class="f"><label for="sDl">Daily entry deadline</label><input id="sDl" type="time" value="${h(st.dailyDeadline||"09:00")}" title="After this time a school with no entries shows red"></div>
@@ -3325,6 +3492,8 @@ function stuFieldInput(f, r, ed, code){
   if(f.key==="sec"){ const c=sc.classes.find(c=>c.cl===(r.cl||sc.classes[0].cl))||sc.classes[0]; return `<select id="${id}" ${dis}>${c.secs.map(x=>`<option ${x.s===v?"selected":""}>${h(x.s)}</option>`).join("")}${v&&!c.secs.some(x=>x.s===v)?`<option selected>${h(v)}</option>`:""}</select>`; }
   if(f.key==="cat") return `<select id="${id}" ${dis}>${catOptions(v,"—")}</select>`;
   if(f.key==="eyes") return `<select id="${id}" ${dis}>${["","Normal","Weak — wears spectacles","Weak — no spectacles yet","Other (see remarks)"].map(o=>`<option ${o===v?"selected":""}>${o}</option>`).join("")}</select>`;
+  if(f.key==="vacc") return `<select id="${id}" ${dis}>${["","Complete (as per EPI card)","Incomplete — doses due","Not known"].map(o=>`<option ${o===v?"selected":""}>${o}</option>`).join("")}</select>`;
+  if(f.key==="hearing") return `<select id="${id}" ${dis}>${["","Normal","Weak — needs check","Uses hearing aid"].map(o=>`<option ${o===v?"selected":""}>${o}</option>`).join("")}</select>`;
   if(f.key==="height"||f.key==="weight") return `<input id="${id}" value="${h(v)}" inputmode="decimal" placeholder="${f.key==="height"?"e.g. 128":"e.g. 26.5"}" ${dis}>`;
   if(["medHist","allergies","surgeries","disability","medNote"].includes(f.key)) return `<textarea id="${id}" rows="2" ${dis} placeholder="${f.key==="allergies"?"e.g. peanuts, penicillin — or None":"None, or details"}">${h(v)}</textarea>`;
   if(f.key==="pType") return `<select id="${id}" ${dis}>${PTYPES.map(([k,l])=>`<option value="${k}" ${(v||"f")===k?"selected":""}>${l}</option>`).join("")}</select>`;
@@ -3589,7 +3758,7 @@ const ACT = {
   userDel: el => { const u=S.users.find(x=>x.uid===el.dataset.id); if(!u) return;
     ask(`Delete ${h(u.name)}?`,`The login <b>${h(u.email)}</b> is removed${ST().adminFn?" completely":" from the portal (it can no longer open anything)"}. Entries and changes made by ${h(u.name)} stay in the log with the name. This cannot be undone — to stop someone only for a while, untick Active instead.`,"Delete user",async()=>{
       if(ST().adminFn && !DEMO){ await adminCall({action:"delete",uid:u.uid}); } else await DB.apply({set:[],upd:[],inc:[],del:[{col:"users",id:u.uid}]});
-      S.users=S.users.filter(x=>x.uid!==u.uid); toast(`${u.name} deleted.`); fillRegion("stBody",true); }); },
+      audit("User deleted",`${u.name} (${u.email})`); S.users=S.users.filter(x=>x.uid!==u.uid); toast(`${u.name} deleted.`); fillRegion("stBody",true); }); },
   adminFnTest: async () => { const url=$("#afUrl").value.trim(); if(!/^https:\/\//.test(url)){ toast("Paste the https:// address of the helper.",true); return; }
     try{ await adminCall({action:"ping"},url); }catch(e){ toast("The helper did not answer correctly: "+e.message,true); return; } await saveSettings({adminFn:url},"Server helper connected — you can now set passwords and delete logins completely."); fillRegion("stBody",true); },
   adminFnOff: async () => { await saveSettings({adminFn:""},"Server helper disconnected."); fillRegion("stBody",true); },
@@ -3754,6 +3923,7 @@ document.addEventListener("change", async e => {
     if(el.dataset.uf && isSA()){ const f=el.dataset.uf; let v=el.type==="checkbox"?el.checked:el.value; if(f==="name"){ v=v.trim(); if(!v){ toast("Name cannot be blank.",true); el.value=(S.users.find(u=>u.uid===el.dataset.id)||{}).name||""; return; } }
       await DB.apply({set:[],inc:[],upd:[{col:"users",id:el.dataset.id,data:{[f]:v}}]});
       if(el.dataset.id===me().uid && f==="name"){ S.user={...S.user,name:v}; boot(); toast("Your name is updated."); return; }
+      { const u=S.users.find(x=>x.uid===el.dataset.id); audit("User changed",`${u?.name||el.dataset.id}: ${f} → ${v}`); }
       toast(f==="name"?`Name changed to "${v}".`:"User updated."); return; }
     if(el.dataset.tf){ const t=S.tfrapps.find(x=>x.id===el.dataset.id); if(!t||!canTfr(t)) return; await DB.apply({set:[],inc:[],upd:[{col:"tfrapps",id:t.id,data:{[el.dataset.tf]:el.value,updatedAt:TS,updatedBy:me().name||""}}]}); toast("Saved."); return; }
     if(el.dataset.fd){ const r=S.fd.rows[el.dataset.id]; if(!r) return; const v=Math.max(0,Number(el.value)||0); if(el.dataset.fd==="m"){ r.m=Math.max(1,v); r.amt=r.fee*r.m; } else r.amt=v; fillRegion("feBody",true); return; }
@@ -3905,6 +4075,8 @@ setInterval(async()=>{ const mins=Number(ST().idleMinutes ?? 30); if(DEMO||!mins
    ===================================================================== */
 boot();
 DB.start().catch(e=>{ $("#app").innerHTML=`<div class="login"><div class="panel"><h2>Could not start</h2><p>${h(e.message)}</p><p class="hint">Check FIREBASE_CONFIG and your internet connection.</p></div></div>`; });
+
+Object.assign(FORMS, EXTRA_FORMS);
 
 }
 </script>
