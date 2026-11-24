@@ -193,6 +193,7 @@ nav .navback{margin:0 0 0 auto;align-self:center;flex:none}
 .f label.btn,.f .pills label.btn{font-size:14px;color:var(--ink);font-weight:600}
 .ph .pills .btn,.ph>.btn{min-height:34px;padding:5px 12px;font-size:14px}
 .grid .f>label{min-height:1.2em}
+.fsbox{position:fixed;left:50%;transform:translateX(-50%);top:12px;z-index:200;max-width:min(680px,94vw);background:#fff;color:#111;border:2px solid #b3122a;border-radius:12px;padding:14px 16px;box-shadow:0 14px 40px rgba(0,0,0,.3);font-size:14.5px}
 </style>
 </head>
 <body>
@@ -476,10 +477,22 @@ function syncPaint(){ const el=document.getElementById("syncDot"); if(!el) retur
   el.className="sync "+cls; el.title=tip; el.innerHTML=`<i></i>${h(txt)}`; }
 addEventListener("online",()=>{ SYNC.err=""; syncPaint(); }); addEventListener("offline",syncPaint);
 /* every 3 minutes while the page is open and visible, confirm with the server (1–3 small reads) */
-setInterval(()=>{ if(DEMO||!S.user||S.user.pending||document.hidden||!navigator.onLine||!DB.check) return; DB.check().then(()=>refresh()).catch(e=>{ SYNC.err="Server not reachable: "+e.message; syncPaint(); }); }, 180e3);
+setInterval(()=>{ if(DEMO||!S.user||S.user.pending||document.hidden||!navigator.onLine||!DB.check) return; DB.check().then(()=>refresh()).catch(e=>{ if(!fsFail(e)){ SYNC.err="Server not reachable: "+e.message; syncPaint(); } }); }, 180e3);
 setInterval(syncPaint, 30e3);
+/* Firebase's offline store on a PC can get stuck ("INTERNAL ASSERTION FAILED"); after that nothing saves until the page reloads.
+   Detect it, tell the person plainly, reload — and if it comes back, clear this PC's offline copy (the server copy is untouched). */
+function fsFail(e){ const msg=String(e?.message||e||""); if(!/INTERNAL ASSERTION|AsyncQueue is already failed|Unexpected state/i.test(msg) || DEMO) return false;
+  if(S.fsBroken) return true; S.fsBroken=true; SYNC.err="Database connection stopped"; syncPaint();
+  let n=0; try{ n=Number(sessionStorage.getItem("apeis_fsfail")||0); sessionStorage.setItem("apeis_fsfail",String(n+1)); }catch(x){}
+  const box=document.createElement("div"); box.className="fsbox"; box.innerHTML=`<b>The database connection on this computer stopped working.</b> This is a known glitch of the Firebase storage inside the browser — <u>everything already saved is safe on the server</u>.
+    ${n?"It happened again, so clear this computer's offline copy (it downloads fresh from the server).":"Reload the page and repeat the last step."}<div class="row" style="justify-content:flex-start;margin-top:8px">
+    <button class="btn" onclick="location.reload()">Reload now</button><button class="btn r" id="fsClear">Clear offline copy & reload</button></div>`;
+  document.body.appendChild(box); box.querySelector("#fsClear").onclick=()=>{ box.querySelector("#fsClear").disabled=true; DB.repair(); };
+  return true; }
+addEventListener("unhandledrejection", e=>fsFail(e.reason)); addEventListener("error", e=>fsFail(e.error||e.message));
+setTimeout(()=>{ try{ sessionStorage.removeItem("apeis_fsfail"); }catch(x){} }, 10*60e3);
 /* every student write also updates that school's small search index (stuIdx/{school}.i.{id}) — 6 small documents instead of thousands of reads */
-const IDX_F = ["admNo","name","father","cl","sec","gender","cat","status","fatherCnic","contact","dob","bform","motherCnic"];
+const IDX_F = ["admNo","name","father","cl","sec","gender","cat","status","fatherCnic","contact","dob","bform","motherCnic","contact2"];
 const idxArr = r => IDX_F.map(k=>String(r[k]??""));
 const idxObj = (id, school, a) => { const o={id,school}; IDX_F.forEach((k,i)=>o[k]=a[i]||""); return o; };
 function idxFind(id){ for(const [sc,m] of Object.entries(S.idx||{})) if(m[id]) return idxObj(id,sc,m[id]); return null; }
@@ -590,7 +603,7 @@ const Fire = {
     }catch(e){ S.user={ uid:u.uid, email:u.email, error:e.message }; S.ready=true; boot(); }
   },
   listen(){
-    const m=this.m, db=this.db, on=(q,f,ign)=>this.unsub.push(m.onSnapshot(q,{includeMetadataChanges:true},snap=>{ if(!snap.metadata.fromCache){ SYNC.last=Date.now(); SYNC.cache=false; SYNC.err=""; } else if(!ign) SYNC.cache=true; syncPaint(); f(snap); },e=>{ SYNC.err=e.message; syncPaint(); toast("Sync error: "+e.message,true); }));
+    const m=this.m, db=this.db, on=(q,f)=>this.unsub.push(m.onSnapshot(q,snap=>{ if(!snap.metadata.fromCache){ SYNC.last=Date.now(); SYNC.cache=false; } syncPaint(); f(snap); },e=>{ SYNC.err=e.message; syncPaint(); fsFail(e); toast("Sync error: "+e.message,true); }));
     const data = d => ({ id:d.id, ...d.data({serverTimestamps:"estimate"}) });
     const first={}; let done; const ready=new Promise(r=>done=r); const got=k=>{ first[k]=1; if(first.settings&&first.schools&&first.strength) done(); };
     const waitNow=()=>{ S.waiting=(this.waitAll||[]).filter(w=>w.session===session()&&!w.deleted); };
@@ -628,8 +641,9 @@ const Fire = {
     const by={}; for (const x of ops.inc) (by[x.school] ||= []).push(new m.FieldPath(x.f||"d",x.key), m.increment(x.n));
     for (const x of (ops.wait||[])) (by[x.school] ||= []).push(new m.FieldPath("w",x.cl), x.n);
     for (const [sc,args] of Object.entries(by)){ b.update(m.doc(db,"strength",sc), ...args); step(); }
+    if(S.fsBroken){ fsFail(new Error("INTERNAL ASSERTION FAILED")); throw new Error("The database connection on this computer has stopped — press “Reload now” in the red box, then try again."); }
     SYNC.pending++; syncPaint();
-    const p = Promise.all(batches.map(x=>x.commit())).then(()=>{ SYNC.pending--; SYNC.last=Date.now(); SYNC.err=""; syncPaint(); }, e=>{ SYNC.pending--; SYNC.err=e.message; syncPaint(); throw e; });
+    const p = Promise.all(batches.map(x=>x.commit())).then(()=>{ SYNC.pending--; SYNC.last=Date.now(); SYNC.err=""; syncPaint(); }, e=>{ SYNC.pending--; SYNC.err=e.message; syncPaint(); fsFail(e); throw e; });
     const r = await Promise.race([p.then(()=>"ok"), sleep(3500).then(()=>"slow")]);
     if (r==="slow"){ if(!quiet) toast("Saved on this device — will sync when the connection returns."); p.catch(e=>toast("Sync FAILED: "+e.message,true)); }
   },
@@ -641,14 +655,11 @@ const Fire = {
   async getDoc(c, id){ const m=this.m, d=await m.getDoc(m.doc(this.db,c,id)); return d.exists() ? {id:d.id,...d.data()} : null; },
   async query(c, field, op, val){ const m=this.m; return (await m.getDocs(m.query(m.collection(this.db,c), m.where(field,op,val)))).docs.map(d=>{ const x={id:d.id,...d.data()}; if(x.at) x.atMs=toMs(x.at); return x; }); },
   /* ask the SERVER (not this device's saved copy) for the latest figures; fails if the server cannot be reached */
-  async check(){ const m=this.m, db=this.db;
-    const [st,sch,set]=await Promise.all([m.getDocsFromServer(m.collection(db,"strength")), m.getDocsFromServer(m.collection(db,"schools")), m.getDocFromServer(m.doc(db,"settings","app"))]);
-    S.strength=Object.fromEntries(st.docs.map(d=>{ const x=d.data(); return [d.id,{d:x.d||{},w:x.w||{},c:x.c||{}}]; })); S.schools=Object.fromEntries(sch.docs.map(d=>[d.id,{id:d.id,...d.data()}])); S.settings=set.data()||{};
-    SYNC.last=Date.now(); SYNC.cache=false; SYNC.err=""; syncPaint(); },
+  /* ask the SERVER (not this device's saved copy) — one small read; the live listeners keep the figures current */
+  async check(){ const m=this.m; const set=await m.getDocFromServer(m.doc(this.db,"settings","app")); S.settings=set.data()||S.settings; SYNC.last=Date.now(); SYNC.cache=false; SYNC.err=""; syncPaint(); },
   async reload(){ for(const k of Object.keys(S.stu)) delete S.stu[k]; S.asOfCache={}; S.txCache={};
-    try{ await this.m.enableNetwork(this.db); }catch(e){}
-    await Promise.race([this.check(), sleep(12000).then(()=>{ throw new Error("timeout"); })]);
-    this.stop(); await this.listen(); refresh(); },
+    await Promise.race([this.check(), sleep(12000).then(()=>{ throw new Error("timeout"); })]); refresh(); },
+  async repair(){ const m=this.m; try{ await m.terminate(this.db); }catch(e){} try{ await m.clearIndexedDbPersistence(this.db); }catch(e){ console.warn(e); } location.reload(); },
   async loadStudents(code){ const m=this.m; return (await m.getDocs(m.query(m.collection(this.db,"students"), m.where("school","==",code)))).docs.map(d=>({id:d.id,...d.data()})); },
   async txByStudent(id){ const m=this.m; return (await m.getDocs(m.query(m.collection(this.db,"transactions"), m.where("studentId","==",id)))).docs.map(d=>{ const x={id:d.id,...d.data()}; x.atMs=toMs(x.at); return x; }).sort((a,b)=>tTime(b)-tTime(a)); },
   async bootstrap(name){
@@ -911,7 +922,7 @@ const entryActions = () => actions().filter(a=>a.on!==false);
 VIEWS.entry = {
   shell(){ const code=entrySchool(); if(!code||!S.schools[code]) return `<div class="panel empty">No school assigned to your account.</div>`;
     return `<div id="eStat"></div><div class="panel"><div class="ph"><h2>Fast entry — ${h(code)} ${h(S.schools[code].name)}</h2>
-      ${isSA()?`<select class="in" style="width:auto" data-chg="entrySchool">${schoolList().map(s=>`<option value="${h(s.code)}" ${s.code===code?"selected":""}>${h(s.code)} — ${h(s.name)}</option>`).join("")}</select>`:""}</div>
+      <div class="pills"><button class="btn" data-act="formDlg" title="Photograph a parent's handwritten form; the portal fills this entry for you to check">📷 Read admission form</button>${isSA()?`<select class="in" style="width:auto" data-chg="entrySchool">${schoolList().map(s=>`<option value="${h(s.code)}" ${s.code===code?"selected":""}>${h(s.code)} — ${h(s.name)}</option>`).join("")}</select>`:""}</div></div>
       <form data-form="entry" class="entry" autocomplete="off"><div class="grid">
         <div class="f"><label for="fAct">Action</label><select id="fAct" data-chg="entryAct">${entryActions().map(a=>`<option value="${h(a.code)}">${h(a.label)} (${KIND_D[a.kind]>0?"+1":KIND_D[a.kind]<0?"−1":"0"})</option>`).join("")}</select></div>
         <div class="f"><label for="fDate">Date</label><input id="fDate" type="date" value="${isoDay(Date.now())}" max="${isoDay(Date.now())}"></div>
@@ -924,7 +935,7 @@ VIEWS.entry = {
         <div class="f"><label for="fName">Student name</label><input id="fName" required></div>
         <div class="f"><label for="fFather">Father name</label><input id="fFather"></div>
         <div class="f"><label for="fCnic">Father CNIC</label><input id="fCnic" data-chg="entryCnic" placeholder="12345-1234567-1" inputmode="numeric" title="Links brothers and sisters in all APEIs"></div>
-        <div class="f"><label for="fCon">Contact No</label><input id="fCon" inputmode="tel"></div>
+        <div class="f"><label for="fCon">Contact No(s)</label><input id="fCon" inputmode="tel" placeholder="0300-1234567, 0333-…"></div>
         <div class="f"><label for="fDob">Date of birth</label><input id="fDob" placeholder="dd-mm-yyyy" inputmode="numeric"></div>
         <div class="f"><label for="fGen">Gender</label><select id="fGen" required><option value="">—</option><option value="b">Boy</option><option value="g">Girl</option></select></div>
         <div class="f"><label for="fCat">Student category</label><select id="fCat">${cats().map((c,i)=>`<option value="${h(c)}">${i+1}. ${h(c)}</option>`).join("")}</select></div>
@@ -1026,7 +1037,9 @@ async function saveEntry(){
   const tx={ school:code, action:a, cl:inp.dataset.cl, sec:inp.dataset.s, gender, cat:$("#fCat").value, name:$("#fName").value.trim(), father:$("#fFather").value.trim(),
     dob:parseDob($("#fDob").value), admNo:$("#fAdm").value.trim(), remarks:$("#fRem").value.trim(), eff:$("#fDate").value };
   const cn=$("#fCnic").value.trim(), con=$("#fCon").value.trim(); if(cn && digits(cn).length!==13){ toast("Father CNIC must have 13 digits (or leave it blank).",true); $("#fCnic").focus(); return; }
-  tx.stuExtra={...(cn?{fatherCnic:fmtCnic(cn)}:{}),...(con?{contact:con}:{})};
+  if(con && phonesBad(con).length){ toast(`"${phonesBad(con)[0]}" is not a phone number — write it like 0300-1234567 (several: separate with commas).`,true); $("#fCon").focus(); return; }
+  const fp=S.formPending?.how==="entry"?S.formPending:null;
+  tx.stuExtra={...(fp?fp.extra:{}),...(cn?{fatherCnic:fmtCnic(cn)}:{}),...(con?{contact:fmtPhones(con)}:{})};
   const eff=effFromDate(tx.eff); if(eff) tx.effMs=eff;
   if(!tx.name){ toast("Student name is required.",true); $("#fName").focus(); return; }
   if(tx.dob===null){ toast("Date of birth not understood — type it like 14-03-2019.",true); $("#fDob").focus(); return; }
@@ -1037,7 +1050,7 @@ async function saveEntry(){
   if(k==="apei_in"){ tx.ext=$("#fExt").value.trim(); }
   try{ await ensureStu(code); }catch(e){}
   if(S.entryStu && norm(S.entryStu.admNo)===norm(tx.admNo)) tx.studentId=S.entryStu.id;
-  const ops=opsNew(); buildTxOps(ops,tx);
+  const ops=opsNew(); buildTxOps(ops,tx); if(fp && KIND_D[k]>0 && tx.studentId) formAttach(ops,tx.studentId,code);
   try{ await DB.apply(ops); }catch(e){ toast("Not saved: "+e.message,true); return; }
   S.entryStu=null; if($("#fFound")) $("#fFound").textContent="";
   const tcl=tx.toSec?tx.toCl:tx.cl, tsec=tx.toSec||tx.sec, after=cur(code,tcl,tsec), sc=S.schools[code], so=sc.classes.find(c=>c.cl===tcl)?.secs.find(z=>z.s===tsec);
@@ -1303,6 +1316,7 @@ async function loadStuPage(){ const p=S.params; S.sp={id:p.id||"",editing:false}
   if(!r){ try{ r=await DB.getDoc("students",p.id); }catch(e){ S.sp.err=e.message; } }
   if(!r){ S.sp.err ||= "This student record was not found (it may have been deleted)."; fillRegion("spBody",true); return; }
   S.sp.rec=clone(r); S.sp.editing=canEditDirect(); fillRegion("spBody",true);
+  DB.getDoc("forms",p.id).then(x=>{ if(x && S.sp?.id===p.id){ S.sp.form=x; fillRegion("spBody",true); } }).catch(()=>{});
   DB.txByStudent(p.id).then(x=>{ if(S.sp?.id===p.id){ S.sp.hist=x; fillRegion("spBody",true); } }).catch(()=>{ S.sp.hist=[]; });
   DB.query("edits","stuId","==",p.id).then(x=>{ if(S.sp?.id===p.id){ S.sp.edits=x.sort((a,b)=>toMs(b.at)-toMs(a.at)); fillRegion("spBody",true); } }).catch(()=>{ if(S.sp) S.sp.edits=[]; });
 }
@@ -1321,13 +1335,14 @@ function stuPageHtml(){ const sp=S.sp; if(!sp) return ""; if(sp.err) return `<di
     ${sp.isNew?`<div class="note" style="margin-top:10px">Use this for students already on roll. A <b>new admission</b> should be entered on the Entry tab — that adds the student to strength and creates the record by itself.</div>`:""}
     ${!may&&!sp.isNew?`<p class="hint">Read-only for your account${role()==="clerk"?` — this student belongs to ${h(code)}`:""}.</p>`:""}
     ${may&&!ed&&!direct?`<p class="hint">To correct this record, <b>double-click</b> any field (or the Edit button). You will be asked to confirm; every change is kept in the edit log with your name.</p>`:""}
-    <form data-form="stuSave" data-id="${h(r.id||"")}" autocomplete="off" style="margin-top:12px"><div class="fgrid ${may&&!ed?"locked":""}" ${may&&!ed?`data-dbl="stuEdit"`:""}>${activeFields().map(f=>`<div class="f"><label for="sf_${f.key}">${h(f.label)}${f.req?" *":""}</label>${stuFieldInput(f,r,ed,code)}</div>`).join("")}</div>
+    <form data-form="stuSave" data-id="${h(r.id||"")}" autocomplete="off" style="margin-top:12px"><div class="fgrid ${may&&!ed?"locked":""}" ${may&&!ed?`data-dbl="stuEdit"`:""}>${activeFields().map(f=>`<div class="f" ${["remarks","address"].includes(f.key)?'style="grid-column:1/-1"':""}><label for="sf_${f.key}">${h(f.label)}${f.req?" *":""}</label>${stuFieldInput(f,r,ed,code)}</div>`).join("")}</div>
     ${ed?`<div class="row">${sp.isNew?"":`<button type="button" class="btn" data-act="stuEditOff">Cancel</button>`}<button class="btn p">${sp.isNew?"Add to data bank":"Save changes"}</button></div>`:""}</form></div>
    ${sp.isNew?"":`<div class="two"><div class="panel"><h2>Siblings in APEIs (${sib.sure.length})</h2>
       ${cnicKey(r.fatherCnic)||cnicKey(r.motherCnic)?(sib.sure.length?`<div class="sibs">${sib.sure.map(sibCard).join("")}</div>`:`<p class="mute">No other child with father CNIC ${h(fmtCnic(r.fatherCnic))} in any APEI data bank.</p>`):`<p class="mute">Add the father's CNIC (13 digits) to find brothers and sisters in all campuses.</p>`}
       ${sib.maybe.length?`<h3 style="font-size:14px;margin:12px 0 6px">Possible siblings — same father name and phone, CNIC missing</h3><div class="sibs">${sib.maybe.map(sibCard).join("")}</div>`:""}</div>
     <div class="panel"><h2>Edit log</h2>${!sp.edits?`<p class="mute">Loading…</p>`:sp.edits.length?`<div class="scroll"><table><tr><th>When</th><th>By</th><th>Field</th><th>From</th><th>To</th></tr>${sp.edits.flatMap(e=>(e.changes||[]).map((c,i)=>`<tr><td>${i?"":fmtDT(toMs(e.at))}</td><td>${i?"":h(e.byName)+` <span class="mute">${h(ROLES[e.role]||e.role||"")}</span>`}</td><td>${h(c.l||c.k)}</td><td class="mute">${h(c.from)}</td><td><b>${h(c.to)}</b></td></tr>`)).join("")}</table></div>`:`<p class="mute">No changes since the record was created.</p>`}</div></div>
     ${r.hist?.length?`<div class="panel"><h2>School years in APEIs</h2><div class="scroll"><table><tr><th>Session</th><th>School</th><th>Class – Sec</th><th>Result</th></tr>${r.hist.map(x=>`<tr><td>${h(x.s)}</td><td>${h(x.school)}</td><td>${h(x.cl)}-${h(x.sec)}</td><td>${h(x.res||"")}</td></tr>`).join("")}<tr class="sub"><td>${h(session())}</td><td>${h(r.school)}</td><td>${h(r.cl)}-${h(r.sec)}</td><td>${h(r.status==="On roll"?"current":r.status)}</td></tr></table></div></div>`:""}
+    ${sp.form?`<div class="panel"><div class="ph"><h2>Admission form (photo)</h2><span class="hint" style="margin:0">Verified by ${h(r.formVerifiedBy||sp.form.byName||"")} ${h(r.formVerifiedAt||"")}</span></div><img src="${sp.form.img}" alt="Admission form" style="max-width:100%;max-height:70vh;border:1px solid var(--line);border-radius:8px"></div>`:""}
     <div class="panel"><h2>Movement history</h2><div class="scroll">${!sp.hist?`<p class="mute">Loading…</p>`:sp.hist.length?txTable(sp.hist,false):`<p class="mute">No admissions, transfers or withdrawals recorded for this student since go-live.</p>`}</div></div>`}`; }
 function stuEditConfirm(){ const r=S.sp?.rec; if(!r||!canEditStu(r)||S.sp.editing) return; if(canEditDirect()){ S.sp.editing=true; fillRegion("spBody",true); return; }
   modal(`<h3>⚠ Edit an official student record?</h3><div class="warnbox"><p style="margin:0 0 6px"><b>${h(r.name)}</b> — ${h(r.school)} ${h(r.cl)}-${h(r.sec)}</p>
@@ -1338,6 +1353,7 @@ async function stuSave(f){
   if(!sp.editing || !(sp.isNew ? canEnter(code)||canEditDirect() : canEditStu(old))){ toast("This record is locked for your account.",true); return; }
   for(const fl of activeFields()){ const el=$("#sf_"+fl.key); if(!el) continue; let v=el.value.trim();
     if(fl.type==="date" && v){ const p=parseDob(v); if(p===null){ toast(`${fl.label}: date not understood (dd-mm-yyyy).`,true); el.focus(); return; } v=p; }
+    if(PHONE_KEYS.has(fl.key) && v){ const bad=phonesBad(v); if(bad.length){ toast(`${fl.label}: "${bad[0]}" is not a phone number (e.g. 0300-1234567).`,true); el.focus(); return; } v=fmtPhones(v); }
     if(["fatherCnic","motherCnic"].includes(fl.key) && v){ if(digits(v).length!==13){ toast(`${fl.label} must have 13 digits.`,true); el.focus(); return; } v=fmtCnic(v); }
     if(fl.req && !v){ toast(`${fl.label} is required.`,true); el.focus(); return; } d[fl.key]=v; }
   const sc=S.schools[code]; if(!sc.classes.some(c=>c.cl===d.cl&&c.secs.some(x=>x.s===d.sec))){ toast("Pick a class and section that exist.",true); return; }
@@ -1351,7 +1367,7 @@ async function stuSave(f){
     if(["cl","sec","status"].some(k=>ch.some(c=>c.k===k))) toast("Saved. Note: editing the record does not change strength — use Entry for admissions, withdrawals and section transfers.");
     S.sp.rec={...old,...d}; S.sp.editing=canEditDirect(); S.sp.edits=null; fillRegion("spBody",true);
     DB.query("edits","stuId","==",id).then(x=>{ if(S.sp?.id===id){ S.sp.edits=x.sort((a,b)=>toMs(b.at)-toMs(a.at)); fillRegion("spBody",true); } }).catch(()=>{});
-  } else { const nid=newId(); ops.set.push({col:"students",id:nid,data:{school:code,...d,createdAt:TS,updatedAt:TS,by:me().name||""}}); await DB.apply(ops); toast(`${d.name} added to the data bank.`); history.replaceState(null,"",hashFor("student",{id:nid})); S.params={id:nid}; loadStuPage(); }
+  } else { const nid=newId(); const fx=S.formPending?.how==="bank"?{formVerifiedBy:S.formPending.extra.formVerifiedBy,formVerifiedAt:S.formPending.extra.formVerifiedAt}:{}; ops.set.push({col:"students",id:nid,data:{school:code,...d,...fx,createdAt:TS,updatedAt:TS,by:me().name||""}}); if(S.formPending?.how==="bank") formAttach(ops,nid,code); await DB.apply(ops); toast(`${d.name} added to the data bank.`); history.replaceState(null,"",hashFor("student",{id:nid})); S.params={id:nid}; loadStuPage(); }
 }
 function stuOneModels(){ const r=S.sp.rec, F=activeFields(); return {name:`Student_${norm(r.name)}_${r.admNo||""}`, title:"STUDENT RECORD", sub:`${S.schools[r.school]?.name||r.school}`, orientation:"portrait",
   models:[tbl(`${r.name} — ${r.cl}-${r.sec} · ${r.status}`,["Field","Value"],F.map(f=>({c:[f.label,f.key==="cat"?catLabel(r.cat):stuVal(r,f)]}))),
@@ -1588,6 +1604,7 @@ const EXPORTS = {
   find: findModels,
   drill: () => ({name:"Breakdown", title:(DRILL_T[S.params.m]||"Breakdown").toUpperCase(), sub:"", orientation:"landscape", models:drillModels()}),
   stuOne: stuOneModels,
+  contacts: contactModels,
   siblings: sibModels,
   tfr: tfrModels,
   daycare: () => ({name:"Day_care", title:"DAY CARE", sub:"Not included in school strength", orientation:"landscape", models:[dcSumModel()]}),
@@ -1675,7 +1692,8 @@ async function impEntries(file){
     const a=matchAction(v.action); if(!a) E("action",v.action?`"${v.action}" is not an action — copy one from "Valid values"`:"missing");
     const o=chkCs(code,v,E); const name=v.name; if(!name) E("name","missing");
     const gender=chkGender(v,E,code,o?.cl); const dob=chkDate(v,"dob",E,{future:false}); const eff=chkDate(v,"date",E,{future:false}); const cat=chkCat(v,E,W); const cnic=chkCnic(v,"cnic",E);
-    const tx={school:code, action:a?.code, cl:o?.cl, sec:o?.s, gender, cat, name, father:v.father||"", dob:dob||"", admNo:v.adm||"", remarks:v.remarks||"", eff:eff||isoDay(Date.now()), stuExtra:{...(cnic?{fatherCnic:cnic}:{}),...(v.contact?{contact:v.contact}:{})}};
+    if(v.contact && phonesBad(v.contact).length) E("contact",`"${phonesBad(v.contact)[0]}" is not a phone number (0300-1234567; several: separate with commas)`);
+    const tx={school:code, action:a?.code, cl:o?.cl, sec:o?.s, gender, cat, name, father:v.father||"", dob:dob||"", admNo:v.adm||"", remarks:v.remarks||"", eff:eff||isoDay(Date.now()), stuExtra:{...(cnic?{fatherCnic:cnic}:{}),...(v.contact?{contact:fmtPhones(v.contact)}:{})}};
     const em=effFromDate(eff); if(em) tx.effMs=em;
     if(a && o && !r.errs.length){ const k=a.kind, apei=String(v.apei||"").trim();
       if(k==="sec"){ const ts=S.schools[code].classes.find(x=>x.cl===o.cl).secs.find(x=>norm(x.s)===norm(v.tosec)); if(!ts) E("tosec",v.tosec?`section "${v.tosec}" not in ${o.cl}`:"missing — needed for a section transfer"); else if(ts.s===o.s) E("tosec","same as the present section"); else { tx.toCl=o.cl; tx.toSec=ts.s; } }
@@ -1699,6 +1717,7 @@ async function impStudents(file){
     if(!v.name) E("name","missing"); const o=chkCs(code,v,E); if(o){ d.cl=o.cl; d.sec=o.s; }
     d.gender=chkGender(v,E,code,o?.cl); if(v.cat!==undefined) d.cat=String(v.cat).trim()?chkCat(v,E,W):"";
     for(const k of ["fatherCnic","motherCnic"]) if(v[k]) d[k]=chkCnic(v,k,E);
+    for(const k of PHONE_KEYS) if(v[k]){ const b=phonesBad(v[k]); if(b.length) E(k,`"${b[0]}" is not a phone number (0300-1234567; several: separate with commas)`); else d[k]=fmtPhones(v[k]); }
     if(v.status && !STU_STATUS.some(s=>norm(s)===norm(v.status))) E("status",`"${v.status}" — use ${STU_STATUS.join(" / ")}`); d.status=STU_STATUS.find(s=>norm(s)===norm(v.status))||"On roll";
     for(const f of F) if(f.req && !d[f.key] && !r.errs.some(e=>e.c===f.key)) E(f.key,"missing");
     if(d.admNo){ if(seen.has(norm(d.admNo))) E("admNo",`Adm No ${d.admNo} appears twice in the file`); seen.add(norm(d.admNo)); }
@@ -1714,7 +1733,7 @@ async function impWaiting(file){ const code=waitSchool(); const X=extraFields("w
   for(const r of rows){ const v=r.v, [E,W]=mkRow(r); const c=S.schools[code].classes.find(x=>norm(x.cl)===norm(v.cl)||norm(arab(x.cl))===norm(arab(String(v.cl||""))));
     if(!c) E("cl",v.cl?`"${v.cl}" is not a class of ${code}`:"missing"); if(!v.name) E("name","missing"); const ad=chkDate(v,"appl",E,{future:false}); const dob=chkDate(v,"dob",E,{future:false});
     let st=waitSts()[0].name; if(v.status){ const s=waitSts().find(s=>norm(s.name)===norm(v.status)); if(!s) E("status",`"${v.status}" — use ${waitSts().map(s=>s.name).join(" / ")}`); else st=s.name; }
-    r.d={school:code,cl:c?.cl,date:ad||isoDay(Date.now()),name:v.name,father:v.father||"",unit:v.unit||"",contact:v.contact||"",dob:dob?isoToDmy(dob):"",status:st,marks:v.marks||"",dqRemarks:v.dq||"",admsn:v.admsn||"",schRemarks:v.sch||"",x:Object.fromEntries(X.map(f=>[f.key,v[f.key]||""])),session:session(),at:TS,by:me().uid,byName:me().name||""}; }
+    r.d={school:code,cl:c?.cl,date:ad||isoDay(Date.now()),name:v.name,father:v.father||"",unit:v.unit||"",contact:fmtPhones(v.contact),dob:dob?isoToDmy(dob):"",status:st,marks:v.marks||"",dqRemarks:v.dq||"",admsn:v.admsn||"",schRemarks:v.sch||"",x:Object.fromEntries(X.map(f=>[f.key,v[f.key]||""])),session:session(),at:TS,by:me().uid,byName:me().name||""}; }
   impSet({kind:"wait", region:"wImp", file:file.name, cols:cols.map(c=>[c[0],c[1]]), rows, commit: async good=>{ const ops=opsNew(); for(const r of good) ops.set.push({col:"waiting",id:newId(),data:r.d}); await DB.apply(ops); toast(`${good.length} applicants imported into ${code}.`); } }); }
 
 /* ---- transfer requests ---- */
@@ -1726,7 +1745,7 @@ async function impTfr(file){ const X=extraFields("tfrFields"); const cols=[...TF
     const c1=sc(v.c1); if(!c1) E("c1",v.c1?`"${v.c1}" is not a school code (${schoolList().map(s=>s.code).join(", ")})`:"missing"); const c2=v.c2?sc(v.c2):null; if(v.c2&&!c2) E("c2",`"${v.c2}" is not a school code`);
     const cu=sc(v.cur); let ad=chkDate(v,"appl",E,{future:false}); const today=isoDay(Date.now()); if(ad && ad!==today && !isSA()){ W(`application date ${isoToDmy(ad)} replaced by today — only the Super Admin can back-date`); ad=today; }
     const g=v.gender?chkGender(v,E):""; const cat=v.cat?chkCat(v,E,W):"";
-    r.d={appDate:ad||today,backdated:!!(ad&&ad<today),name:v.name,father:v.father||"",cl:l,gender:g||"b",cat,contact:v.contact||"",curSchool:cu?cu.code:(v.cur?"__other":""),curExt:cu?"":(v.cur||""),choice1:c1?.code,choice2:c2?.code||"",admNo:v.adm||"",remarks:v.rem||"",status:"Pending",x:Object.fromEntries(X.map(f=>[f.key,v[f.key]||""]))}; }
+    r.d={appDate:ad||today,backdated:!!(ad&&ad<today),name:v.name,father:v.father||"",cl:l,gender:g||"b",cat,contact:fmtPhones(v.contact),curSchool:cu?cu.code:(v.cur?"__other":""),curExt:cu?"":(v.cur||""),choice1:c1?.code,choice2:c2?.code||"",admNo:v.adm||"",remarks:v.rem||"",status:"Pending",x:Object.fromEntries(X.map(f=>[f.key,v[f.key]||""]))}; }
   rows.sort((a,b)=>(a.d.appDate||"").localeCompare(b.d.appDate||"")||a.line-b.line);
   impSet({kind:"tfr", region:"tImp", file:file.name, cols:cols.map(c=>[c[0],c[1]]), rows, commit: async good=>{ const n=await tfrCreate(good.map(r=>r.d)); toast(`${n} transfer requests registered (numbers given in order of application date).`); } }); }
 
@@ -1735,7 +1754,7 @@ const DC_COLS = [["name","Child Name",["childname","childsname","name"]],["gende
 async function impDc(file){ const code=dcSchool(); const rows=await readTable(file,DC_COLS,["name"]); if(!rows) return;
   for(const r of rows){ const v=r.v, [E]=mkRow(r); if(!v.name) E("name","missing"); const g=v.gender?chkGender(v,E):"b"; const dob=chkDate(v,"dob",E,{future:false}); const ad=chkDate(v,"adm",E,{future:false});
     if(v.fee && isNaN(Number(String(v.fee).replace(/,/g,"")))) E("fee",`"${v.fee}" is not a number`); if(v.status && !["present","left"].includes(norm(v.status))) E("status","use Present or Left");
-    r.d={name:v.name,gender:g||"b",dob:dob||"",parent:v.parent||"",desig:v.desig||"",contact:v.contact||"",admDate:ad||"",fee:Number(String(v.fee||"").replace(/,/g,""))||0,status:norm(v.status)==="left"?"Left":"Present"}; }
+    r.d={name:v.name,gender:g||"b",dob:dob||"",parent:v.parent||"",desig:v.desig||"",contact:fmtPhones(v.contact),admDate:ad||"",fee:Number(String(v.fee||"").replace(/,/g,""))||0,status:norm(v.status)==="left"?"Left":"Present"}; }
   impSet({kind:"dc", region:"dcImp", file:file.name, cols:DC_COLS, rows, commit: async good=>{ const kids={}; for(const r of good) kids[newId()]=r.d; await DB.apply({set:[{col:"dcare",id:code,data:{kids,updatedAt:TS,byName:me().name||""},merge:"deep"}],upd:[],inc:[]}); toast(`${good.length} children added to ${code} day care.`); } }); }
 
 /* ---- fee defaulters list ---- */
@@ -1749,7 +1768,7 @@ async function impFee(file){ const code=S.fd.code; const rows=await readTable(fi
     r.st=st; r.m=m; r.amt=amt; if(st) r.v.name=r.v.name||st.name; }
   impSet({kind:"fee", region:"feBody", file:file.name, cols:FEE_COLS, rows, commit: async good=>{ for(const r of good){ feeAddStu(r.st,r.m); if(r.amt!==null) S.fd.rows[r.st.id].amt=r.amt; } toast(`${good.length} defaulters added — check and press Save.`); } }); }
 
-async function impGo(){ const I=S.imp; if(!I) return; const good=I.rows.filter(r=>!r.errs.length); try{ await I.commit(good); S.imp=null; }catch(e){ toast("Import failed, nothing saved: "+e.message,true); return; }
+async function impGo(){ const I=S.imp; if(!I) return; const good=I.rows.filter(r=>!r.errs.length); try{ await I.commit(good); S.imp=null; }catch(e){ if(fsFail(e)) toast("Not imported — the database connection stopped. Press “Reload now” in the red box, then import the file again.",true); else toast("Import failed, nothing saved: "+e.message,true); return; }
   if(I.kind==="dc") fillRegion("dcList",true); fillRegion(I.region,true); }
 
 /* =====================================================================
@@ -1870,6 +1889,117 @@ async function promoGo(){ const ns=$("#pgName").value.trim(), start=$("#pgStart"
       n++; } }
   try{ if(n) await DB.apply(so); await rebuildIdx(); }catch(e){ toast("Strength is rolled over, but the student records were not all updated: "+e.message+" — open this page again and press Rebuild search index.",true); }
   S.promo=null; S.imp=null; toast(`Session ${ns} started. ${nf(n)} student records updated.`); boot(); }
+
+/* =====================================================================
+   21) PHONE NUMBERS · CONTACT DIRECTORY (Super Admin) · READING HANDWRITTEN ADMISSION FORMS
+   ===================================================================== */
+
+/* ---------- phone numbers: always saved as 0300-1234567; several per student, separated by commas ---------- */
+function fmtPhone(v){ let d=digits(v); if(!d) return ""; if(d.startsWith("0092")) d=d.slice(2); if(d.startsWith("92") && d.length===12) d="0"+d.slice(2); if(d.length===10 && d[0]==="3") d="0"+d;
+  return /^03\d{9}$/.test(d) ? d.slice(0,4)+"-"+d.slice(4) : d; }
+const splitPhones = v => String(v??"").split(/[,;\/\n|]+|\s{2,}|\band\b/i).map(x=>x.trim()).filter(x=>digits(x).length);
+const fmtPhones = v => [...new Set(splitPhones(v).map(fmtPhone).filter(Boolean))].join(", ");
+const phoneOk = p => { const d=digits(p); return /^03\d{9}$/.test(d) || (d[0]==="0" && d.length>=9 && d.length<=11); };
+const phonesBad = v => splitPhones(v).filter(x=>!phoneOk(fmtPhone(x)));
+const waNo = p => { const d=digits(p); return d[0]==="0" ? "92"+d.slice(1) : d; };
+const PHONE_KEYS = new Set(["contact","contact2"]);
+
+/* ---------- Contact directory — Super Admin only ---------- */
+function contactRows(){ const p=S.params, rows=[];
+  for(const r of idxAll()){ if(p.cSch && r.school!==p.cSch) continue; if((p.cSt||"On roll")!=="all" && r.status!==(p.cSt||"On roll")) continue; if(p.cLvl && lvlOf({cl:r.cl})!==p.cLvl) continue; if(p.cCat && canonCat(r.cat)!==p.cCat) continue;
+    const nums=[...splitPhones(r.contact),...splitPhones(r.contact2)].map(fmtPhone).filter(phoneOk); if(!nums.length) continue;
+    rows.push({src:"Student", name:r.name, father:r.father, school:r.school, cl:`${r.cl}-${r.sec}`, cat:catLabel(r.cat), nums:[...new Set(nums)], id:r.id}); }
+  if(p.cApp){ for(const w of S.waiting){ if(p.cSch && w.school!==p.cSch) continue; const n=splitPhones(w.contact).map(fmtPhone).filter(phoneOk); if(n.length) rows.push({src:"Applicant",name:w.name,father:w.father||"",school:w.school,cl:w.cl,cat:w.unit||"",nums:n}); }
+    for(const t of S.tfrapps.filter(t=>tfrOpen(t.status))){ if(p.cSch && t.choice1!==p.cSch) continue; const n=splitPhones(t.contact).map(fmtPhone).filter(phoneOk); if(n.length) rows.push({src:"Transfer request",name:t.name,father:t.father||"",school:t.choice1,cl:t.cl,cat:catLabel(t.cat),nums:n}); } }
+  if(p.cFam){ const M=new Map(); for(const r of rows){ const k=r.nums[0]; if(!M.has(k)) M.set(k,{...r,kids:[]}); M.get(k).kids.push(`${r.name} (${r.school} ${r.cl})`); } return [...M.values()].map(r=>({...r,name:r.kids.join("; ")})); }
+  return rows; }
+function contactsHtml(){ const p=S.params, R=contactRows(), all=idxAll(), withNo=all.filter(r=>splitPhones(r.contact).length).length;
+  return `<div class="panel"><div class="ph"><h2>Contact directory <span class="tag t-mid">Super Admin only</span></h2><div class="pills">${expBar("contacts")}${canDL()?`<button class="btn s" data-act="vcf">Phone contacts (.vcf)</button>`:""}</div></div>
+    <p class="hint" style="margin-top:0">Every number is stored in one format (0300-1234567). A student may have several numbers. ${nf(withNo)} of ${nf(all.length)} students in the data bank have a number. The .vcf file imports straight into a phone's contacts; the Excel sheet has a WhatsApp column (92…).</p>
+    <div class="grid"><div class="f"><label>School</label><select data-chg="setPsel" data-k="cSch"><option value="">All schools</option>${schoolList().map(s=>`<option ${p.cSch===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select></div>
+      <div class="f"><label>Class</label><select data-chg="setPsel" data-k="cLvl"><option value="">All classes</option>${allLevels().map(l=>`<option ${p.cLvl===l?"selected":""}>${h(l)}</option>`).join("")}</select></div>
+      <div class="f"><label>Category</label><select data-chg="setPsel" data-k="cCat">${catOptions(p.cCat,"All categories")}</select></div>
+      <div class="f"><label>Status</label><select data-chg="setPsel" data-k="cSt"><option value="">On roll</option><option value="all" ${p.cSt==="all"?"selected":""}>Everyone (incl. left)</option></select></div>
+      <label class="ck"><input type="checkbox" data-chg="setPck" data-k="cFam" ${p.cFam?"checked":""}> one row per number (brothers & sisters together)</label>
+      <label class="ck"><input type="checkbox" data-chg="setPck" data-k="cApp" ${p.cApp?"checked":""}> include applicants & transfer requests</label></div>
+    <p class="hint">${R.length} contacts</p>
+    <div class="scroll">${R.length?`<table><tr><th>#</th><th>${p.cFam?"Children":"Name"}</th><th>Father</th><th>School</th><th>Class</th><th>Category</th><th>Number(s)</th><th>Source</th></tr>${R.slice(0,600).map((r,i)=>`<tr><td class="mute">${i+1}</td><td style="white-space:normal">${r.id&&!p.cFam?`<span class="dn" data-act="openStu" data-id="${h(r.id)}">${h(r.name)}</span>`:h(r.name)}</td><td>${h(r.father)}</td><td>${h(r.school)}</td><td>${h(r.cl)}</td><td>${h(r.cat)}</td><td><b>${r.nums.map(h).join(", ")}</b></td><td class="mute">${h(r.src)}</td></tr>`).join("")}</table>`:`<div class="empty">No numbers for this selection.</div>`}</div></div>`; }
+function contactModels(){ const R=contactRows(), fam=S.params.cFam; return {name:"Contacts", title:"CONTACT DIRECTORY", sub:`${R.length} contacts`, orientation:"landscape",
+  models:[tbl("CONTACTS",["#",fam?"Children":"Name","Father","School","Class","Category","Number 1","Number 2","Number 3","WhatsApp","Source"],R.map((r,i)=>({c:[String(i+1),r.name,r.father,r.school,r.cl,r.cat,r.nums[0]||"",r.nums[1]||"",r.nums[2]||"",waNo(r.nums[0]),r.src]})))]}; }
+function vcf(){ if(!canDL()){ toast(DL_MSG,true); return; } const R=contactRows(); const esc=s=>String(s||"").replace(/([,;\\])/g,"\\$1");
+  const txt=R.map(r=>{ const fn=`${r.father?r.father+" — ":""}${S.params.cFam?r.name:"F/o "+r.name} (${r.school} ${r.cl})`.slice(0,120);
+    return ["BEGIN:VCARD","VERSION:3.0",`FN:${esc(fn)}`,`N:${esc(fn)};;;;`,...r.nums.map(n=>`TEL;TYPE=CELL:+${waNo(n)}`),`ORG:${esc(ST().org||"APEIs")}`,`NOTE:${esc(r.src+" · "+r.cat)}`,"END:VCARD"].join("\r\n"); }).join("\r\n");
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([txt],{type:"text/vcard"})); a.download=`APEIs_contacts_${isoDay(Date.now())}.vcf`; a.click(); toast(`${R.length} contacts saved as a phone contacts file.`); }
+
+/* ---------- Reading a handwritten admission form (photo) — AI reads, the clerk checks every field, then it is saved ---------- */
+const FORM_FIELDS = [["name","Student name"],["father","Father name"],["gender","Gender (B/G)"],["dob","Date of birth"],["cl","Class applied for"],["bform","B-Form No"],["fatherCnic","Father CNIC"],["motherCnic","Mother CNIC"],
+  ["contact","Contact numbers"],["fatherRank","Father rank / appt"],["serviceNo","Service / Pak No"],["unit","Unit / department"],["cat","Category (best match)"],["address","Address"],["religion","Religion"],["prevSchool","Previous school"],["remarks","Other information"]];
+const aiCfg = () => S.ai || {};
+async function loadAi(){ if(S.ai) return S.ai; try{ S.ai=await DB.getDoc("secrets","ai")||{}; }catch(e){ S.ai={}; } return S.ai; }
+function shrinkImage(file, max=1600, q=0.72){ return new Promise((res,rej)=>{ const img=new Image(); img.onload=()=>{ const k=Math.min(1,max/Math.max(img.width,img.height)); const c=document.createElement("canvas"); c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
+  c.getContext("2d").drawImage(img,0,0,c.width,c.height); res(c.toDataURL("image/jpeg",q)); URL.revokeObjectURL(img.src); }; img.onerror=()=>rej(new Error("This file is not a picture the browser can open (use JPG or PNG).")); img.src=URL.createObjectURL(file); }); }
+async function aiRead(dataUrl){
+  const cfg=await loadAi(); if(!cfg.key) throw new Error("Form reading is not switched on yet — the Super Admin adds the free Google AI key in Setup → Form reading.");
+  const prompt=`You are reading a HANDWRITTEN school admission form from Pakistan (APEIs / Army Public Schools). The writing may be English or Urdu and is often unclear.
+Return ONLY JSON with these keys (empty string if not on the form): ${FORM_FIELDS.map(f=>f[0]).join(", ")}, unsure.
+Rules: gender "B" or "G". dob as dd-mm-yyyy. CNIC as 12345-1234567-1. contact: every phone number on the form, separated by commas. cl: the class applied for, e.g. "EYS-I", "Pre-I", "I", "IV", "IX".
+cat: pick the closest of: ${cats().join(" | ")} — or "" if not clear. Write names in English letters even if written in Urdu.
+unsure: an array of the keys you could not read confidently. Never guess numbers: if a digit is unreadable, leave the field empty and list it in unsure.`;
+  const models=[cfg.model||"gemini-flash-latest","gemini-2.5-flash"].filter((x,i,a)=>a.indexOf(x)===i); let last;
+  for(const model of models){ try{
+      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":cfg.key},
+        body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:"image/jpeg",data:dataUrl.split(",")[1]}}]}],generationConfig:{responseMimeType:"application/json",temperature:0}})});
+      const j=await r.json(); if(!r.ok){ last=new Error(j.error?.message||("HTTP "+r.status)); if(r.status===404) continue; throw last; }
+      const t=(j.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join(""); const o=JSON.parse(t.replace(/^```(json)?|```$/g,"").trim()); return o;
+    }catch(e){ last=e; if(!/404|not found/i.test(e.message)) break; } }
+  throw new Error("The form could not be read: "+(last?.message||"no answer")); }
+function formDlg(){ modal(`<h3>📷 Read a handwritten admission form</h3>
+   <p>Take a clear photo of the whole form (flat, in daylight, no shadow) or choose a scanned picture. The portal reads it and fills a form for you to <b>check line by line</b> — nothing is saved until you press Verified.</p>
+   <div class="row" style="justify-content:flex-start"><label class="btn p">Take photo / choose picture <input type="file" accept="image/*" capture="environment" data-chg="formPic" hidden></label></div>
+   <p class="hint">Handwriting is read by Google's AI. It is good but not perfect: CNIC and phone numbers must always be checked against the paper.</p>
+   <div class="row"><button class="btn" data-act="closeModal">Cancel</button></div>`); }
+async function formRead(file){ let img; try{ img=await shrinkImage(file); }catch(e){ toast(e.message,true); return; }
+  modal(`<h3>Reading the form…</h3><img src="${img}" alt="" style="max-width:100%;max-height:50vh;border:1px solid var(--line);border-radius:8px"><p class="hint">This takes 5–20 seconds.</p>`);
+  let o; try{ o=await aiRead(img); }catch(e){ modal(`<h3>Could not read the form</h3><p class="neg">${h(e.message)}</p><div class="row"><button class="btn" data-act="closeModal">Close</button><button class="btn p" data-act="formDlg">Try another photo</button></div>`); return; }
+  S.form={img, o, unsure:new Set((o.unsure||[]).map(String))}; formVerifyDlg(); }
+function formVerifyDlg(){ const F=S.form, o=F.o, code=entrySchool()||mySchool()||schoolList()[0].code;
+  const v=k=>{ let x=String(o[k]??"").trim(); if(k==="contact") x=fmtPhones(x); if(["fatherCnic","motherCnic"].includes(k)&&digits(x).length===13) x=fmtCnic(x); if(k==="gender") x=/^g/i.test(x)?"g":/^b/i.test(x)?"b":""; return x; };
+  modal(`<h3>Check the details against the form</h3><p class="hint" style="margin-top:0">Fields in <span class="amber"><b>amber</b></span> were hard to read. Correct anything wrong, then press Verified.</p>
+   <div class="two"><div><img src="${F.img}" alt="Admission form" style="width:100%;border:1px solid var(--line);border-radius:8px;cursor:zoom-in" onclick="this.style.width=this.style.width==='200%'?'100%':'200%'" title="Click to zoom"></div>
+   <form data-form="formOk" class="fgrid" style="align-content:start">${FORM_FIELDS.map(([k,l])=>{ const un=F.unsure.has(k), val=v(k); const st=un?' style="border-color:var(--amber);background:var(--ambersoft)"':"";
+     if(k==="gender") return `<div class="f"><label>${l}${un?" ⚠":""}</label><select id="fo_gender"${st}><option value="">—</option><option value="b" ${val==="b"?"selected":""}>Boy</option><option value="g" ${val==="g"?"selected":""}>Girl</option></select></div>`;
+     if(k==="cat") return `<div class="f"><label>${l}${un?" ⚠":""}</label><select id="fo_cat"${st}>${catOptions(cats().find(c=>norm(c)===norm(val))||"","—")}</select></div>`;
+     if(k==="remarks"||k==="address") return `<div class="f" style="grid-column:1/-1"><label>${l}${un?" ⚠":""}</label><textarea id="fo_${k}" rows="2"${st}>${h(val)}</textarea></div>`;
+     return `<div class="f"><label>${l}${un?" ⚠":""}</label><input id="fo_${k}" value="${h(val)}"${st}></div>`; }).join("")}
+     <label class="ck" style="grid-column:1/-1"><input type="checkbox" id="fo_keep" checked> Keep a copy of the form picture with the student's record</label>
+     <div class="actrow" style="grid-column:1/-1"><button type="button" class="btn" data-act="closeModal">Cancel</button>${canEnter(code)?`<button class="btn p" name="go" value="entry">✓ Verified — use for a New Admission</button>`:""}<button class="btn" name="go" value="bank">✓ Verified — add to data bank (already on roll)</button></div></form></div>`,"wide"); }
+function formCollect(){ const d={}; for(const [k] of FORM_FIELDS){ const el=$("#fo_"+k); if(el) d[k]=el.value.trim(); }
+  if(d.contact) d.contact=fmtPhones(d.contact); for(const k of ["fatherCnic","motherCnic"]) if(d[k]) d[k]=fmtCnic(d[k]);
+  const dob=d.dob?parseDob(d.dob):""; return {d, dob, bad:[...(d.dob&&dob===null?["Date of birth"]:[]),...["fatherCnic","motherCnic"].filter(k=>d[k]&&digits(d[k]).length!==13).map(k=>k==="fatherCnic"?"Father CNIC":"Mother CNIC"),...(phonesBad(d.contact).length?["Contact numbers"]:[])]}; }
+function formOk(f, how){ const {d,dob,bad}=formCollect(); if(bad.length){ toast("Please correct: "+bad.join(", "),true); return; }
+  const keep=$("#fo_keep")?.checked, extra={...d}; delete extra.cl; delete extra.gender; delete extra.name; delete extra.father; delete extra.dob; delete extra.cat;
+  extra.formVerifiedBy=me().name||""; extra.formVerifiedAt=fmtDT(Date.now());
+  S.formPending={extra, img:keep?S.form.img:null, how}; closeModal();
+  if(how==="entry"){ go("entry"); setTimeout(()=>{ const set=(id,v)=>{ const el=$("#"+id); if(el&&v!==undefined) el.value=v; };
+      set("fAct","NEW"); set("fName",d.name); set("fFather",d.father); set("fDob",dob?isoToDmy(dob):""); set("fCnic",d.fatherCnic); set("fCon",d.contact); if(d.gender) set("fGen",d.gender); if(d.cat) set("fCat",d.cat);
+      const inp=$("#fCS"); if(inp){ inp.value=d.cl||""; inp.focus(); } entryToggle?.();
+      const box=$("#fFound"); if(box) box.innerHTML=`<span class="pos">Filled from the verified admission form.</span> Now pick the <b>Class – Section</b> and press Save; the other form details (B-Form, address, rank…) are added to the student's record.`; },150); }
+  else { go("student",{new:1,school:entrySchool()||mySchool()||schoolList()[0].code}); setTimeout(()=>{ const r=S.sp?.rec; if(!r) return; Object.assign(r,{name:d.name,father:d.father,gender:d.gender||r.gender,dob:dob||"",cat:d.cat||"",...extra}); fillRegion("spBody",true);
+      toast("Filled from the form — choose class and section, then press Add to data bank."); },350); } }
+/* after the student is created, store the form picture (small JPEG) in its own document */
+function formAttach(ops, stuId, school){ const P=S.formPending; if(!P) return; if(P.img) ops.set.push({col:"forms",id:stuId,data:{stuId,school,img:P.img,at:TS,by:me().uid,byName:me().name||""}}); S.formPending=null; }
+
+/* Setup → Form reading */
+function aiSetupHtml(){ const c=aiCfg();
+  return `<div class="panel"><h2>Reading handwritten admission forms</h2>
+   <p>Clerks photograph a parent's handwritten form; Google's Gemini AI reads it; the clerk checks every field against the paper and presses <b>Verified</b> before anything is saved. Works on any phone or PC with a camera or scanner.</p>
+   <ol class="steps"><li>Open <b>aistudio.google.com</b> with the office Google account → <b>Get API key</b> → Create API key (free; a daily limit of a few hundred forms is plenty).</li>
+     <li>In Google Cloud console → APIs & Services → Credentials, open that key and restrict it to the website <b>${h(location.origin)}/*</b> — then it is useless anywhere else.</li>
+     <li>Paste it below and press <b>Save & test</b>.</li></ol>
+   <form data-form="aiSave" class="grid"><div class="f wide" style="grid-column:span 2"><label for="aiKey">Google AI (Gemini) API key</label><input id="aiKey" type="password" autocomplete="off" placeholder="${c.key?"saved — paste a new one to replace":"AIza…"}"></div>
+    <div class="f"><label for="aiModel">Model</label><input id="aiModel" value="${h(c.model||"gemini-flash-latest")}"></div></form>
+   <div class="actrow"><span class="hint" style="margin:0">${c.key?`<span class="pos">Switched on.</span>`:"Not switched on yet."} The key is readable only by signed-in school staff.</span>${c.key?`<button class="btn r" data-act="aiOff">Switch off</button>`:""}<button class="btn p" data-act="aiSaveGo">Save & test</button></div>
+   <p class="hint"><b>Privacy:</b> the form picture is sent to Google only to be read; Google does not keep it for training when the key is used through the paid tier — on the free tier Google may use inputs to improve its products, so you may prefer to enable billing on that Google project (cost is well under one rupee per form).</p></div>`; }
 
 /* =====================================================================
    8) REPORTS — designer (tick what to show), presets, print/PDF, Excel, WhatsApp
@@ -2185,7 +2315,7 @@ const WA_HELP = [["{org}","Organisation name"],["{date} {time}","Today's date / 
    9) SETUP (Super Admin only) — everything is editable here
    ===================================================================== */
 const SETUP_TABS = [["schools","Schools & sections"],["opening","Opening strength"],["users","Users & permissions"],["general","General & appearance"],["cats","Categories"],["catopen","Category figures"],["actions","Actions & statuses"],
-  ["stufields","Student fields"],["appfields","Applicant columns"],["labels","Labels & terms"],["stages","Consolidation"],["fees","Fees"],["wa","WhatsApp templates"],["presets","Report presets"],["live","Senior's QR code"],["data","Backup & data"],["session","New session & promotion"]];
+  ["stufields","Student fields"],["appfields","Applicant columns"],["labels","Labels & terms"],["stages","Consolidation"],["fees","Fees"],["wa","WhatsApp templates"],["presets","Report presets"],["live","Senior's QR code"],["data","Backup & data"],["ai","Form reading (AI)"],["session","New session & promotion"]];
 VIEWS.setup = {
   shell:()=>`<div class="note">Everything in the portal can be changed here — names, numbers, lists, columns, colours, permissions. Nothing needs a programmer.</div><div class="subtabs">${SETUP_TABS.map(([k,l])=>`<button class="pill ${S.setupTab===k?"on":""}" data-act="setupTab" data-id="${k}">${l}</button>`).join("")}</div><div id="stBody"></div>`,
   regions:{ stBody(){ return (SETUP[S.setupTab]||SETUP.schools)(); } },
@@ -2279,6 +2409,7 @@ const SETUP = {
       <div class="row"><button class="btn p">Save columns</button></div></form></div>`; }).join("")
     + `<div class="panel"><h2>Transfer request statuses</h2><form data-form="tfrSt"><div class="f"><label for="sTst">One per line. Pending and Approved keep their seniority place.</label><textarea id="sTst" rows="6">${h(tfrSts().join("\n"))}</textarea></div><div class="row"><button class="btn p">Save statuses</button></div></form></div>`; },
   session(){ return promoHtml(); },
+  ai(){ if(!S.ai) loadAi().then(()=>fillRegion("stBody",true)); return aiSetupHtml(); },
   fees(){ return `<div class="panel"><h2>Fees</h2><p>The monthly fee for each category and stage is set in <a href="#fees?tab=str">Fees → Fee structure</a>. Day-care fees are set per school in <a href="#daycare">Day Care</a>.</p>
       <p class="hint">Defaulter returns are entered by each school in Fees → Defaulters return; the print-ready report with comparison is in Fees → Report.</p></div>`; },
   actions(){ const A=actions(); return `<div class="panel"><h2>Movement actions</h2><p class="hint">Rename, switch off, or add your own. "Effect" decides whether strength goes up or down.</p><form data-form="actions"><div class="scroll"><table><tr><th>Code</th><th>Label</th><th>Effect</th><th>In use</th></tr>
@@ -2392,7 +2523,7 @@ function stuRegHtml(){ const code=stuSchool(); if(!code) return `<div class="pan
     const sc=S.schools[code];
     return `<div class="panel"><div class="ph"><h2>Student data bank — ${h(code)} ${h(sc.name)}</h2>
       <div class="pills">${mySchool()?"":`<select class="in" style="width:auto" data-chg="stuSchool">${schoolList().map(s=>`<option value="${h(s.code)}" ${s.code===code?"selected":""}>${h(s.code)}</option>`).join("")}</select>`}
-      ${ed?`<button class="btn p" data-act="go" data-id="student" data-p="new=1&school=${h(code)}">+ Add student</button><button class="btn" data-act="tplStudents">Excel template</button><label class="btn">Import Excel <input type="file" accept=".xlsx,.xls,.csv" data-chg="impStudents" hidden></label>`:""}${canDL()?`<button class="btn" data-act="stuExport">Export Excel</button>`:""}</div></div>
+      ${ed?`<button class="btn" data-act="formDlg">📷 Read admission form</button><button class="btn p" data-act="go" data-id="student" data-p="new=1&school=${h(code)}">+ Add student</button><button class="btn" data-act="tplStudents">Excel template</button><label class="btn">Import Excel <input type="file" accept=".xlsx,.xls,.csv" data-chg="impStudents" hidden></label>`:""}${canDL()?`<button class="btn" data-act="stuExport">Export Excel</button>`:""}</div></div>
       <div class="grid"><div class="f"><label for="sQ">Search name, father, Adm No, B-Form, contact</label><input id="sQ" data-sf="q" value="${h(S.stuQ||"")}" placeholder="type to search…"></div>
         <div class="f"><label for="sCl">${h(L("cl"))}</label><select id="sCl" data-sf="cl"><option value="">All classes</option>${sc.classes.map(c=>`<option ${S.stuCl===c.cl?"selected":""}>${h(c.cl)}</option>`).join("")}</select></div>
         <div class="f"><label for="sSt">Status</label><select id="sSt" data-sf="st">${["On roll","All",...STU_STATUS.slice(1)].map(x=>`<option ${(S.stuSt||"On roll")===x?"selected":""}>${x}</option>`).join("")}</select></div>
@@ -2403,9 +2534,9 @@ function stuRegHtml(){ const code=stuSchool(); if(!code) return `<div class="pan
         <p class="hint" style="margin-top:0">Strength comes from the entries; this shows how many of those students are already in the data bank. Fill it school by school with the Excel import — nothing here changes strength.</p><div class="scroll" id="sReg"></div></div>`;}
 const stuTab = () => { const t=S.params.tab||"reg"; return canSeeStudents()?t:"cat"; };
 VIEWS.students = {
-  shell(){ const T=[["reg","Register"],["cat","Category-wise strength"],["sib","Siblings in APEIs"]].filter(([k])=>k==="cat"||canSeeStudents()); const t=stuTab();
+  shell(){ const T=[["reg","Register"],["cat","Category-wise strength"],["sib","Siblings in APEIs"],["con","Contacts"]].filter(([k])=>k==="con"?isSA():k==="cat"||canSeeStudents()); const t=stuTab();
     return `<div class="subtabs">${T.map(([k,l])=>`<button class="pill ${t===k?"on":""}" data-act="setP" data-p="tab=${k}">${l}</button>`).join("")}${canSeeStudents()?`<span class="hint" style="margin:0 0 0 auto;align-self:center">Tip: the search box at the top finds any student in all schools — press <kbd>/</kbd></span>`:""}</div>`
-      + (t==="cat" ? catPanelHtml() : t==="sib" ? `<div class="panel"><div class="ph"><h2>Siblings across all APEIs</h2><div class="pills"><select class="in" style="width:auto" data-chg="setPsel" data-k="sibSch"><option value="">All schools</option>${schoolList().map(s=>`<option ${S.params.sibSch===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select><label class="ck"><input type="checkbox" data-chg="setPck" data-k="sibX" ${S.params.sibX?"checked":""}> only families in 2+ campuses</label><label class="ck"><input type="checkbox" data-chg="setPck" data-k="sibAll" ${S.params.sibAll?"checked":""}> include students who left</label>${expBar("siblings")}</div></div><div class="scroll" id="sibBody"></div></div>` : stuRegHtml()); },
+      + (t==="con" && isSA() ? contactsHtml() : t==="cat" ? catPanelHtml() : t==="sib" ? `<div class="panel"><div class="ph"><h2>Siblings across all APEIs</h2><div class="pills"><select class="in" style="width:auto" data-chg="setPsel" data-k="sibSch"><option value="">All schools</option>${schoolList().map(s=>`<option ${S.params.sibSch===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select><label class="ck"><input type="checkbox" data-chg="setPck" data-k="sibX" ${S.params.sibX?"checked":""}> only families in 2+ campuses</label><label class="ck"><input type="checkbox" data-chg="setPck" data-k="sibAll" ${S.params.sibAll?"checked":""}> include students who left</label>${expBar("siblings")}</div></div><div class="scroll" id="sibBody"></div></div>` : stuRegHtml()); },
   regions:{
     sibBody(){ return sibHtml(); },
     cTbl(){ return catTblHtml(); },
@@ -2453,6 +2584,8 @@ function stuFieldInput(f, r, ed, code){
   if(f.key==="cl") return `<select id="${id}" data-chg="stuCl" ${dis}>${sc.classes.map(c=>`<option ${c.cl===v?"selected":""}>${h(c.cl)}</option>`).join("")}${v&&!sc.classes.some(c=>c.cl===v)?`<option selected>${h(v)}</option>`:""}</select>`;
   if(f.key==="sec"){ const c=sc.classes.find(c=>c.cl===(r.cl||sc.classes[0].cl))||sc.classes[0]; return `<select id="${id}" ${dis}>${c.secs.map(x=>`<option ${x.s===v?"selected":""}>${h(x.s)}</option>`).join("")}${v&&!c.secs.some(x=>x.s===v)?`<option selected>${h(v)}</option>`:""}</select>`; }
   if(f.key==="cat") return `<select id="${id}" ${dis}>${catOptions(v,"—")}</select>`;
+  if(f.key==="remarks"||f.key==="address") return `<textarea id="${id}" rows="${f.key==="remarks"?3:2}" ${dis} placeholder="${f.key==="remarks"?"Anything worth noting about this student that has no other place":""}">${h(v)}</textarea>`;
+  if(PHONE_KEYS.has(f.key)) return `<input id="${id}" value="${h(v)}" placeholder="0300-1234567, 0333-7654321" inputmode="tel" ${dis} title="Several numbers: separate with commas">`;
   if(f.key==="fatherCnic"||f.key==="motherCnic") return `<input id="${id}" value="${h(v)}" placeholder="12345-1234567-1" inputmode="numeric" ${dis}>`;
   if(f.key==="status") return `<select id="${id}" ${dis}>${STU_STATUS.map(x=>`<option ${x===(v||"On roll")?"selected":""}>${x}</option>`).join("")}</select>`;
   if(f.type==="list") return `<select id="${id}" ${dis}><option value=""></option>${String(f.options||"").split(",").map(x=>x.trim()).filter(Boolean).map(x=>`<option ${x===v?"selected":""}>${h(x)}</option>`).join("")}</select>`;
@@ -2704,6 +2837,12 @@ const ACT = {
   demoReset: () => ask("Reset demo data?","All test entries will be deleted.","Reset",async()=>Local.reset()),
   /* ---- v4: navigation ---- */
   back: () => goBack(),
+  vcf: () => vcf(), formDlg: () => formDlg(),
+  aiOff: () => ask("Switch off form reading?","Clerks will no longer be able to read forms from photos.","Switch off",async()=>{ await DB.apply({set:[{col:"secrets",id:"ai",data:{key:"",model:aiCfg().model||""}}],upd:[],inc:[]}); S.ai=null; await loadAi(); fillRegion("stBody",true); toast("Form reading switched off."); }),
+  aiSaveGo: async () => { const key=$("#aiKey").value.trim()||aiCfg().key, model=$("#aiModel").value.trim()||"gemini-flash-latest"; if(!key){ toast("Paste the API key first.",true); return; }
+    toast("Testing the key with Google…"); try{ const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},body:JSON.stringify({contents:[{parts:[{text:"Reply with the single word OK"}]}]})}); const j=await r.json(); if(!r.ok) throw new Error(j.error?.message||("HTTP "+r.status)); }
+    catch(e){ toast("The key did not work: "+e.message,true); return; }
+    await DB.apply({set:[{col:"secrets",id:"ai",data:{key,model,at:TS,by:me().name||""}}],upd:[],inc:[]}); S.ai={key,model}; fillRegion("stBody",true); toast("Form reading is switched on and the key works."); },
   menuToggle: el => { const m=$("#umenu"); m.hidden=!m.hidden; el.setAttribute("aria-expanded",String(!m.hidden)); },
   promoSchool: el => { promoState().school=el.dataset.id; fillRegion("stBody",true); },
   promoReset: () => { const P=promoState(); delete P.map[P.school]; delete P.stay[P.school]; fillRegion("stBody",true); },
@@ -2772,6 +2911,7 @@ const CHG = {
     const sib=k?idxAll().filter(x=>cnicKey(x.fatherCnic)===k):[]; box.innerHTML=sib.length?`<b>Siblings already in APEIs:</b> ${sib.map(x=>`${h(x.name)} (${h(x.school)} ${h(x.cl)}-${h(x.sec)}${x.status!=="On roll"?", "+h(x.status):""})`).join(" · ")}`:k?`<span class="mute">No brother/sister with this father CNIC in any APEI data bank yet.</span>`:""; },
   taCur: el => { $("#taExtW").hidden=el.value!=="__other"; },
   impRep: el => { const f=el.files[0]; el.value=""; if(f) impRep(f); },
+  formPic: el => { const f=el.files[0]; el.value=""; if(f) formRead(f); },
   impTfr: el => { const f=el.files[0]; el.value=""; if(f) impTfr(f); }, impDc: el => { const f=el.files[0]; el.value=""; if(f) impDc(f); }, impFee: el => { const f=el.files[0]; el.value=""; if(f) impFee(f); },
   entrySchool: el => { S.entrySchool=el.value; S.imp=null; renderView(); },
   entryAct: () => entryToggle(), entryDest: () => { $("#fDestCl").value=""; entryToggle(); },
@@ -2851,6 +2991,7 @@ const FORMS = {
     ops.upd.push({col:"transfers",id:t.id,data:{status:"accepted",inTx:inId,toCl:cl,toSec:sec,accBy:me().name||"",accAt:TS}}); await DB.apply(ops); closeModal(); toast(`${t.name} joined ${t.to} ${cl}-${sec}.`); },
   log: () => { const p={from:$("#lgFrom").value,to:$("#lgTo").value,school:$("#lgSch").value,act:$("#lgAct")?.value,by:$("#lgBy")?.value,q:$("#lgQ")?.value.trim(),sa:$("#lgNoSA")&&!$("#lgNoSA").checked?"1":""}; history.replaceState(null,"",hashFor("log",{...S.params,...p})); S.params={...S.params,...p}; runLog(); },
   promoGo: () => promoGo(),
+  formOk: (f, how) => formOk(f, how||"entry"),
   tfrAdd: async () => { const d={appDate:isSA()?$("#taDate").value:isoDay(Date.now()),name:$("#taName").value.trim(),father:$("#taFather").value.trim(),cl:$("#taCl").value,gender:$("#taGen").value,cat:$("#taCat").value,contact:$("#taCon").value.trim(),curSchool:$("#taCur").value,curExt:$("#taCur").value==="__other"?$("#taExt").value.trim():"",choice1:$("#taC1").value,choice2:$("#taC2").value,admNo:$("#taAdm").value.trim(),remarks:$("#taRem").value.trim(),status:"Pending",x:Object.fromEntries(extraFields("tfrFields").map(f=>[f.key,$("#tx_"+f.key)?.value||""]))};
     if(!d.name) return; if(d.choice1===d.curSchool){ toast("1st choice is the same as the present school.",true); return; } d.backdated=d.appDate<isoDay(Date.now());
     const dup=S.tfrapps.find(t=>tfrOpen(t.status)&&norm(t.name)===norm(d.name)&&norm(t.father)===norm(d.father)&&t.cl===d.cl); if(dup && !confirm(`${dup.id} already exists for ${dup.name} (${dup.cl}). Register again?`)) return;
@@ -2909,7 +3050,7 @@ const FORMS = {
     for(const t of S.tfrapps.filter(t=>tfrOpen(t.status))) ops.upd.push({col:"tfrapps",id:t.id,data:{cl:nextLevel(t.cl),prevCl:t.cl,session:ns,promotedAt:TS}});
     ops.set.push({col:"settings",id:"app",data:{session:ns,sessionStart:$("#roStart").value},merge:true}); await DB.apply(ops); toast(`Session ${ns} started.`); boot(); }
 };
-document.addEventListener("submit", e => { const f=e.target; if(!f.dataset.form) return; e.preventDefault(); Promise.resolve(FORMS[f.dataset.form](f)).catch(err=>toast(err.message,true)); });
+document.addEventListener("submit", e => { const f=e.target; if(!f.dataset.form) return; e.preventDefault(); Promise.resolve(FORMS[f.dataset.form](f, e.submitter?.value)).catch(err=>toast(err.message,true)); });
 
 /* category figures are entered as TODAY's numbers; the stored base = typed − movements already recorded */
 function setCatLive(c, typed, dc, list){ const p=c.cl+"|"; const keys=new Set([...(list||[]),...Object.keys(typed),...Object.keys(c.cat||{}),...Object.keys(dc).filter(k=>k.startsWith(p)).map(k=>k.slice(p.length))]);
