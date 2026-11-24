@@ -1172,11 +1172,12 @@ VIEWS.waiting = {
           <div class="f"><label for="tfCl">Class</label><select id="tfCl" data-chg="setPsel" data-k="tcl"><option value="">All classes</option>${allLevels().map(l=>`<option ${p.tcl===l?"selected":""}>${h(l)}</option>`).join("")}</select></div>
           <div class="f"><label for="tfSt">Status</label><select id="tfSt" data-chg="setPsel" data-k="tst"><option value="">Pending / Approved</option><option value="all" ${p.tst==="all"?"selected":""}>All</option>${tfrSts().map(s=>`<option ${p.tst===s?"selected":""}>${h(s)}</option>`).join("")}</select></div></div>
         <div class="scroll" id="tList"></div></div>`; }
-    const code=waitSchool(), addSchool=code!=="ALL"?code:null, canAdd=addSchool&&canEnter(addSchool), X=extraFields("waitFields");
+    const code=waitSchool(), pickSch=code==="ALL"&&canDecide(), addSchool=code!=="ALL"?code:pickSch?(S.wAddSch||schoolList()[0].code):null, canAdd=addSchool&&(canEnter(addSchool)||canDecide()), X=extraFields("waitFields");
     return tabs+`<div class="note">Optional. The class-wise waiting count is typed on the Entry tab. Use this page when you want applicants by name (test, marks, DQ remarks); every applicant with a counted status is added to that class's waiting count.</div>
      <div class="panel"><div class="ph"><h2>Applicants by name</h2><div class="pills">${(isSA()||role()==="hq")?`<select class="in" style="width:auto" data-chg="waitSchool"><option value="ALL">All schools</option>${schoolList().map(s=>`<option value="${h(s.code)}" ${s.code===code?"selected":""}>${h(s.code)}</option>`).join("")}</select>`:""}
       <select class="in" style="width:auto" data-chg="waitStatus"><option value="active">Counted statuses</option><option value="all" ${S.waitStatus==="all"?"selected":""}>All statuses</option>${waitSts().map(s=>`<option ${S.waitStatus===s.name?"selected":""}>${h(s.name)}</option>`).join("")}</select></div></div>
      ${canAdd?pasteBox("new")+`<form data-form="wait" class="entry" autocomplete="off" style="margin-bottom:12px"><div class="grid">
+       ${pickSch?`<div class="f"><label for="wSch">School *</label><select id="wSch" data-chg="wAddSch">${schoolList().map(s=>`<option value="${h(s.code)}" ${s.code===addSchool?"selected":""}>${h(s.code)} — ${h(s.name)}</option>`).join("")}</select></div>`:""}
        <div class="f"><label for="wDate">Appl date</label><input id="wDate" type="date" value="${isoDay(Date.now())}" max="${isoDay(Date.now())}" ${isSA()?"":"disabled title=\"Today's date is put in automatically; only the Super Admin can change it\""}></div>
        <div class="f"><label for="wCl">${h(L("cl"))}</label><select id="wCl">${S.schools[addSchool].classes.map(c=>`<option>${h(c.cl)}</option>`).join("")}</select></div>
        <div class="f"><label for="wName">Student name</label><input id="wName" required></div>
@@ -1191,7 +1192,7 @@ VIEWS.waiting = {
        ${X.map(f=>`<div class="f"><label for="wx_${h(f.key)}">${h(f.label)}</label>${xInput("wx_"+f.key,f,"")}</div>`).join("")}
        <button class="btn p" style="min-height:40px">Add ↵</button></div>
        <div class="row" style="justify-content:flex-start"><button type="button" class="btn s" data-act="tplWaiting">Excel template</button><label class="btn s">Import filled file <input type="file" accept=".xlsx,.xls,.csv" data-chg="impWaiting" hidden></label></div></form>`:""}
-     ${!canAdd&&isSA()?`<p class="hint">Choose one school above to add or import applicants.</p>`:""}
+     ${pickSch?`<p class="hint">To import an Excel file of applicants, choose one school in the box at the top.</p>`:""}
      <div id="wImp"></div><div class="row" style="justify-content:flex-start;margin:0 0 6px">${expBar("waitlist")}</div><div class="scroll" id="wList"></div></div>`; },
   regions:{
     tList(){ return tfrTableHtml(); },
@@ -1201,13 +1202,13 @@ VIEWS.waiting = {
       if(!Lr.length) return `<div class="empty">No applicants for this filter.</div>`;
       const cell=(w,f,html)=>canWait(f,w)?html:h(w[f]);
       return `${S.params.cl?`<div class="fchips"><span class="fchip">${h(L("cl"))}: ${h(S.params.cl)}<button data-act="findDrop" data-id="cl">×</button></span></div>`:""}<p class="hint" style="margin-top:0">${Lr.length} applicant${Lr.length===1?"":"s"}</p><table><tr><th>#</th><th>Appl date</th><th>School</th><th>${h(L("cl"))}</th><th>Reg / Adm No</th><th>Name</th><th>Father</th><th>G/B</th><th>Category</th><th>Unit</th><th>Contact</th><th>DOB</th>${X.map(f=>`<th>${h(f.label)}</th>`).join("")}<th>Status</th><th>Marks</th><th>Remarks by DQ</th><th>Admsn status</th><th>Remarks by school</th><th></th></tr>${Lr.map((w,i)=>`<tr>
-        <td class="mute">${i+1}</td><td>${h(w.date)}</td><td>${h(w.school)}</td><td>${h(w.cl)}</td><td>${h(w.regNo||"")}</td><td>${h(w.name)}</td><td>${h(w.father)}</td><td>${w.gender?gTxt(w.gender):""}</td><td>${h(w.cat?catLabel(w.cat):"")}</td><td>${h(w.unit||"")}</td><td>${h(fmtPhones(w.contact||""))}</td><td>${h(w.dob)}</td>${X.map(f=>`<td>${h((w.x||{})[f.key]??"")}</td>`).join("")}
+        <td class="mute">${i+1}</td><td>${h(fixYr(w.date))}</td><td>${h(w.school)}</td><td>${h(w.cl)}</td><td>${h(w.regNo||"")}</td><td>${h(w.name)}</td><td>${h(w.father)}</td><td>${w.gender?gTxt(w.gender):""}</td><td>${h(w.cat?catLabel(w.cat):"")}</td><td>${h(w.unit||"")}</td><td>${h(fmtPhones(w.contact||""))}</td><td>${h(w.dob)}</td>${X.map(f=>`<td>${h((w.x||{})[f.key]??"")}</td>`).join("")}
         <td>${cell(w,"status",`<select class="in" data-wf="status" data-id="${h(w.id)}">${waitSts().map(s=>`<option ${s.name===w.status?"selected":""}>${h(s.name)}</option>`).join("")}</select>`)}</td>
         <td>${cell(w,"marks",`<input class="in num" data-wf="marks" data-id="${h(w.id)}" value="${h(w.marks)}">`)}</td>
         <td>${cell(w,"dqRemarks",`<input class="in" data-wf="dqRemarks" data-id="${h(w.id)}" value="${h(w.dqRemarks)}">`)}</td>
         <td>${cell(w,"admsn",`<input class="in" data-wf="admsn" data-id="${h(w.id)}" value="${h(w.admsn)}">`)}</td>
         <td>${cell(w,"schRemarks",`<input class="in" data-wf="schRemarks" data-id="${h(w.id)}" value="${h(w.schRemarks)}">`)}</td>
-        <td class="stick">${w.status!=="Admitted"&&canEnter(w.school)?`<button class="btn s p" data-act="admitDlg" data-id="${h(w.id)}">Admit</button>`:""} ${isSA()?`<button class="btn s r" data-act="waitDel" data-id="${h(w.id)}">Remove</button>`:""}</td></tr>`).join("")}</table>`; }
+        <td class="stick">${canDecide()||canEnter(w.school)?`<button class="btn s" data-act="wEdit" data-id="${h(w.id)}" title="Correct this applicant's details">✎</button> `:""}${w.status!=="Admitted"&&canEnter(w.school)?`<button class="btn s p" data-act="admitDlg" data-id="${h(w.id)}">Admit</button>`:""} ${isSA()?`<button class="btn s r" data-act="waitDel" data-id="${h(w.id)}">Remove</button>`:""}</td></tr>`).join("")}</table>`; }
   }
 };
 
@@ -2121,6 +2122,7 @@ function aiSetupHtml(){ const c=aiCfg();
 
 /* one-time adjustments of saved settings when a new version is first opened by the Super Admin */
 async function migrate(){ if(!isSA()) return; const st=ST(), up={};
+  { const bad=S.waiting.filter(w=>/^00\d\d-/.test(String(w.date||""))); if(bad.length){ const ops=opsNew(); for(const w of bad) ops.upd.push({col:"waiting",id:w.id,data:{date:fixYr(w.date)}}); await DB.apply(ops,true); toast(`${bad.length} applicant date${bad.length>1?"s":""} with a 2-digit year corrected (e.g. 0026 → 2026).`); } }
   if(st.stages?.length && !st.stages.some(g=>g.levels.includes("IG-1")) && !st.migr45) up.stages=[...st.stages,{name:"O & A Level (APSIS)",levels:["IG-1","O-II","O-III","AS","A-II"]}];
   if(!st.migr45) up.migr45=true;
   if(Object.keys(up).length>1 || up.stages) await saveSettings(up, up.stages?"Consolidation updated: APSIS PG / Nur / KG count as EYS-I / EYS-II / Pre-I, and IG-1 … A-II form an “O & A Level” stage.":"");
@@ -2812,10 +2814,14 @@ async function dupTrash(groups){ const ops=opsNew(); let n=0; const names=[];
 /* ---------- dashboard: fees and health boxes; fee drill-down to the defaulter ---------- */
 function feeTot(){ if(!S.feeRets){ if(!S.feeLoading){ S.feeLoading=1; loadFeeRets().then(()=>fillRegion("dKpi",true)).catch(()=>{}); } return null; } const day=isoDay(Date.now()); let str=0,tot=0,amt=0,n=0;
   for(const s of schoolList()){ const x=feeRow(s.code,day); if(!x) continue; n++; str+=x.str; tot+=x.tot; amt+=x.amt; } return {str,tot,amt,n,pct:str?tot/str*100:0}; }
-function extraKpis(){ const F=feeTot(), H=idxAll().filter(r=>r.status==="On roll"), eyes=H.filter(r=>/^weak/i.test(r.eyes||"")).length, hd=H.filter(r=>r.eyes||r.height||r.weight).length;
-  const K=(go,lab,val,sub,cls,g)=>`<div class="kpi click ${g}" role="button" tabindex="0" ${go}><span>${lab}</span><b class="${cls||""}">${val}</b><i>${sub}</i></div>`;
-  return (F?K(`data-act="go" data-id="drill" data-p="m=fee"`,"Fee defaulters",nf(F.tot),`${F.pct.toFixed(1)}% of ${nf(F.str)} · paid ${(100-F.pct).toFixed(1)}%${F.n<schoolList().length?` · ${F.n}/${schoolList().length} schools returned`:""}`,F.tot?"neg":"pos","kg5"):K(`data-act="go" data-id="fees"`,"Fee defaulters","…","loading returns","","kg5"))
-   +(canSeeStudents()&&canSD()?K(`data-act="go" data-id="students" data-p="tab=health"`,"Health",`${nf(eyes)}`,`weak eyesight · ${H.length?(hd/H.length*100).toFixed(1):"0"}% have health details`,"","kg6"):""); }
+function extraKpis(){ const F=feeTot(), H=idxAll().filter(r=>r.status==="On roll"), hd=H.filter(r=>r.eyes||r.height||r.weight||r.allergies||r.disability||r.medDate||r.vacc).length;
+  const flag=H.filter(r=>/^weak/i.test(r.eyes||"")||(r.allergies&&!/^none$/i.test(r.allergies))||(r.disability&&!/^none$/i.test(r.disability))||/incomplete/i.test(r.vacc||"")).length;
+  const K=(go,lab,val,sub,cls,g)=>`<div class="kpi click ${g}" role="button" tabindex="0" ${go}><span>${lab}</span><b class="${cls||""}">${val}</b><i>${sub}</i></div>`, NS=schoolList().length;
+  const fee = !F ? K(`data-act="go" data-id="fees"`,"Fee defaulters","…","loading returns","","kg5")
+    : !F.n ? K(`data-act="go" data-id="fees"`,"Fee defaulters","—",`no fee return sent yet (0 of ${NS} schools)`,"","kg5")
+    : K(`data-act="go" data-id="drill" data-p="m=fee"`,"Fee defaulters",`${nf(F.tot)} <small style="font-size:.55em;font-weight:600">of ${nf(F.str)}</small>`,`<b>${F.pct.toFixed(1)}%</b> defaulters · ${(100-F.pct).toFixed(1)}% paid${F.n<NS?` · ${F.n} of ${NS} schools' returns`:""}`,F.tot?"neg":"pos","kg5");
+  const hl = canSeeStudents()&&canSD() ? K(`data-act="go" data-id="students" data-p="tab=health"`,"Student health",`${H.length?(hd/H.length*100).toFixed(1):"0"}%`,`${nf(hd)} of ${nf(H.length)} have health records${flag?` · ${nf(flag)} need attention`:""}`,"","kg6") : "";
+  return fee+hl; }
 function feeDrillHtml(){ if(!S.feeRets){ loadFeeRets().then(()=>fillRegion("drBody",true)); return `<p class="mute">Loading fee returns…</p>`; } const p=S.params, day=isoDay(Date.now());
   if(!p.school){ let T={str:0,tot:0,amt:0}; const R=schoolList().map(s=>({s,x:feeRow(s.code,day)}));
     return `<p class="hint" style="margin-top:0">Each school's latest defaulters return. Click a school.</p><table><tr><th>School</th><th class="n">Strength</th><th class="n">Defaulters</th><th class="n">%</th><th class="n">Paid</th><th class="n">Paid %</th><th class="n">Amount due</th><th>Return of</th></tr>
@@ -2863,10 +2869,29 @@ async function pasteFill(kind){ const t=$("#pb_"+kind)?.value||""; if(!t.trim())
   set("wName",o.name); set("wFather",o.father); set("wCon",o.contact?fmtPhones(o.contact):""); set("wDob",o.dob); set("wRem",o.reason);
   if(o.gender) set("wGen",/^g|girl|f/i.test(o.gender)?"g":"b");
   if(o.cat){ const c=cats().find(c=>norm(c)===norm(o.cat))||cats().find(c=>norm(o.cat).includes(norm(c))||norm(c).includes(norm(o.cat))); if(c) set("wCat",c); else set("wUnit",o.cat); }
-  if(o.cl){ const el=$("#wCl"); const v=[...(el?.options||[])].map(x=>x.value).find(l=>norm(l)===norm(lvlOf({cl:String(o.cl).replace(/^class\s*/i,"")}))||norm(l)===norm(o.cl)); if(v) el.value=v; }
+  if(o.cl){ const el=$("#wCl"); const want=lvlOf({cl:String(o.cl).replace(/^class\s*/i,"").trim()}); const v=[...(el?.options||[])].map(x=>x.value).find(l=>norm(l)===norm(o.cl)||lvlOf({cl:l})===want||norm(lvlOf({cl:l}))===norm(want)); if(v) el.value=v; }
   $("#wName")?.focus(); toast("Form filled — check each field, add the Registration No, then Add."); }
 
+/* applicant record: SA / DQ Office (and the school's clerk) correct any detail */
+const fixYr = d => /^00\d\d-/.test(String(d||"")) ? "20"+String(d).slice(2) : (d||"");
+function wEditDlg(id){ const w=S.waiting.find(x=>x.id===id); if(!w) return; const sc=S.schools[w.school], X=extraFields("waitFields");
+  const F=(k,l,inp)=>`<div class="f"><label for="we_${k}">${l}</label>${inp}</div>`, I=(k,v,ex="")=>`<input id="we_${k}" value="${h(v??"")}" ${ex}>`;
+  modal(`<h3>✎ Applicant — ${h(w.name)}</h3><form data-form="wEdit" data-id="${h(id)}"><div class="grid">
+    ${F("date","Appl date",`<input id="we_date" type="date" value="${h(fixYr(w.date))}" max="${isoDay(Date.now())}">`)}
+    ${F("school","School",`<select id="we_school">${schoolList().map(s=>`<option value="${h(s.code)}" ${s.code===w.school?"selected":""}>${h(s.code)}</option>`).join("")}</select>`)}
+    ${F("cl","Class",`<select id="we_cl">${[...new Set([...(sc?.classes||[]).map(c=>c.cl),...allLevels()])].map(c=>`<option ${c===w.cl?"selected":""}>${h(c)}</option>`).join("")}</select>`)}
+    ${F("regNo","Registration / Adm No",I("regNo",w.regNo))}${F("name","Student name *",I("name",w.name,"required"))}${F("father","Father name",I("father",w.father))}
+    ${F("gender","Gender",`<select id="we_gender"><option value="">—</option><option value="b" ${w.gender==="b"?"selected":""}>Boy</option><option value="g" ${w.gender==="g"?"selected":""}>Girl</option></select>`)}
+    ${F("cat","Category",`<select id="we_cat">${catOptions(w.cat||"","—")}</select>`)}${F("unit","Unit / Rank",I("unit",w.unit))}${F("contact","Contact",I("contact",w.contact))}${F("dob","DOB",I("dob",w.dob,'placeholder="dd-mm-yyyy"'))}
+    ${F("schRemarks","Remarks by school",I("schRemarks",w.schRemarks))}${X.map(f=>F("x_"+f.key,h(f.label),I("x_"+f.key,(w.x||{})[f.key])))}</div>
+    <div class="row"><button type="button" class="btn" data-act="closeModal">Cancel</button><button class="btn p">Save</button></div></form>`,"wide"); }
+async function wEditSave(f){ const id=f.dataset.id, w=S.waiting.find(x=>x.id===id); if(!w) return; const v=k=>$("#we_"+k)?.value.trim()??"";
+  if(!v("name")){ toast("Name is required.",true); return; } if(v("contact")&&phonesBad(v("contact")).length){ toast("Write the contact number like 0300-1234567.",true); return; }
+  const d={date:v("date"),school:v("school"),cl:v("cl"),regNo:v("regNo"),name:v("name"),father:v("father"),gender:v("gender"),cat:v("cat"),unit:v("unit"),contact:fmtPhones(v("contact")),dob:v("dob"),schRemarks:v("schRemarks"),x:{...(w.x||{}),...Object.fromEntries(extraFields("waitFields").map(fl=>[fl.key,v("x_"+fl.key)]))},updatedAt:TS,updatedBy:me().name||""};
+  const ch=Object.keys(d).filter(k=>!["updatedAt","updatedBy","x"].includes(k)&&String(w[k]??"")!==String(d[k]??"")); closeModal(); if(!ch.length&&JSON.stringify(w.x||{})===JSON.stringify(d.x)){ toast("Nothing was changed."); return; }
+  await DB.apply({set:[],inc:[],upd:[{col:"waiting",id,data:d}]}); audit("Applicant corrected",`${d.name} (${d.school} ${d.cl}): ${ch.join(", ")||"extra columns"}`); toast("Applicant updated."); }
 Object.assign(EXTRA_ACT,{
+  wEdit: el => wEditDlg(el.dataset.id),
   ckOpen: el => { const k=el.dataset.id; S.ckOpen=S.ckOpen===k?"":k; fillRegion("chkBody",true); setTimeout(()=>{ const d=$("#ckDet"); if(d) d.previousElementSibling?.scrollIntoView({block:"start",behavior:"smooth"}); },60); },
   ckList: el => { setParams({ckList:el.dataset.id||""}); },
   ckVerAll: () => ckVerAll(),
@@ -2879,8 +2904,10 @@ Object.assign(EXTRA_ACT,{
   slipView: async el => { try{ const d=await DB.getDoc("feeSlip",el.dataset.id); if(!d?.img){ toast("Slip not found.",true); return; } modal(`<h3>Paid slip</h3><img src="${d.img}" alt="Paid slip" style="max-width:100%;max-height:70vh;border:1px solid var(--line)"><div class="row"><button class="btn" data-act="closeModal">Close</button></div>`,"wide"); }catch(e){ toast(e.message,true); } },
   pasteFill: el => pasteFill(el.dataset.id),
 });
-const EXTRA_FORMS = { ckSec: f => ckSecSave(f), feePay: () => feePaySave(),
+const EXTRA_FORMS = { wEdit: f => wEditSave(f), ckSec: f => ckSecSave(f), feePay: () => feePaySave(),
   waitOpt: async () => { await saveSettings({waitTyped:$("#sWt").value!=="off"},"Waiting list setting saved."); } };
+
+Object.assign(EXTRA_CHG,{ wAddSch: el => { S.wAddSch=el.value; renderView(); } });
 
 /* =====================================================================
    8) REPORTS — designer (tick what to show), presets, print/PDF, Excel, WhatsApp
@@ -3962,7 +3989,8 @@ const FORMS = {
     try{ await DB.changePw(o,n); closeModal(); }
     catch(e){ const c=e.code||""; msg(["auth/wrong-password","auth/invalid-credential","auth/invalid-login-credentials"].includes(c)?"Current password is wrong — nothing was changed.":c==="auth/too-many-requests"?"Too many wrong tries. Wait a few minutes, then try again.":c==="auth/weak-password"?"New password is too weak; use at least 8 characters.":(e.message||c)); $("#pw0").select(); } },
   entry: saveEntry,
-  wait: async () => { const code=waitSchool(); const need=[["wGen","Gender"],["wCat","Category"],["wReg","Registration / Adm No"],["wCon","Contact number"]].find(([i])=>!$("#"+i)?.value.trim()); if(need){ toast(need[1]+" is required.",true); $("#"+need[0]).focus(); return; }
+  wait: async () => { const code=waitSchool()==="ALL"?($("#wSch")?.value||""):waitSchool(); if(!code){ toast("Choose the school.",true); return; }
+    if(isSA()&&$("#wDate").value&&$("#wDate").value<"2000"){ toast("The application date's year is wrong — write it with 4 digits (e.g. 2026).",true); $("#wDate").focus(); return; } const need=[["wGen","Gender"],["wCat","Category"],["wReg","Registration / Adm No"],["wCon","Contact number"]].find(([i])=>!$("#"+i)?.value.trim()); if(need){ toast(need[1]+" is required.",true); $("#"+need[0]).focus(); return; }
     if(phonesBad($("#wCon").value).length){ toast("Write the contact number like 0300-1234567.",true); $("#wCon").focus(); return; }
     const d={school:code,cl:$("#wCl").value,date:isSA()?$("#wDate").value:isoDay(Date.now()),gender:$("#wGen").value,cat:$("#wCat").value,regNo:$("#wReg").value.trim(),name:$("#wName").value.trim(),father:$("#wFather").value.trim(),unit:$("#wUnit").value.trim(),contact:fmtPhones($("#wCon").value),dob:$("#wDob").value.trim(),schRemarks:$("#wRem").value.trim(),x:Object.fromEntries(extraFields("waitFields").map(f=>[f.key,$("#wx_"+f.key)?.value||""])),dqRemarks:"",marks:"",admsn:"",status:waitSts()[0].name,session:session(),at:TS,by:me().uid,byName:me().name||""};
     if(!d.name) return; await DB.apply({set:[{col:"waiting",id:newId(),data:d}],upd:[],inc:[]}); toast(`${d.name} added to ${d.cl}.`); for(const id of ["wName","wFather","wUnit","wCon","wDob","wRem","wReg"]) $("#"+id).value=""; $("#wName").focus(); },
