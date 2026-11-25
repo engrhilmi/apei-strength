@@ -565,7 +565,7 @@ function deepMerge(a, b, fix){ const o=isPlain(a)?{...a}:{}; for(const [k,v] of 
 const SYNC = { pending:0, last:Date.now(), err:"", online:navigator.onLine };
 function syncPaint(){ const el=document.getElementById("syncDot"); if(!el) return; const off=!navigator.onLine;
   const age=Math.round((Date.now()-SYNC.last)/60e3);
-  const [cls,txt,tip] = SYNC.err ? ["bad","Sync problem",SYNC.err] : off ? ["off","Offline — saved on this device","Entries are kept on this computer and upload by themselves when the internet returns."] : SYNC.pending ? ["busy","Saving…","Sending to the cloud"]
+  const [cls,txt,tip] = SYNC.err ? ["bad","Sync problem",SYNC.err] : off ? ["off","Offline — saved on this device","Entries are kept on this computer and upload by themselves when the internet returns."] : SYNC.pending ? ["busy",SYNC.prog?`Saving ${SYNC.prog}…`:"Saving…","Sending to the cloud"]
     : DEMO ? ["ok","Demo — this browser","Demo mode keeps data in this browser only."] : SYNC.cache ? ["busy","Connecting to server…","Showing the copy saved on this device until the server answers."]
     : ["ok",`Live · checked ${fmtT(SYNC.last)}`,`Connected to the server. Last confirmed ${fmtDT(SYNC.last)}${age?` (${age} min ago)`:""}. Changes by any clerk appear by themselves; press Refresh to check now.`];
   el.className="sync "+cls; el.title=tip; el.innerHTML=`<i></i>${h(txt)}`; }
@@ -592,12 +592,13 @@ const idxArr = r => IDX_F.map(k=>r[k]===DEL||r[k]==null?"":String(r[k]).replace(
 const idxObj = (id, school, a) => { if(typeof a==="string") a=a.split(IDX_SEP); const o={id,school}; IDX_F.forEach((k,i)=>o[k]=(a&&a[i])||""); if(o.contact) o.contact=fmtPhones(o.contact); if(o.contact2) o.contact2=fmtPhones(o.contact2); return o; };
 function idxFind(id){ for(const [sc,m] of Object.entries(S.idx||{})) if(m[id]) return idxObj(id,sc,m[id]); return null; }
 function addIdxOps(ops){ if(ops.noIdx) return;
-  const add=(school,id,v)=>ops.set.push({col:"stuIdx",id:school,data:{i:{[id]:v}},merge:"deep",_idx:1});
-  const cur={}, full=id=>{ if(cur[id]) return cur[id]; for(const L of Object.values(S.stu)){ const r=L?.rows?.find(r=>r.id===id); if(r) return r; } return idxFind(id); };
+  const acc={}, add=(school,id,v)=>{ (acc[school]||={})[id]=v; };   // one write per school, not one per student
+  let byId=null; const cur={}, full=id=>{ if(cur[id]) return cur[id]; if(!byId){ byId=new Map(); for(const L of Object.values(S.stu)) for(const r of L?.rows||[]) byId.set(r.id,r); } return byId.get(id)||idxFind(id); };
   const keep=(id,r)=>{ const o={...r}; for(const k in o) if(o[k]===DEL) delete o[k]; cur[id]=o; return o; };
   for(const x of [...ops.set]) if(x.col==="students"){ const base=x.merge?full(x.id)||{}:{}; const r=keep(x.id,{...base,...x.data}); if(r.school) add(r.school,x.id,idxArr(r)); }
   for(const x of ops.upd) if(x.col==="students"){ const base=full(x.id); if(!base) continue; const r=keep(x.id,{...base,...x.data}); add(r.school,x.id,idxArr(r)); if(x.data.school && base.school && x.data.school!==base.school) add(base.school,x.id,DEL); }
   for(const x of ops.del||[]) if(x.col==="students"){ const base=full(x.id); if(base) add(base.school,x.id,DEL); }
+  for(const [school,i] of Object.entries(acc)) ops.set.push({col:"stuIdx",id:school,data:{i},merge:"deep",_idx:1});
 }
 function txToOps(ops, tx){
   tx.id = tx.id || newId();
@@ -738,16 +739,20 @@ const Fire = {
   async apply(ops, quiet){
     addIdxOps(ops); patchStuCache(ops); const m=this.m, db=this.db; let b=m.writeBatch(db), n=0; const batches=[b];
     const step=()=>{ if(++n>=400){ b=m.writeBatch(db); batches.push(b); n=0; } };
-    for (const x of ops.set){ b.set(m.doc(db,x.col,x.id), this.conv(x.data), x.merge==="deep"?{merge:true}:x.merge?{mergeFields:Object.keys(x.data)}:{}); step(); }
+    const late=ops.set.filter(x=>x._idx), early=ops.set.filter(x=>!x._idx);
+    for (const x of early){ b.set(m.doc(db,x.col,x.id), this.conv(x.data), x.merge==="deep"?{merge:true}:x.merge?{mergeFields:Object.keys(x.data)}:{}); step(); }
     for (const x of ops.upd){ b.update(m.doc(db,x.col,x.id), this.conv(x.data)); step(); }
     for (const x of (ops.del||[])){ b.delete(m.doc(db,x.col,x.id)); step(); }
+    for (const x of late){ b.set(m.doc(db,x.col,x.id), this.conv(x.data), {merge:true}); step(); }
     const by={}; for (const x of ops.inc) (by[x.school] ||= []).push(new m.FieldPath(x.f||"d",x.key), m.increment(x.n));
     for (const x of (ops.wait||[])) (by[x.school] ||= []).push(new m.FieldPath("w",x.cl), x.n);
     for (const [sc,args] of Object.entries(by)){ b.update(m.doc(db,"strength",sc), ...args); step(); }
     if(S.fsBroken){ fsFail(new Error("INTERNAL ASSERTION FAILED")); throw new Error("The database connection on this computer has stopped — press “Reload now” in the red box, then try again."); }
     SYNC.pending++; syncPaint();
-    const p = Promise.all(batches.map(x=>x.commit())).then(()=>{ SYNC.pending--; SYNC.last=Date.now(); SYNC.err=""; syncPaint(); }, e=>{ SYNC.pending--; SYNC.err=e.message; syncPaint(); fsFail(e); throw e; });
-    const r = await Promise.race([p.then(()=>"ok"), sleep(3500).then(()=>"slow")]);
+    let done=0; const big=batches.length>2; if(big) SYNC.prog=`0 of ${batches.length}`;
+    if(big) S.bulkBusy=true;
+    const p = (big ? (async()=>{ const last=batches.pop(); for(let i=0;i<batches.length;i+=4){ await Promise.all(batches.slice(i,i+4).map(x=>x.commit())); done=Math.min(i+4,batches.length); SYNC.prog=`${done} of ${batches.length+1}`; syncPaint(); if(!quiet) toast(`Saving… ${Math.round(done/(batches.length+1)*100)}%`); } await last.commit(); SYNC.prog=""; })().finally(()=>{ S.bulkBusy=false; if(S.bulkMissed){ S.bulkMissed=false; refresh(); } }) : Promise.all(batches.map(x=>x.commit()))).then(()=>{ SYNC.pending--; SYNC.last=Date.now(); SYNC.err=""; syncPaint(); }, e=>{ SYNC.pending--; SYNC.err=e.message; syncPaint(); fsFail(e); throw e; });
+    const r = big ? await p.then(()=>"ok") : await Promise.race([p.then(()=>"ok"), sleep(3500).then(()=>"slow")]);
     if (r==="slow"){ if(!quiet) toast("Saved on this device — will sync when the connection returns."); p.catch(e=>toast("Sync FAILED: "+e.message,true)); }
   },
   async fetchTx(from,to){
@@ -802,8 +807,8 @@ function buildSeed(){
 function patchStuCache(ops){
   const now=Date.now(), fix=o=>Object.fromEntries(Object.entries(o).map(([k,v])=>[k,v===TS?now:v]));
   for(const x of ops.set||[]) if(x.col==="students"){ const d=fix(x.data), L=S.stu[d.school]; if(L){ const i=L.rows.findIndex(r=>r.id===x.id); const row={id:x.id,...(x.merge&&i>=0?L.rows[i]:{}),...d}; i>=0?L.rows[i]=row:L.rows.push(row); } }
-  for(const x of ops.upd||[]) if(x.col==="students") for(const L of Object.values(S.stu)){ const r=L.rows.find(r=>r.id===x.id); if(r) Object.assign(r,fix(x.data)); }
-  for(const x of ops.del||[]) if(x.col==="students") for(const L of Object.values(S.stu)) L.rows=L.rows.filter(r=>r.id!==x.id);
+  const U=(ops.upd||[]).filter(x=>x.col==="students"); if(U.length){ const M=new Map(); for(const L of Object.values(S.stu)) for(const r of L?.rows||[]) M.set(r.id,r); for(const x of U){ const r=M.get(x.id); if(r) Object.assign(r,fix(x.data)); } }
+  const D=new Set((ops.del||[]).filter(x=>x.col==="students").map(x=>x.id)); if(D.size) for(const L of Object.values(S.stu)) if(L?.rows) L.rows=L.rows.filter(r=>!D.has(r.id));
 }
 
 /* =====================================================================
@@ -899,6 +904,7 @@ function fillRegion(id, force){
 let rq=false;
 function refresh(){
   S.lastChange=Date.now();
+  if(S.bulkBusy){ S.bulkMissed=true; return; }   // a big save is running: repaint once at the end, not after every part
   if(rq) return; rq=true;
   requestAnimationFrame(()=>{ rq=false;
     if(!S.user || S.user.pending || !$("#main")){ if(S.user && !S.user.pending && !$("#main")) boot(); return; }
@@ -3019,8 +3025,8 @@ Object.assign(EXTRA_ACT,{
   txPurge: () => { if(!isSA()) return; const L0=selectedTx().filter(t=>["void","rejected","cancelled"].includes(t.status)); if(!L0.length){ toast("Tick voided / rejected / cancelled entries first. A counted entry must be voided before it can be deleted.",true); return; }
     ask(`Delete ${L0.length} entr${L0.length===1?"y":"ies"} for ever?`,`Only entries that no longer count (voided, rejected, cancelled) are deleted, so strength does not change. They disappear from the Log for good.`,"Delete for ever",async()=>{ const ops=opsNew(); ops.del=L0.map(t=>({col:"transactions",id:t.id})); await DB.apply(ops); audit("Log entries deleted",`${L0.length}: ${L0.slice(0,15).map(t=>t.name).join(", ")}`); toast(`${L0.length} entries deleted.`); runLog(); }); },
   regTrash: () => { const ids=$$("#sList [data-sel]").filter(x=>x.checked).map(x=>x.dataset.sel); if(!ids.length){ toast("Tick the students first.",true); return; }
-    ask(`Move ${ids.length} student${ids.length>1?"s":""} to Trash?`,"They leave the data bank and wait in Students → Trash, from where they can be restored. Strength is not changed.","Move to Trash",async()=>{ const all=schoolList().flatMap(s=>stuOf(s.code)||[]), ops=opsNew(); let n=0; for(const id of ids){ const r=all.find(x=>x.id===id); if(!r) continue; const o=stuToTrash(r,"removed from register"); ops.set.push(...o.set); (ops.del||=[]).push(...(o.del||[])); n++; }
-      await DB.apply(ops); for(const c of new Set(ids.map(id=>all.find(x=>x.id===id)?.school).filter(Boolean))) await ensureStu(c,true); S.trash=null; audit("Students moved to Trash",`${n} from the register`); toast(`${n} moved to Trash.`); fillRegion("sList",true); }); },
+    ask(`Move ${ids.length} student${ids.length>1?"s":""} to Trash?`,"They leave the data bank and wait in Students → Trash, from where they can be restored. Strength is not changed.","Move to Trash",async()=>{ const all=schoolList().flatMap(s=>stuOf(s.code)||[]), AM=new Map(all.map(x=>[x.id,x])), ops=opsNew(); let n=0; for(const id of ids){ const r=AM.get(id); if(!r) continue; const o=stuToTrash(r,"removed from register"); ops.set.push(...o.set); (ops.del||=[]).push(...(o.del||[])); n++; }
+      await DB.apply(ops); for(const c of new Set(ids.map(id=>AM.get(id)?.school).filter(Boolean))) await ensureStu(c,true); S.trash=null; audit("Students moved to Trash",`${n} from the register`); toast(`${n} moved to Trash.`); fillRegion("sList",true); }); },
   ckSchool: el => setParams({ckSch:el.dataset.id, ckList:"all"}),
 });
 
@@ -3169,9 +3175,10 @@ function hqUids(){ if(hqMemo.src===S.users) return hqMemo.set; hqMemo={src:S.use
 Object.assign(EXTRA_ACT,{
   vlDel: el => { const purge=el.dataset.id==="purge"; if(purge&&!isSA()) return; const ids=$$("#vlBody [data-sel]").filter(x=>x.checked).map(x=>x.dataset.sel); if(!ids.length){ toast("Tick the records first.",true); return; }
     const go=async()=>{ toast("Working… please wait."); const ops=opsNew(); let n=0; const sch=new Set();
-      for(const id of ids){ const x=idxFind(id); if(!x) continue; const L2=await ensureStu(x.school); const r=L2.find(y=>y.id===id); if(!r) continue; sch.add(r.school); n++;
+      const M=new Map(); for(const c of new Set(ids.map(id=>idxFind(id)?.school).filter(Boolean))) for(const y of await ensureStu(c)) M.set(y.id,y);
+      for(const id of ids){ const r=M.get(id); if(!r) continue; sch.add(r.school); n++;
         if(purge){ (ops.del||=[]).push({col:"students",id},{col:"photos",id}); } else { const o=stuToTrash(r,"removed from the data bank list"); ops.set.push(...o.set); (ops.del||=[]).push(...(o.del||[])); } }
-      const pend=apprPending().filter(a=>ids.includes(a.stuId)); for(const a of pend) ops.upd.push({col:"approvals",id:a.id,data:{status:"rejected",decidedBy:me().uid,decidedByName:me().name||"",decidedAt:TS,decidedMs:Date.now(),decNote:"record removed"}});
+      const idS=new Set(ids), pend=apprPending().filter(a=>idS.has(a.stuId)); for(const a of pend) ops.upd.push({col:"approvals",id:a.id,data:{status:"rejected",decidedBy:me().uid,decidedByName:me().name||"",decidedAt:TS,decidedMs:Date.now(),decNote:"record removed"}});
       await DB.apply(ops); for(const c of sch) await ensureStu(c,true); S.trash=null; audit(purge?"Students deleted for ever":"Students moved to Trash",`${n} from the ${S.params.tab==="verd"?"Verified":"Unverified"} list`); toast(`${n} record${n>1?"s":""} ${purge?"deleted for ever":"moved to Trash"}.`); apprLoad(); fillRegion("vlBody",true); };
     if(purge){ modal(`<h3>Delete ${ids.length} record${ids.length>1?"s":""} for ever?</h3><p>The student records and their photos are removed and <b>cannot be restored</b>. Strength figures and the Log are not changed.</p><div class="f"><label for="vlOk">Type <b>DELETE</b> to confirm</label><input id="vlOk" autocomplete="off"></div><div class="row"><button class="btn" data-act="closeModal">Cancel</button><button class="btn r" id="vlYes">Delete for ever</button></div>`);
       $("#vlYes").onclick=()=>{ if(($("#vlOk").value||"").trim().toUpperCase()!=="DELETE"){ toast("Type DELETE to confirm.",true); return; } closeModal(); go().catch(e=>toast(e.message,true)); }; }
