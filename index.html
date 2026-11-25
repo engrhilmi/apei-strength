@@ -233,6 +233,43 @@ nav a.on{background:rgba(255,255,255,.18);border-bottom:3px solid #f59e0b!import
 .stile .ic{font-size:20px;line-height:1;width:26px;text-align:center}.stile b{display:block;font-size:14px;color:var(--c)}.stile small{display:block;color:var(--mute,#64748b);font-size:12px;margin-top:1px}
 tr.tot td.dn:hover,tr.tot .dn:hover{background:rgba(255,255,255,.18)!important;color:#fff!important}
 main caption.scap{text-align:left;padding-left:12px}
+/* Setup tiles — polished */
+.sthead{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;margin:0 0 12px}
+.stcur{background:var(--panel,#fff);border:1px solid var(--line);border-radius:99px;padding:5px 14px;font-size:13px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.stiles{gap:14px}
+.sgrp{border:0;border-radius:16px;box-shadow:0 2px 6px rgba(15,23,42,.08),0 8px 24px -12px rgba(15,23,42,.18);transition:transform .15s,box-shadow .15s}
+.sgrp:hover{transform:translateY(-2px);box-shadow:0 4px 10px rgba(15,23,42,.10),0 14px 30px -14px rgba(15,23,42,.28)}
+.sgrp h4{background:linear-gradient(120deg,var(--c),color-mix(in srgb,var(--c) 65%,#000));padding:10px 14px;font-size:11.5px;letter-spacing:.09em}
+.stile{align-items:center;padding:10px 14px;gap:12px;transition:background .12s}
+.stile .ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:18px;background:color-mix(in srgb,var(--c) 12%,transparent);flex:none}
+.stile .tx{flex:1;min-width:0}.stile .go{color:var(--c);font-size:20px;opacity:.35;transition:opacity .12s,transform .12s}
+.stile:hover .go{opacity:1;transform:translateX(3px)}
+.stile.on{background:color-mix(in srgb,var(--c) 16%,transparent);box-shadow:inset 5px 0 0 var(--c)}.stile.on .go{opacity:1}
+.stile.on .ic{background:var(--c);color:#fff;filter:saturate(1.2)}
+#stBody.flash>.panel:first-child{animation:stflash 1.2s ease}
+@keyframes stflash{0%{box-shadow:0 0 0 4px rgba(245,158,11,.7)}100%{box-shadow:0 0 0 0 rgba(245,158,11,0)}}
+/* back to top */
+#toTop{position:fixed;left:18px;bottom:22px;z-index:60;width:46px;height:46px;border-radius:50%;border:0;background:var(--band);color:#fff;font-size:22px;cursor:pointer;
+  box-shadow:0 6px 16px rgba(0,0,0,.28);opacity:0;transform:translateY(16px) scale(.8);pointer-events:none;transition:opacity .25s,transform .25s}
+#toTop.show{opacity:.92;transform:none;pointer-events:auto}#toTop:hover{opacity:1;transform:translateY(-3px)}
+@media print{#toTop{display:none}}
+.hero{background:linear-gradient(120deg,var(--hc),color-mix(in srgb,var(--hc) 60%,#000));color:#fff;border-radius:16px;padding:16px 20px;margin:0 0 14px;box-shadow:0 8px 24px -12px rgba(0,0,0,.4)}
+.hero h2{margin:0 0 4px;font-size:20px;color:#fff}.hero p{margin:0;opacity:.95;line-height:1.5}
+.ewbar{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:70;background:#be185d;color:#fff;padding:9px 14px;border-radius:12px;box-shadow:0 8px 20px rgba(0,0,0,.3);font-size:14px;display:flex;gap:10px;align-items:center}
+.ewbar .btn{background:#fff;color:#be185d;border:0}
+body.ewon :is(h1,h2,h3,h4,th,label,caption,summary,nav a,.pill,.btn,.kpi>span,.stile b,.scap):hover{outline:2px dashed #be185d;outline-offset:2px;cursor:text}
+#annBar{position:sticky;top:calc(var(--bandH,62px) + 44px);z-index:28}
+.ann{display:flex;align-items:center;gap:10px;background:var(--ac);color:#fff;padding:7px max(3vw,14px);font-weight:600;font-size:14.5px;border-bottom:1px solid rgba(255,255,255,.25)}
+.ann-ic{font-size:17px}.ann-tx{flex:1;min-width:0;overflow:hidden}.ann-aud{font-size:11px;background:rgba(255,255,255,.2);border-radius:99px;padding:2px 8px;white-space:nowrap}
+.ann-x{background:none;border:0;color:#fff;font-size:16px;cursor:pointer;opacity:.8}.ann-x:hover{opacity:1}
+.ann-flash{animation:annflash 1.1s steps(2,jump-none) infinite}
+@keyframes annflash{0%,100%{background:var(--ac)}50%{background:color-mix(in srgb,var(--ac) 55%,#fff);color:#111}}
+.ann-run{display:flex;width:max-content;animation:annrun 22s linear infinite}.ann-run span{padding-right:80px;white-space:nowrap}
+.ann-ticker:hover .ann-run{animation-play-state:paused}
+@keyframes annrun{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.ann-flash,.ann-run{animation:none}}
+.ann-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+@media print{#annBar{display:none}}
 </style>
 </head>
 <body>
@@ -807,7 +844,7 @@ function applyRoute(force){
 function goBack(){ if(S.navStack.length>1) history.back(); else go(homeView()); }
 
 function boot(){ setTimeout(actLogin,1200); setTimeout(()=>{ if(S.user&&role()!=="viewer") apprLoad(); },1500);
-  const app=$("#app"); applyTheme();
+  const app=$("#app"); applyTheme(); document.title=ST().tabTitle||"APEIs Strength Portal";
   if(!S.ready){ app.innerHTML=`<div class="login"><div class="panel">Loading…</div></div>`; return; }
   if(!S.user){ app.innerHTML = loginHtml(); return; }
   if(S.user.pending || S.user.inactive || S.user.error){ app.innerHTML = gateHtml(); return; }
@@ -815,10 +852,11 @@ function boot(){ setTimeout(actLogin,1200); setTimeout(()=>{ if(S.user&&role()!=
   if(!S.navStack.length) S.navStack.push(location.hash||"#"+S.view);
   document.body.classList.toggle("nopr", !canPR());
   app.innerHTML = `
-  <div class="band" id="band"><div class="bandtop"><div class="brandrow">${ST().logo?`<img src="${h(ST().logo)}" alt="" class="logo">`:""}<div><h1>${h(ST().org||"APEIs Peshawar Garrison")} — Strength Portal</h1>
-    <small>Session ${h(session())} · ${DEMO?"Demo mode (this browser only)":"Live (Firebase)"}</small></div></div>
+  <div class="band" id="band"><div class="bandtop"><div class="brandrow">${ST().logo?`<img src="${h(ST().logo)}" alt="" class="logo">`:""}<div><h1>${h(ST().appTitle||(ST().org||"APEIs Peshawar Garrison")+" — Strength Portal")}</h1>
+    <small>${ST().appSub?h(ST().appSub)+" · ":""}Session ${h(session())} · ${DEMO?"Demo mode (this browser only)":"Live (Firebase)"}</small></div></div>
     <div class="who"><span class="sync" id="syncDot"></span>${DEMO?`<span class="chip demo">DEMO</span>`:""}
     <span class="zoomc" title="Text size of tables (this computer only)"><button class="btn s" data-act="tz" data-d="-1" aria-label="Smaller">A−</button><button class="btn s" data-act="tz" data-d="0" id="tzV">${Math.round(tzNow()*100)}%</button><button class="btn s" data-act="tz" data-d="1" aria-label="Larger">A+</button></span>
+    <button class="btn s" id="undoBtn" data-act="undoDlg" title="Undo your last change" hidden>↶ Undo</button>
     <button class="btn s" data-act="reload" title="Fetch the latest figures again">⟳ Refresh</button>
     ${role()!=="viewer"?`<div class="umenu"><button class="btn s bell" data-act="bell" title="Notifications">🔔<span class="badge" id="bellN" hidden></span></button><div class="umenu-list notes" id="bellList" hidden></div></div>`:""}
     <div class="umenu"><button class="btn s ubtn" data-act="menuToggle" aria-haspopup="true" aria-expanded="false" title="Your account">☰ <span>${whoLabel()}</span></button>
@@ -828,7 +866,7 @@ function boot(){ setTimeout(actLogin,1200); setTimeout(()=>{ if(S.user&&role()!=
         ${DEMO?`<button data-act="switchUser" role="menuitem">⇄ Switch role</button>`:`<button data-act="pwDlg" role="menuitem">🔑 Change password</button>`}
         <button data-act="signOut" role="menuitem" class="danger">⏻ Sign out</button></div></div></div></div>
     ${canSeeStudents()?`<div class="gsearch combo"><input id="gq" placeholder="🔍 Search students in all schools — name, Adm No, class (e.g. 9a), father CNIC, phone…  (press /)" autocomplete="off" aria-label="Search students"><div class="combo-list" id="gqList" hidden></div></div>`:""}</div>
-  <nav id="nav"></nav><main id="main"></main>`;
+  <nav id="nav"></nav><div id="annBar"></div><main id="main"></main>`; setTimeout(annPaint,0);
   document.documentElement.style.setProperty("--bandH", $("#band").offsetHeight+"px");
   wireGlobalSearch(); syncPaint(); bellPaint();
   renderView();
@@ -887,7 +925,7 @@ function loginHtml(){
   if(DEMO) return `<div class="login"><div class="panel"><h2 style="font-size:22px;margin-bottom:6px">APEIs Strength Portal</h2>
     <div class="note">Demo mode — Firebase isn't configured yet, so data stays in this browser only. Pick any role to see what that person sees; everyone shares one interface.</div>
     <div style="display:grid;gap:8px">${Object.values(Local.st.users).map(u=>`<button class="btn" style="text-align:left" data-act="demoLogin" data-id="${h(u.uid)}"><b>${h(u.name)}</b> <span style="color:var(--mute)">· ${h(ROLES[u.role])}${u.school!=="ALL"?" · "+h(u.school):""}</span></button>`).join("")}</div></div></div>`;
-  return `<div class="login"><div class="panel">${ST().logo?`<img src="${h(ST().logo)}" alt="" style="height:56px;margin-bottom:8px">`:""}<h2 style="font-size:22px;margin-bottom:12px">APEIs Strength Portal</h2>
+  return `<div class="login"><div class="panel">${ST().logo?`<img src="${h(ST().logo)}" alt="" style="height:56px;margin-bottom:8px">`:""}<h2 style="font-size:22px;margin-bottom:12px">${h(ST().appTitle||"APEIs Strength Portal")}</h2>
     <form data-form="login" class="grid" style="grid-template-columns:1fr">
       <div class="f"><label for="lEmail">Email or username</label><input id="lEmail" required autocomplete="username"></div>
       <div class="f"><label for="lPw">Password</label><input id="lPw" type="password" required autocomplete="current-password"></div>
@@ -917,7 +955,7 @@ const dashPeriod = () => S.dashPeriod || (["cutoff","today","yesterday","7d"].in
 const dashCode = () => S.dashSchool||mySchool()||schoolList()[0]?.code;
 const consSel = () => S.liveCons||ST().consGroup||"APSACS";
 VIEWS.dash = {
-  shell:()=>`<div class="livehead"><div><h2>${h(L("hLive"))}</h2><span class="hint" style="margin:0" id="lvClock"></span></div>
+  shell:()=>`${heroHtml()}<div class="livehead"><div><h2>${h(L("hLive"))}</h2><span class="hint" style="margin:0" id="lvClock"></span></div>
      <select class="in" style="width:auto" data-chg="dashPeriod" title="Which movements count as ${h(L("net"))}">${["cutoff","today","yesterday","7d"].map(k=>`<option value="${k}" ${dashPeriod()===k?"selected":""}>Movement: ${PERIODS[k]}</option>`).join("")}</select></div>
     <div id="dKpi"></div><div class="panel" id="dStatus"></div>
     <div class="panel only-wide"><div class="ph"><h2>${h(L("hSum"))}</h2><span class="hint" style="margin:0">Click a school to open its classes below</span></div><div class="scroll" id="dSum"></div></div>
@@ -3064,9 +3102,9 @@ function verListHtml(t){ const p=S.params, sch=mySchool()||p.vlSch||"", R=sortSt
   return `<div class="ph"><h2>${t==="verd"?"✅ Verified records":"📥 Unverified records"} — ${nf(R.length)}</h2><div class="pills">${mySchool()?"":`<select class="in" style="width:auto" data-chg="setPsel" data-k="vlSch"><option value="">All schools</option>${schoolList().map(s=>`<option ${p.vlSch===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select>`}
     ${t==="unv"?`<select class="in" style="width:auto" data-chg="setPsel" data-k="vlW"><option value="">All unverified</option><option value="n" ${p.vlW==="n"?"selected":""}>Not yet sent</option><option value="w" ${p.vlW==="w"?"selected":""}>Waiting for the DQ Office</option></select>`:""}</div></div>
    <p class="hint" style="margin-top:0">${nf(nV)} of ${nf(all.length)} records verified (${all.length?(nV/all.length*100).toFixed(1):"0"}%). ${t==="unv"?(dec?"Every record entered or imported stays here until it is verified. Tick and verify, or approve the schools' requests in <b>Approvals</b>.":"Every record you enter or import stays here until the DQ Office verifies it. Check each against the register, tick it and press <b>Send for verification</b>."):"Records checked by the school and approved by the DQ Office / Super Admin."}</p>
-   ${t==="unv"&&R.length?`<div class="pills" style="margin-bottom:6px"><button class="btn s g" data-act="vlGo">${dec?"✓ Verify ticked":"Send ticked for verification"}</button></div>`:""}
-   ${R.length?`<table><tr>${t==="unv"?`<th><input type="checkbox" data-selall="1" style="width:18px;height:18px"></th>`:""}<th>#</th><th>School</th><th>Class – Sec</th><th>Adm No</th><th>Name</th><th>Father / Guardian</th><th>G/B</th><th>Category</th><th>${t==="verd"?"Verified by":"Status"}</th></tr>
-   ${R.slice(0,lim).map((r,i)=>`<tr class="click" data-act="openStu" data-id="${h(r.id)}">${t==="unv"?`<td>${r.vreq&&!dec?"":`<input type="checkbox" data-sel="${h(r.id)}" style="width:18px;height:18px">`}</td>`:""}<td class="mute">${i+1}</td><td>${h(r.school)}</td><td>${h(r.cl)}-${h(r.sec)}</td><td>${h(r.admNo)}</td><td><b>${h(r.name)}</b></td><td>${h(parentOf(r))}</td><td>${gTxt(r.gender)}</td><td>${h(catLabel(r.cat))}</td><td>${t==="verd"?h(String(r.ver).replace("|"," · ")):r.vreq?`<span class="tag t-mid">waiting DQ</span>`:`<span class="mute">not sent</span>`}</td></tr>`).join("")}</table>${R.length>lim?`<div class="row" style="justify-content:flex-start"><button class="btn" data-act="vlMore">Show all ${nf(R.length)}</button></div>`:""}`:`<div class="empty">None.</div>`}`; }
+   ${R.length&&(t==="unv"||dec)?`<div class="pills" style="margin-bottom:6px">${t==="unv"?`<button class="btn s g" data-act="vlGo">${dec?"✓ Verify ticked":"Send ticked for verification"}</button>`:""}${dec?`<button class="btn s r" data-act="vlDel" data-id="trash">🗑 Move ticked to Trash</button>`:""}${isSA()?`<button class="btn s r" data-act="vlDel" data-id="purge">Delete ticked for ever</button>`:""}${R.length>lim?`<span class="mute mini" style="align-self:center">The heading box ticks the ${nf(lim)} shown — press “Show all” first to tick all ${nf(R.length)}.</span>`:""}</div>`:""}
+   ${R.length?`<table><tr>${t==="unv"||dec?`<th><input type="checkbox" data-selall="1" style="width:18px;height:18px"></th>`:""}<th>#</th><th>School</th><th>Class – Sec</th><th>Adm No</th><th>Name</th><th>Father / Guardian</th><th>G/B</th><th>Category</th><th>${t==="verd"?"Verified by":"Status"}</th></tr>
+   ${R.slice(0,lim).map((r,i)=>`<tr class="click" data-act="openStu" data-id="${h(r.id)}">${t==="unv"||dec?`<td>${r.vreq&&!dec?"":`<input type="checkbox" data-sel="${h(r.id)}" style="width:18px;height:18px">`}</td>`:""}<td class="mute">${i+1}</td><td>${h(r.school)}</td><td>${h(r.cl)}-${h(r.sec)}</td><td>${h(r.admNo)}</td><td><b>${h(r.name)}</b></td><td>${h(parentOf(r))}</td><td>${gTxt(r.gender)}</td><td>${h(catLabel(r.cat))}</td><td>${t==="verd"?h(String(r.ver).replace("|"," · ")):r.vreq?`<span class="tag t-mid">waiting DQ</span>`:`<span class="mute">not sent</span>`}</td></tr>`).join("")}</table>${R.length>lim?`<div class="row" style="justify-content:flex-start"><button class="btn" data-act="vlMore">Show all ${nf(R.length)}</button></div>`:""}`:`<div class="empty">None.</div>`}`; }
 Object.assign(EXTRA_ACT,{
   vlMore: () => { S.vlLim=1e6; fillRegion("vlBody",true); },
   vlGo: async () => { const ids=$$("#vlBody [data-sel]").filter(x=>x.checked).map(x=>x.dataset.sel); if(!ids.length){ toast("Tick the records first.",true); return; }
@@ -3103,6 +3141,110 @@ Object.assign(EXTRA_FORMS,{ txFix: f => txFixSave(f) });
 /* entries made by the DQ Office itself are marked, listed and reported to the Super Admin */
 let hqMemo={src:null,set:new Set()};
 function hqUids(){ if(hqMemo.src===S.users) return hqMemo.set; hqMemo={src:S.users,set:new Set((S.users||[]).filter(u=>u.role==="hq").flatMap(u=>[u.uid,...(u.prevUids||[])]))}; return hqMemo.set; }
+
+Object.assign(EXTRA_ACT,{
+  vlDel: el => { const purge=el.dataset.id==="purge"; if(purge&&!isSA()) return; const ids=$$("#vlBody [data-sel]").filter(x=>x.checked).map(x=>x.dataset.sel); if(!ids.length){ toast("Tick the records first.",true); return; }
+    const go=async()=>{ toast("Working… please wait."); const ops=opsNew(); let n=0; const sch=new Set();
+      for(const id of ids){ const x=idxFind(id); if(!x) continue; const L2=await ensureStu(x.school); const r=L2.find(y=>y.id===id); if(!r) continue; sch.add(r.school); n++;
+        if(purge){ (ops.del||=[]).push({col:"students",id},{col:"photos",id}); } else { const o=stuToTrash(r,"removed from the data bank list"); ops.set.push(...o.set); (ops.del||=[]).push(...(o.del||[])); } }
+      const pend=apprPending().filter(a=>ids.includes(a.stuId)); for(const a of pend) ops.upd.push({col:"approvals",id:a.id,data:{status:"rejected",decidedBy:me().uid,decidedByName:me().name||"",decidedAt:TS,decidedMs:Date.now(),decNote:"record removed"}});
+      await DB.apply(ops); for(const c of sch) await ensureStu(c,true); S.trash=null; audit(purge?"Students deleted for ever":"Students moved to Trash",`${n} from the ${S.params.tab==="verd"?"Verified":"Unverified"} list`); toast(`${n} record${n>1?"s":""} ${purge?"deleted for ever":"moved to Trash"}.`); apprLoad(); fillRegion("vlBody",true); };
+    if(purge){ modal(`<h3>Delete ${ids.length} record${ids.length>1?"s":""} for ever?</h3><p>The student records and their photos are removed and <b>cannot be restored</b>. Strength figures and the Log are not changed.</p><div class="f"><label for="vlOk">Type <b>DELETE</b> to confirm</label><input id="vlOk" autocomplete="off"></div><div class="row"><button class="btn" data-act="closeModal">Cancel</button><button class="btn r" id="vlYes">Delete for ever</button></div>`);
+      $("#vlYes").onclick=()=>{ if(($("#vlOk").value||"").trim().toUpperCase()!=="DELETE"){ toast("Type DELETE to confirm.",true); return; } closeModal(); go().catch(e=>toast(e.message,true)); }; }
+    else ask(`Move ${ids.length} record${ids.length>1?"s":""} to Trash?`,"They leave the data bank and wait in Students → Trash, from where they can be restored. Strength is not changed.","Move to Trash",go); },
+});
+
+/* back-to-top button (bottom left) */
+(()=>{ const b=document.createElement("button"); b.id="toTop"; b.title="Back to top"; b.setAttribute("aria-label","Back to top"); b.textContent="↑"; b.onclick=()=>window.scrollTo({top:0,behavior:"smooth"}); document.body.appendChild(b);
+  let t=0; window.addEventListener("scroll",()=>{ if(t) return; t=requestAnimationFrame(()=>{ t=0; b.classList.toggle("show",window.scrollY>500); }); },{passive:true}); })();
+
+const undoAllowed = () => isSA() || (role()==="hq" && Number(me().undoBtn||0)>Date.now());
+/* ---------- ↶ Undo: Super Admin / DQ Office can take back their own recent changes, one step at a time ---------- */
+const UNDO=[], UNDO_SKIP=new Set(["activity","audit","stuIdx","strength","snapshots"]); let undoBusy=false, lastLabel="";
+document.addEventListener("click",e=>{ const b=e.target.closest("button,[data-act]"); if(b){ const t=(b.textContent||"").replace(/\s+/g," ").trim(); if(t&&t.length<60&&!/undo/i.test(t)) lastLabel=t; } },true);
+const _dbApply=DB.apply.bind(DB);
+DB.apply=async function(ops,quiet){
+  if(undoBusy||ops.noUndo||!S.user||S.user.pending||!undoAllowed()) return _dbApply(ops,quiet);
+  const docs=[...ops.set,...ops.upd,...(ops.del||[])].filter(x=>!x._idx&&!UNDO_SKIP.has(x.col)), keys=[...new Map(docs.map(x=>[x.col+"/"+x.id,x])).values()];
+  if(!keys.length&&!ops.inc.length&&!(ops.wait||[]).length) return _dbApply(ops,quiet);
+  if(keys.length>80){ const r=await _dbApply(ops,quiet); UNDO.push({label:lastLabel||"Large change",at:Date.now(),big:true}); undoPaint(); return r; }
+  let before; try{ before=await Promise.all(keys.map(x=>DB.getDoc(x.col,x.id).catch(()=>undefined))); }catch(e){ before=null; }
+  const waitPrev=(ops.wait||[]).map(w=>({school:w.school,cl:w.cl,n:manualWait(w.school,w.cl)}));
+  const r=await _dbApply(ops,quiet);
+  if(before&&!before.includes(undefined)){ const inv={set:[],upd:[],inc:ops.inc.map(x=>({...x,n:-x.n})),del:[],wait:waitPrev,noUndo:true};
+    keys.forEach((x,i)=>{ const b=before[i]; if(b){ const d={...b}; delete d.id; if(x.col==="transactions") delete d.atMs; inv.set.push({col:x.col,id:x.id,data:d}); } else inv.del.push({col:x.col,id:x.id}); });
+    UNDO.push({label:lastLabel||`${keys.length} change${keys.length>1?"s":""}`,what:keys.map(x=>x.col),at:Date.now(),inv}); if(UNDO.length>25) UNDO.shift(); }
+  else UNDO.push({label:lastLabel||"Change",at:Date.now(),big:true});
+  undoPaint(); return r; };
+function undoPaint(){ const b=$("#undoBtn"); if(!b) return; const ok=undoAllowed()&&UNDO.length; b.hidden=!ok; if(ok){ const u=UNDO.at(-1); b.title=`Undo: ${u.label} (${fmtT(u.at)})`; } }
+setInterval(undoPaint,3000);
+const COLN={students:"student record",transactions:"entry",trash:"Trash",edits:"edit log",approvals:"approval",waiting:"applicant",tfrapps:"transfer request",transfers:"transfer",settings:"settings",users:"user",feeRet:"fee return",feePay:"fee payment",dcare:"day care",daily:"day status",requests:"request",schools:"school setup"};
+function undoDlg(){ if(!UNDO.length) return; const L2=[...UNDO].reverse();
+  modal(`<h3>↶ Undo your recent changes</h3><p class="hint" style="margin-top:0">Your changes made since you opened the portal, newest first. Undo takes back the <b>newest</b> one each time, so you can step back one by one. If someone else changed the same record in between, their change is replaced too.</p>
+   <table><tr><th>#</th><th>When</th><th>What you did</th><th>Affects</th></tr>${L2.map((u,i)=>`<tr ${i?"class=\"mute\"":""}><td>${i+1}</td><td>${fmtT(u.at)}</td><td><b>${h(u.label)}</b></td><td>${u.big?`<span class="neg">too large to undo here — use Trash / Log / Void</span>`:h([...new Set(u.what||[])].map(c=>COLN[c]||c).join(", "))}</td></tr>`).join("")}</table>
+   <div class="row"><button class="btn" data-act="closeModal">Close</button><button class="btn p" data-act="undoGo" ${L2[0].big?"disabled":""}>↶ Undo “${h(L2[0].label)}”</button></div>`); }
+async function undoGo(){ const u=UNDO.at(-1); if(!u||u.big){ toast("The last change is too large to undo here.",true); return; } closeModal(); undoBusy=true;
+  try{ await DB.apply(u.inv); UNDO.pop(); for(const c of Object.keys(S.stu||{})) if(S.stu[c]) await ensureStu(c,true).catch(()=>{}); audit("Undone",u.label); toast(`Undone: ${u.label}`); if(S.view==="log") runLog(); else renderView(); }
+  catch(e){ toast("Could not undo: "+e.message,true); } finally{ undoBusy=false; undoPaint(); } }
+Object.assign(EXTRA_ACT,{ undoDlg: () => undoDlg(), undoGo: () => undoGo() });
+document.addEventListener("keydown",e=>{ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"&&!e.target.closest("input,textarea,select,[contenteditable]")&&UNDO.length&&undoAllowed()){ e.preventDefault(); undoDlg(); } });
+
+/* ---------- portal name, front-page banner ---------- */
+function heroHtml(){ const st=ST(); if(!st.heroOn||!(st.heroTitle||st.heroText)) return ""; const c=st.heroColor||"#0b1f4b";
+  return `<div class="hero" style="--hc:${h(c)}">${st.heroTitle?`<h2>${h(st.heroTitle)}</h2>`:""}${st.heroText?`<p>${h(st.heroText).replace(/\n/g,"<br>")}</p>`:""}</div>`; }
+Object.assign(EXTRA_FORMS,{ brand: async () => { await saveSettings({appTitle:$("#bTitle").value.trim(),appSub:$("#bSub").value.trim(),tabTitle:$("#bTab").value.trim(),heroOn:$("#bHeroOn").value==="1",heroColor:$("#bHeroC").value,heroTitle:$("#bHeroT").value.trim(),heroText:$("#bHeroX").value.trim()},"Saved — the top bar updates now."); boot(); } });
+
+/* ---------- edit any wording on screen (Super Admin) ---------- */
+const OV_SEL="h1,h2,h3,h4,th,label,caption,summary,nav a,.pill,.btn,.kpi>span,.stile b,.stile small,.sgrp h4,.scap,legend,.tag";
+function ovMap(){ return ST().textOv||{}; }
+function applyOv(root){ const ov=ovMap(); if(!root||!Object.keys(ov).length) return; for(const el of root.querySelectorAll(OV_SEL)){ for(const n of el.childNodes){ if(n.nodeType!==3) continue; const t=n.nodeValue.trim(); if(t&&ov[t]!==undefined&&ov[t]!==t) n.nodeValue=n.nodeValue.replace(t,ov[t]); } } }
+new MutationObserver(()=>{ clearTimeout(window.__ovT); window.__ovT=setTimeout(()=>applyOv(document.getElementById("app")),50); }).observe(document.documentElement,{childList:true,subtree:true});
+function ovOrig(t){ for(const [a,b] of Object.entries(ovMap())) if(b===t) return a; return t; }
+document.addEventListener("click",e=>{ if(!S.editWords||!isSA()) return; const el=e.target.closest(OV_SEL); if(!el||el.closest("#modalRoot,.ewbar")) return;
+  const tn=[...el.childNodes].find(n=>n.nodeType===3&&n.nodeValue.trim()); if(!tn) return; e.preventDefault(); e.stopPropagation();
+  const now=tn.nodeValue.trim(), orig=ovOrig(now);
+  modal(`<h3>✎ Change this wording</h3><p class="hint" style="margin-top:0">Original: <b>${h(orig)}</b></p><div class="f"><label for="ovNew">Show instead</label><input id="ovNew" value="${h(now)}"></div><div class="row"><button class="btn" data-act="closeModal">Cancel</button>${orig!==now?`<button class="btn" id="ovBack">Back to original</button>`:""}<button class="btn p" id="ovOk">Save for everyone</button></div>`);
+  const save=async v=>{ const m={...ovMap()}; if(!v||v===orig) delete m[orig]; else m[orig]=v; closeModal(); await saveSettings({textOv:m},"Wording saved for everyone."); renderView(); };
+  $("#ovOk").onclick=()=>save($("#ovNew").value.trim()); if($("#ovBack")) $("#ovBack").onclick=()=>save(""); },true);
+function ewBar(){ let b=document.querySelector(".ewbar"); if(!S.editWords){ b?.remove(); document.body.classList.remove("ewon"); return; } document.body.classList.add("ewon");
+  if(!b){ b=document.createElement("div"); b.className="ewbar"; b.innerHTML=`✎ <b>Editing words is ON</b> — click any heading, title, label, tab or button to change its wording. <button class="btn s" data-act="editWords">Done</button>`; document.body.appendChild(b); } }
+Object.assign(EXTRA_ACT,{
+  editWords: () => { if(!isSA()) return; S.editWords=!S.editWords; ewBar(); toast(S.editWords?"Editing is ON — click any wording to change it.":"Editing is OFF."); if(S.view==="setup") fillRegion("stBody",true); },
+  ovReset: async el => { const m={...ovMap()}; delete m[el.dataset.id]; await saveSettings({textOv:m},"Back to original."); renderView(); },
+});
+
+/* ---------- 📢 Announcements (Super Admin): a bar under the tabs, optionally flashing or scrolling ---------- */
+const ANN_AUD = [["all","Everyone"],["clerk","All school clerks"],["hq","DQ Office"],["principal","Principals"],["viewer","Senior / viewers"]];
+const ANN_STY = [["banner","Plain banner"],["flash","Flashing (blinks to catch the eye)"],["ticker","Scrolling (moves across the bar)"]];
+const annList = () => ST().ann || [];
+const annSeen = () => { try{ return new Set(JSON.parse(localStorage.getItem("apeis_ann_seen")||"[]")); }catch(e){ return new Set(); } };
+function annMine(){ const d=isoDay(Date.now()), r=role(), sc=me().school, seen=annSeen();
+  return annList().filter(a=>a.on!==false && (!a.from||a.from<=d) && (!a.to||a.to>=d) && (a.aud==="all"||a.aud===r||(a.aud==="school:"+sc)||isSA()) && (a.pin||!seen.has(a.id))); }
+function annPaint(){ const el=document.getElementById("annBar"); if(!el) return; if(!S.user||S.user.pending){ el.innerHTML=""; return; } const L2=annMine();
+  el.innerHTML=L2.map(a=>`<div class="ann ann-${h(a.sty||"banner")}" style="--ac:${h(a.col||"#b45309")}"><span class="ann-ic">📢</span><div class="ann-tx">${a.sty==="ticker"?`<div class="ann-run"><span>${h(a.text)}</span><span aria-hidden="true">${h(a.text)}</span></div>`:`<span>${h(a.text)}</span>`}</div>${isSA()?`<span class="ann-aud">${h(a.aud.startsWith("school:")?a.aud.slice(7):(ANN_AUD.find(x=>x[0]===a.aud)||[,""])[1])}</span>`:""}${a.pin?"":`<button class="ann-x" data-act="annSeen" data-id="${h(a.id)}" title="Hide this announcement">✕</button>`}</div>`).join(""); }
+setInterval(annPaint,15e3);
+function annSetupHtml(){ const L2=annList(), e=S.annEdit?L2.find(a=>a.id===S.annEdit)||{}:{};
+  return `<div class="panel" style="border:2px solid #b45309"><h2>📢 Announcements</h2><p class="hint" style="margin-top:0">A coloured bar under the tabs, on every page, for the people you choose. Make it flash or scroll across when it must not be missed; give dates to show it only for a period.</p>
+   ${L2.length?`<table><tr><th>#</th><th>Announcement</th><th>For</th><th>Style</th><th>Dates</th><th>Shown</th><th></th></tr>${L2.map((a,i)=>`<tr><td class="mute">${i+1}</td><td style="white-space:normal;max-width:380px"><span class="ann-dot" style="background:${h(a.col||"#b45309")}"></span>${h(a.text)}${a.pin?` <span class="tag t-mid">cannot be hidden</span>`:""}</td><td>${h(a.aud.startsWith("school:")?a.aud.slice(7)+" (school)":(ANN_AUD.find(x=>x[0]===a.aud)||[,""])[1])}</td><td>${h((ANN_STY.find(x=>x[0]===a.sty)||ANN_STY[0])[1].split(" (")[0])}</td><td>${a.from?fmtD(Date.parse(a.from+"T12:00")):"now"} – ${a.to?fmtD(Date.parse(a.to+"T12:00")):"until removed"}</td>
+     <td><button class="btn s ${a.on!==false?"g":""}" data-act="annOn" data-id="${h(a.id)}">${a.on!==false?"On":"Off"}</button></td><td style="white-space:nowrap"><button class="btn s" data-act="annEdit" data-id="${h(a.id)}">✎</button> <button class="btn s r" data-act="annDel" data-id="${h(a.id)}">Delete</button></td></tr>`).join("")}</table>`:`<p class="mute">No announcements yet.</p>`}
+   <form data-form="ann" class="grid" style="margin-top:10px">
+    <div class="f" style="grid-column:1/-1"><label for="anTx">${e.id?"Edit announcement":"New announcement"}</label><textarea id="anTx" rows="2" required placeholder="e.g. Fee defaulters return due by 5 Dec. All clerks to complete the data bank by 30 Nov.">${h(e.text||"")}</textarea></div>
+    <div class="f"><label for="anAud">For</label><select id="anAud">${ANN_AUD.map(([k,l])=>`<option value="${k}" ${e.aud===k?"selected":""}>${l}</option>`).join("")}${schoolList().map(s=>`<option value="school:${h(s.code)}" ${e.aud==="school:"+s.code?"selected":""}>${h(s.code)} only</option>`).join("")}</select></div>
+    <div class="f"><label for="anSty">Style</label><select id="anSty">${ANN_STY.map(([k,l])=>`<option value="${k}" ${e.sty===k?"selected":""}>${l}</option>`).join("")}</select></div>
+    <div class="f"><label for="anCol">Colour</label><select id="anCol">${[["#b45309","Amber"],["#be123c","Red"],["#0b1f4b","Navy"],["#0f766e","Green"],["#7c3aed","Purple"]].map(([c,l])=>`<option value="${c}" ${e.col===c?"selected":""}>${l}</option>`).join("")}</select></div>
+    <div class="f"><label for="anFrom">Show from</label><input id="anFrom" type="date" value="${h(e.from||"")}"></div>
+    <div class="f"><label for="anTo">Until</label><input id="anTo" type="date" value="${h(e.to||"")}"></div>
+    <div class="f"><label for="anPin">Can people hide it (✕)?</label><select id="anPin"><option value="">Yes</option><option value="1" ${e.pin?"selected":""}>No — always shown</option></select></div>
+    <div class="row" style="justify-content:flex-start;grid-column:1/-1">${e.id?`<button type="button" class="btn" data-act="annEdit" data-id="">Cancel</button>`:""}<button class="btn p">${e.id?"Save changes":"Publish announcement"}</button></div></form></div>`; }
+async function annSave(list,msg){ await saveSettings({ann:list},msg); annPaint(); fillRegion("stBody",true); }
+Object.assign(EXTRA_FORMS,{ ann: async () => { const t=$("#anTx").value.trim(); if(!t){ toast("Write the announcement.",true); return; } const a={text:t,aud:$("#anAud").value,sty:$("#anSty").value,col:$("#anCol").value,from:$("#anFrom").value,to:$("#anTo").value,pin:$("#anPin").value==="1",on:true,by:me().name||"",atMs:Date.now()};
+  const L2=[...annList()]; if(S.annEdit){ const i=L2.findIndex(x=>x.id===S.annEdit); if(i>=0) L2[i]={...L2[i],...a,id:S.annEdit}; } else L2.unshift({...a,id:newId()}); const ed=!!S.annEdit; S.annEdit=null; await annSave(L2,ed?"Announcement updated.":"Announcement published."); } });
+Object.assign(EXTRA_ACT,{
+  annSeen: el => { const s=annSeen(); s.add(el.dataset.id); try{ localStorage.setItem("apeis_ann_seen",JSON.stringify([...s].slice(-200))); }catch(e){} annPaint(); },
+  annEdit: el => { S.annEdit=el.dataset.id||null; fillRegion("stBody",true); setTimeout(()=>$("#anTx")?.focus(),50); },
+  annOn: el => annSave(annList().map(a=>a.id===el.dataset.id?{...a,on:a.on===false}:a),"Saved."),
+  annDel: el => ask("Delete this announcement?","It disappears for everyone.","Delete",()=>annSave(annList().filter(a=>a.id!==el.dataset.id),"Announcement deleted.")),
+});
 
 /* =====================================================================
    8) REPORTS — designer (tick what to show), presets, print/PDF, Excel, WhatsApp
@@ -3428,7 +3570,7 @@ const SETUP_INFO = { schools:["🏫","Schools, classes, sections, seats"], openi
 const SETUP_TABS = [["schools","Schools & sections"],["opening","Opening strength"],["users","Users & permissions"],["general","General & appearance"],["cats","Categories"],["catopen","Category figures"],["actions","Actions & statuses"],
   ["stufields","Student fields"],["appfields","Applicant columns"],["labels","Labels & terms"],["stages","Consolidation"],["fees","Fees"],["wa","WhatsApp templates"],["presets","Report presets"],["live","Senior's QR code"],["data","Backup & data"],["ai","Form reading (AI)"],["session","New session & promotion"]];
 VIEWS.setup = {
-  shell:()=>{ const name=Object.fromEntries(SETUP_TABS); return `<div class="stiles">${SETUP_GROUPS.map(([g,c,keys])=>`<div class="sgrp" style="--c:${c}"><h4>${h(g)}</h4>${keys.filter(k=>name[k]).map(k=>`<button class="stile ${S.setupTab===k?"on":""}" data-act="setupTab" data-id="${k}"><span class="ic">${SETUP_INFO[k]?.[0]||"•"}</span><span><b>${h(name[k])}</b><small>${h(SETUP_INFO[k]?.[1]||"")}</small></span></button>`).join("")}</div>`).join("")}</div><div id="stBody"></div>`; },
+  shell:()=>{ const name=Object.fromEntries(SETUP_TABS); return `<div class="sthead"><div><h2 style="margin:0">⚙ Setup</h2><p class="hint" style="margin:2px 0 0">Everything in the portal can be changed here. Pick a tile — its page opens below.</p></div>${S.setupTab?`<span class="stcur">Now open: <b>${h(name[S.setupTab]||"")}</b></span>`:""}</div><div class="stiles">${SETUP_GROUPS.map(([g,c,keys])=>`<div class="sgrp" style="--c:${c}"><h4>${h(g)}</h4>${keys.filter(k=>name[k]).map(k=>`<button class="stile ${S.setupTab===k?"on":""}" data-act="setupTab" data-id="${k}"><span class="ic">${SETUP_INFO[k]?.[0]||"•"}</span><span class="tx"><b>${h(name[k])}</b><small>${h(SETUP_INFO[k]?.[1]||"")}</small></span><span class="go">›</span></button>`).join("")}</div>`).join("")}</div><div id="stBody"></div>`; },
   regions:{ stBody(){ return (SETUP[S.setupTab]||SETUP.schools)(); } },
   post(id){ if(S.setupTab==="session") wireRepSearch(); },
   after(){ if(S.setupTab==="wa") waPreview(); }
@@ -3482,19 +3624,29 @@ const SETUP = {
       <div class="f"><label for="uSch">School</label><select id="uSch"><option value="ALL">ALL (Super Admin / HQ / Senior)</option>${schoolList(true).map(s=>`<option>${h(s.code)}</option>`).join("")}</select></div>
       <button class="btn p">Create</button></form>
       <p class="hint">Senior / Viewer sees the Dashboard and Reports only and cannot change anything — give this to your Commandant with the QR code. Usernames without "@" become name@${h(LOGIN_DOMAIN)}.</p></div>
-      <div class="panel"><h2>All users</h2>${roleGuide()}<p class="hint" style="margin-top:0">To change someone's role or school, pick it in the <b>Role</b> / <b>School</b> column — it is saved at once and the person sees the change the next time the page refreshes.</p><div class="scroll"><table><tr><th>Name</th><th>Login</th><th>Role</th><th>School</th>${PERMS.map(p=>`<th>${p[1]}</th>`).join("")}<th>Undo own entry (min)</th><th>Undo record changes</th><th>Active</th><th>Password / remove</th></tr>${Lu.map(u=>`<tr><td><input class="in" style="max-width:220px" value="${h(u.name)}" data-uf="name" data-id="${h(u.uid)}" aria-label="Name of ${h(u.email)}"></td><td>${h(u.email)}</td>
+      <div class="panel"><h2>All users</h2>${roleGuide()}<p class="hint" style="margin-top:0">To change someone's role or school, pick it in the <b>Role</b> / <b>School</b> column — it is saved at once and the person sees the change the next time the page refreshes.</p><div class="scroll"><table><tr><th>Name</th><th>Login</th><th>Role</th><th>School</th>${PERMS.map(p=>`<th>${p[1]}</th>`).join("")}<th>Undo own entry (min)</th><th>Undo record changes</th><th>↶ Undo button</th><th>Active</th><th>Password / remove</th></tr>${Lu.map(u=>`<tr><td><input class="in" style="max-width:220px" value="${h(u.name)}" data-uf="name" data-id="${h(u.uid)}" aria-label="Name of ${h(u.email)}"></td><td>${h(u.email)}</td>
        <td style="white-space:nowrap"><span class="rolechip" style="background:${ROLE_C[u.role]||"#64748b"}">${h(ROLES[u.role]||u.role)}</span><br><select class="in" data-uf="role" data-id="${h(u.uid)}" ${u.uid===me().uid?"disabled":""} title="Change this user's role">${Object.entries(ROLES).map(([k,v])=>`<option value="${k}" ${u.role===k?"selected":""}>${v}</option>`).join("")}</select></td>
        <td><select class="in" data-uf="school" data-id="${h(u.uid)}" ${u.uid===me().uid?"disabled":""}><option ${u.school==="ALL"?"selected":""}>ALL</option>${schoolList(true).map(s=>`<option ${u.school===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select></td>
        ${PERMS.map(p=>p[0]).map(k=>`<td>${u.role==="superadmin"?`<span class="mute">always</span>`:`<select class="in" data-uf="${k}" data-id="${h(u.uid)}"><option value="" ${!u[k]?"selected":""}>Role default (${permDef(u.role,k)?"allowed":"blocked"})</option><option value="yes" ${u[k]==="yes"?"selected":""}>Allowed</option><option value="no" ${u[k]==="no"?"selected":""}>Blocked</option></select>`}</td>`).join("")}
        <td>${u.role==="clerk"?`<input class="in num" type="number" min="0" placeholder="${h(ST().voidMinutes??15)}" value="${h(u.voidMin??"")}" data-uu="voidMin" data-id="${h(u.uid)}" title="Blank = the general setting">`:`<span class="mute">—</span>`}</td>
        <td>${u.role==="superadmin"?`<span class="mute">always</span>`:["hq","clerk"].includes(u.role)?`<select class="in" data-uu="undoUntil" data-id="${h(u.uid)}"><option value="">${untilOf(u)>Date.now()?(untilOf(u)>Date.parse("2099-01-01")?"Allowed (until revoked)":"Allowed until "+fmtDT(untilOf(u))):"Not allowed"}</option><option value="m15">Allow for 15 minutes</option><option value="m30">Allow for 30 minutes</option><option value="m60">Allow for 1 hour</option><option value="m120">Allow for 2 hours</option><option value="m240">Allow for 4 hours</option><option value="custom">Allow for … minutes (type)</option><option value="d1">Allow for 1 day</option><option value="d7">Allow for 7 days</option><option value="d30">Allow for 30 days</option><option value="forever">Allow until I revoke</option><option value="0">Not allowed</option></select>`:`<span class="mute">—</span>`}</td>
+       <td>${u.role==="superadmin"?`<span class="mute">always</span>`:u.role==="hq"?`<select class="in" data-uu="undoBtn" data-id="${h(u.uid)}"><option value="">${Number(u.undoBtn||0)>Date.now()?(u.undoBtn>Date.parse("2099-01-01")?"On (until revoked)":"On until "+fmtDT(u.undoBtn)):"Off"}</option><option value="m60">On for 1 hour</option><option value="d1">On for 1 day</option><option value="d7">On for 7 days</option><option value="d30">On for 30 days</option><option value="custom">On for … minutes (type)</option><option value="forever">On until I switch it off</option><option value="0">Off</option></select>`:`<span class="mute">—</span>`}</td>
        <td><input type="checkbox" data-uf="active" data-id="${h(u.uid)}" ${u.active?"checked":""} ${u.uid===me().uid?"disabled":""} style="width:20px;height:20px"></td>
        <td>${u.uid===me().uid||u.replacedBy?(u.replacedBy?`<span class="mute">replaced</span> <button class="btn s r" data-act="userDel" data-id="${h(u.uid)}">Delete</button>`:""):`<button class="btn s" data-act="pwReset" data-id="${h(u.uid)}">Reset…</button> <button class="btn s r" data-act="userDel" data-id="${h(u.uid)}">Delete</button>`}</td></tr>`).join("")}</table></div>
        <div class="panel" style="margin-top:12px"><h2>Excel, Word, print & WhatsApp — role defaults</h2><p class="hint" style="margin-top:0"><b>Students' personal data</b> covers every list or page with names, parents, CNICs, phone numbers, addresses and admission forms — it is <b>off</b> for everyone until you tick it here or allow a person above; it needs the Excel / Word / Print switch as well. Strength figures and summaries are not personal. What each role may do unless a user above is set to Allowed or Blocked. Blank forms (Excel templates for import) are always available. Super Admin can always download and print.</p>
        <form data-form="permDefaults"><table><tr><th>Role</th>${PERMS.map(p=>`<th>${p[1]}</th>`).join("")}</tr>${DL_ROLES.map(r=>`<tr><td>${h(ROLES[r])}</td>${PERMS.map(p=>p[0]).map(k=>`<td><input type="checkbox" name="${r}_${k}" ${permDef(r,k)?"checked":""} style="width:20px;height:20px"></td>`).join("")}</tr>`).join("")}</table><div class="row"><button class="btn p">Save role defaults</button></div></form>
        <p class="hint">A change takes effect the next time that person opens or refreshes the portal. Note: anything a person can see on screen could still be copied by hand or photographed — these switches stop downloads and printing from the portal, not viewing.</p></div>
        <p class="hint">Edit a name and press Tab or click elsewhere to save; it shows at the top of that person's screen and on their new log entries (older entries keep the name they were saved with). To remove someone, untick Active — their past entries stay in the log.</p></div>`; },
-  general(){ const st=ST(); return `<div class="panel"><h2>Waiting list</h2><form data-form="waitOpt" class="row" style="justify-content:flex-start"><select class="in" id="sWt" style="width:auto"><option value="on" ${st.waitTyped===false?"":"selected"}>Clerks type a class-wise count on the Entry tab, plus applicants by name</option><option value="off" ${st.waitTyped===false?"selected":""}>Only applicants entered by name (Applicants tab) — no typed counts</option></select><button class="btn p">Save</button></form><p class="hint">Use the second choice once every school enters its applicants by name; the typed counts are then ignored everywhere.</p></div><div class="panel"><h2>Ownership / credit line</h2><p class="hint" style="margin-top:0">Shown at the foot of every page and every printout, e.g. “Designed & developed by …, Regional Director APEIs Peshawar Region”.</p><form data-form="credit" class="row" style="justify-content:flex-start"><input class="in" id="sCredit" style="flex:1;min-width:260px" value="${h(st.credit||"")}" placeholder="Designed & developed by …"><button class="btn p">Save</button></form></div><div class="panel"><h2>General</h2><form data-form="general" class="grid">
+  general(){ const st=ST(); return annSetupHtml()+`<div class="panel"><h2>Name of the portal & front page</h2><form data-form="brand" class="grid">
+      <div class="f" style="grid-column:span 2"><label for="bTitle">Title in the top bar</label><input id="bTitle" value="${h(st.appTitle||"")}" placeholder="${h((st.org||"APEIs Peshawar Garrison")+" — Strength Portal")}"></div>
+      <div class="f" style="grid-column:span 2"><label for="bSub">Sub-title (before “Session …”)</label><input id="bSub" value="${h(st.appSub||"")}" placeholder="e.g. Regional Directorate APEIs Peshawar"></div>
+      <div class="f"><label for="bTab">Name in the browser tab / phone app</label><input id="bTab" value="${h(st.tabTitle||"")}" placeholder="APEIs Strength Portal"></div>
+      <div class="f"><label for="bHeroOn">Front-page banner on the Dashboard</label><select id="bHeroOn"><option value="">Off</option><option value="1" ${st.heroOn?"selected":""}>On</option></select></div>
+      <div class="f"><label for="bHeroC">Banner colour</label><select id="bHeroC">${[["#0b1f4b","Navy"],["#0f766e","Green"],["#7c3aed","Purple"],["#b45309","Amber"],["#be123c","Maroon"]].map(([c,l])=>`<option value="${c}" ${st.heroColor===c?"selected":""}>${l}</option>`).join("")}</select></div>
+      <div class="f" style="grid-column:span 2"><label for="bHeroT">Banner heading</label><input id="bHeroT" value="${h(st.heroTitle||"")}" placeholder="e.g. Admissions 2026-27 are open"></div>
+      <div class="f" style="grid-column:1/-1"><label for="bHeroX">Banner text (a message for everyone who opens the Dashboard)</label><textarea id="bHeroX" rows="3" placeholder="e.g. All schools to complete the data bank by 30 Nov. Fee returns due on the 5th of each month.">${h(st.heroText||"")}</textarea></div>
+      <button class="btn p">Save</button></form><p class="hint">Leave a box empty to use the standard wording. To change any other word on any page, use <b>Labels & terms → ✎ Edit words on screen</b>.</p></div>
+    <div class="panel"><h2>Waiting list</h2><form data-form="waitOpt" class="row" style="justify-content:flex-start"><select class="in" id="sWt" style="width:auto"><option value="on" ${st.waitTyped===false?"":"selected"}>Clerks type a class-wise count on the Entry tab, plus applicants by name</option><option value="off" ${st.waitTyped===false?"selected":""}>Only applicants entered by name (Applicants tab) — no typed counts</option></select><button class="btn p">Save</button></form><p class="hint">Use the second choice once every school enters its applicants by name; the typed counts are then ignored everywhere.</p></div><div class="panel"><h2>Ownership / credit line</h2><p class="hint" style="margin-top:0">Shown at the foot of every page and every printout, e.g. “Designed & developed by …, Regional Director APEIs Peshawar Region”.</p><form data-form="credit" class="row" style="justify-content:flex-start"><input class="in" id="sCredit" style="flex:1;min-width:260px" value="${h(st.credit||"")}" placeholder="Designed & developed by …"><button class="btn p">Save</button></form></div><div class="panel"><h2>General</h2><form data-form="general" class="grid">
       <div class="f wide" style="grid-column:span 2"><label for="sOrg">Organisation name</label><input id="sOrg" value="${h(st.org||"")}"></div>
       <div class="f"><label for="sShort">Short name (report titles)</label><input id="sShort" value="${h(orgShort())}"></div>
       <div class="f"><label for="sDl">Daily entry deadline</label><input id="sDl" type="time" value="${h(st.dailyDeadline||"09:00")}" title="After this time a school with no entries shows red"></div>
@@ -3513,7 +3665,10 @@ const SETUP = {
       <div class="panel"><h2>Appearance — default for everyone</h2><p class="hint">Each person can still choose their own with the 🎨 Theme button at the top; this sets what new users see.</p>${themeForm("uiDefault")}</div>
       <div class="panel"><h2>Logo</h2><p class="hint">Shown on the sign-in page, the header and printed reports. PNG or JPG; it is resized automatically.</p>
       <div class="row" style="justify-content:flex-start">${st.logo?`<img src="${h(st.logo)}" alt="" style="height:64px;border:1px solid var(--line);border-radius:6px;padding:4px;background:#fff">`:""}<label class="btn">Choose image <input type="file" accept="image/*" data-chg="logo" hidden></label>${st.logo?`<button class="btn r" data-act="logoDel">Remove</button>`:""}</div></div>`; },
-  labels(){ return `<div class="panel"><h2>Labels & terms</h2><p class="hint">Change the words used in the portal — column headings (on screen, in reports and in Excel), the names on the dashboard boxes and the dashboard headings. The grey text under each box is the original word. Clear a box to go back to it.</p><form data-form="labels">
+  labels(){ const ov=ST().textOv||{}; return `<div class="panel" style="border:2px solid #be185d"><h2>✎ Edit words on screen</h2><p class="hint" style="margin-top:0">Switch on, then go to any page and <b>click any heading, table title, column title, label, tab or button</b> to type new wording. It is saved for everyone at once. Switch off when done.</p>
+      <button class="btn ${S.editWords?"g":"p"}" data-act="editWords">${S.editWords?"✓ Editing is ON — switch off":"Switch editing ON"}</button>
+      ${Object.keys(ov).length?`<h3 style="font-size:14px;margin:12px 0 6px">Words changed so far (${Object.keys(ov).length})</h3><table><tr><th>Original</th><th>Now shows</th><th></th></tr>${Object.entries(ov).map(([a,b])=>`<tr><td>${h(a)}</td><td><b>${h(b)}</b></td><td><button class="btn s" data-act="ovReset" data-id="${h(a)}">Back to original</button></td></tr>`).join("")}</table>`:""}</div>
+    <div class="panel"><h2>Labels & terms</h2><p class="hint">Change the words used in the portal — column headings (on screen, in reports and in Excel), the names on the dashboard boxes and the dashboard headings. The grey text under each box is the original word. Clear a box to go back to it.</p><form data-form="labels">
       ${LABEL_GROUPS.map(([g,keys])=>`<h3 style="font-size:15px;margin:12px 0 6px">${h(g)}</h3><div class="grid">${keys.map(k=>`<div class="f"><label>${h(DEFAULT_LABELS[k])}</label><input name="${k}" value="${h(L(k))}" placeholder="${h(DEFAULT_LABELS[k])}"></div>`).join("")}</div>`).join("")}<div class="row" style="margin-top:10px"><button class="btn p">Save words</button></div></form></div>`; },
   cats(){ const C=cats(), used=catUse(), extra=Object.keys(used).filter(k=>!C.includes(k));
     return `<div class="panel"><div class="ph"><h2>Student categories (numbered)</h2><div class="pills"><button class="btn" data-act="catRecommended">Use the recommended order…</button></div></div>
@@ -3940,7 +4095,7 @@ const ACT = {
   rDelete: () => { const P=presets(); if(P.length<2){ toast("Keep at least one preset.",true); return; } ask("Delete preset?", `"${h(P.find(p=>p.id===S.rpid)?.name)}" will be removed for everyone.`, "Delete", async()=>{ await saveSettings({presets:P.filter(p=>p.id!==S.rpid),presetsGone:[...new Set([...(ST().presetsGone||[]),S.rpid])]},"Preset deleted."); S.rpid=null; S.rcfg=null; renderView(); }); },
   waCopy: async () => { if(!canWA()){ toast("WhatsApp reports are switched off for your account — ask the Super Admin.",true); return; } const t=$("#waText"); if(!t) return; try{ await navigator.clipboard.writeText(t.value); toast("Copied — paste into WhatsApp."); }catch(e){ t.select(); toast("Text selected — press Ctrl+C to copy.",true); } },
   waEdit: () => { S.setupTab="wa"; },
-  setupTab: el => { S.setupTab=el.dataset.id; renderView(); },
+  setupTab: el => { S.setupTab=el.dataset.id; renderView(); setTimeout(()=>{ const b=$("#stBody"); if(!b) return; const top=b.getBoundingClientRect().top+window.scrollY-(document.querySelector(".band")?.offsetHeight||60)-(document.querySelector("nav")?.offsetHeight||44)-10; window.scrollTo({top,behavior:"smooth"}); b.classList.add("flash"); setTimeout(()=>b.classList.remove("flash"),1200); },60); },
   setupSchool: el => { S.setupSchool=el.dataset.id; fillRegion("stBody",true); },
   secAdd: async el => { const code=setupSchool(), sc=cloneSchool(code), c=sc.classes[+el.dataset.id]; const name=($("#ns_"+el.dataset.id).value.trim()||nextSec(c));
     if(c.secs.some(x=>x.s===name)){ toast("Section "+name+" already exists.",true); return; } c.secs.push({s:name,g:0,b:0}); c.inc=(Number(c.inc)||0)+1; await DB.apply(saveSchoolOps(sc)); toast(`Section ${c.cl} - ${name} added (Inc Sec ${c.inc}). Auth +${sc.cap}.`); },
@@ -4143,9 +4298,9 @@ document.addEventListener("change", async e => {
     if(el.dataset.wf){ const w=S.waiting.find(x=>x.id===el.dataset.id); if(!w||!canWait(el.dataset.wf,w)) return; await DB.apply({set:[],inc:[],upd:[{col:"waiting",id:w.id,data:{[el.dataset.wf]:el.value,updatedAt:TS,updatedBy:me().name||""}}]}); toast("Saved."); return; }
     if(el.dataset.uu && isSA()){ const v=el.value, k=el.dataset.uu; let val;
       if(k==="voidMin") val = v==="" ? DEL : Math.max(0,Math.round(Number(v)||0));
-      else if(v==="custom"){ const m=Math.round(Number(prompt("Allow undoing record changes for how many minutes?","45"))||0); if(m<=0){ fillRegion("stBody",true); return; } val=Date.now()+m*60e3; }
+      else if(v==="custom"){ const m=Math.round(Number(prompt(k==="undoBtn"?"Switch the Undo button on for how many minutes?":"Allow undoing record changes for how many minutes?","45"))||0); if(m<=0){ fillRegion("stBody",true); return; } val=Date.now()+m*60e3; }
       else val = v==="0" ? DEL : v==="forever" ? Date.parse("2099-12-31T23:59") : v.startsWith("m") ? Date.now()+Number(v.slice(1))*60e3 : Date.now()+Number(v.replace("d",""))*864e5;
-      await DB.apply({set:[],inc:[],upd:[{col:"users",id:el.dataset.id,data:{[k]:val}}]}); toast(k==="voidMin"?"Undo window updated.":v==="0"?"Permission to undo record changes removed.":"Permission to undo record changes granted."); fillRegion("stBody",true); return; }
+      await DB.apply({set:[],inc:[],upd:[{col:"users",id:el.dataset.id,data:{[k]:val}}]}); toast(k==="voidMin"?"Undo window updated.":k==="undoBtn"?(v==="0"?"Undo button switched off.":"Undo button switched on."):v==="0"?"Permission to undo record changes removed.":"Permission to undo record changes granted."); fillRegion("stBody",true); return; }
     if(el.dataset.uf && isSA()){ const f=el.dataset.uf; let v=el.type==="checkbox"?el.checked:el.value; if(f==="name"){ v=v.trim(); if(!v){ toast("Name cannot be blank.",true); el.value=(S.users.find(u=>u.uid===el.dataset.id)||{}).name||""; return; } }
       await DB.apply({set:[],inc:[],upd:[{col:"users",id:el.dataset.id,data:{[f]:v}}]});
       if(el.dataset.id===me().uid && f==="name"){ S.user={...S.user,name:v}; boot(); toast("Your name is updated."); return; }
