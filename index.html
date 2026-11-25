@@ -231,6 +231,8 @@ nav a.on{background:rgba(255,255,255,.18);border-bottom:3px solid #f59e0b!import
 .stile{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;border:0;border-top:1px solid var(--line);background:none;padding:9px 12px;cursor:pointer;font:inherit;color:inherit}
 .stile:hover{background:color-mix(in srgb,var(--c) 8%,transparent)}.stile.on{background:color-mix(in srgb,var(--c) 14%,transparent);box-shadow:inset 4px 0 0 var(--c)}
 .stile .ic{font-size:20px;line-height:1;width:26px;text-align:center}.stile b{display:block;font-size:14px;color:var(--c)}.stile small{display:block;color:var(--mute,#64748b);font-size:12px;margin-top:1px}
+tr.tot td.dn:hover,tr.tot .dn:hover{background:rgba(255,255,255,.18)!important;color:#fff!important}
+main caption.scap{text-align:left;padding-left:12px}
 </style>
 </head>
 <body>
@@ -369,7 +371,7 @@ const S = { user:null, settings:{}, schools:{}, strength:{}, recentTx:[], transf
 const me = () => S.user || {};
 const role = () => me().role;
 const isSA = () => role()==="superadmin";
-const canEnter = code => isSA() || (role()==="clerk" && me().school===code);
+const canEnter = code => isSA() || role()==="hq" || (role()==="clerk" && me().school===code);
 const mySchool = () => me().school && me().school!=="ALL" ? me().school : null;
 const SCH = () => S.asOf?.schools || S.schools;          // schools as they were on an "as on" date, else live
 const STR = () => S.asOf?.strength || S.strength;
@@ -543,16 +545,17 @@ function fsFail(e){ const msg=String(e?.message||e||""); if(!/INTERNAL ASSERTION
 addEventListener("unhandledrejection", e=>fsFail(e.reason)); addEventListener("error", e=>fsFail(e.error||e.message));
 setTimeout(()=>{ try{ sessionStorage.removeItem("apeis_fsfail"); }catch(x){} }, 10*60e3);
 /* every student write also updates that school's small search index (stuIdx/{school}.i.{id}) — 6 small documents instead of thousands of reads */
-const IDX_F = ["admNo","name","father","cl","sec","gender","cat","status","fatherCnic","contact","dob","bform","motherCnic","contact2","fatherRank","unit","serviceNo","cv","pType","mother","guardian","guardianRel","guardianCnic","dup","dupOk","eyes","height","weight","allergies","disability","ver","medDate","vacc","medication"];
+const IDX_F = ["admNo","name","father","cl","sec","gender","cat","status","fatherCnic","contact","dob","bform","motherCnic","contact2","fatherRank","unit","serviceNo","cv","pType","mother","guardian","guardianRel","guardianCnic","dup","dupOk","eyes","height","weight","allergies","disability","ver","medDate","vacc","medication","vreq"];
 const IDX_SEP = "\u001f";
 const idxArr = r => IDX_F.map(k=>r[k]===DEL||r[k]==null?"":String(r[k]).replace(/\u001f/g," ")).join(IDX_SEP);
 const idxObj = (id, school, a) => { if(typeof a==="string") a=a.split(IDX_SEP); const o={id,school}; IDX_F.forEach((k,i)=>o[k]=(a&&a[i])||""); if(o.contact) o.contact=fmtPhones(o.contact); if(o.contact2) o.contact2=fmtPhones(o.contact2); return o; };
 function idxFind(id){ for(const [sc,m] of Object.entries(S.idx||{})) if(m[id]) return idxObj(id,sc,m[id]); return null; }
 function addIdxOps(ops){ if(ops.noIdx) return;
   const add=(school,id,v)=>ops.set.push({col:"stuIdx",id:school,data:{i:{[id]:v}},merge:"deep",_idx:1});
-  const full=id=>{ for(const L of Object.values(S.stu)){ const r=L.rows.find(r=>r.id===id); if(r) return r; } return idxFind(id); };
-  for(const x of [...ops.set]) if(x.col==="students"){ const base=x.merge?full(x.id)||{}:{}; const r={...base,...x.data}; if(r.school) add(r.school,x.id,idxArr(r)); }
-  for(const x of ops.upd) if(x.col==="students"){ const base=full(x.id); if(!base) continue; const r={...base,...x.data}; add(r.school,x.id,idxArr(r)); if(x.data.school && base.school && x.data.school!==base.school) add(base.school,x.id,DEL); }
+  const cur={}, full=id=>{ if(cur[id]) return cur[id]; for(const L of Object.values(S.stu)){ const r=L?.rows?.find(r=>r.id===id); if(r) return r; } return idxFind(id); };
+  const keep=(id,r)=>{ const o={...r}; for(const k in o) if(o[k]===DEL) delete o[k]; cur[id]=o; return o; };
+  for(const x of [...ops.set]) if(x.col==="students"){ const base=x.merge?full(x.id)||{}:{}; const r=keep(x.id,{...base,...x.data}); if(r.school) add(r.school,x.id,idxArr(r)); }
+  for(const x of ops.upd) if(x.col==="students"){ const base=full(x.id); if(!base) continue; const r=keep(x.id,{...base,...x.data}); add(r.school,x.id,idxArr(r)); if(x.data.school && base.school && x.data.school!==base.school) add(base.school,x.id,DEL); }
   for(const x of ops.del||[]) if(x.col==="students"){ const base=full(x.id); if(base) add(base.school,x.id,DEL); }
 }
 function txToOps(ops, tx){
@@ -590,7 +593,7 @@ const Local = {
     S.settings = st.settings.app || {}; S.schools = st.schools;
     S.strength = Object.fromEntries(Object.entries(st.strength).map(([k,v])=>[k,{d:v.d||{},w:v.w||{},c:v.c||{}}]));
     S.recentTx = V("transactions").map(t=>({...t, atMs:toMs(t.at)})).filter(t=>t.atMs>=cut).sort((a,b)=>b.atMs-a.atMs);
-    S.transfers = V("transfers").filter(t=>["pending","rejected"].includes(t.status)).map(t=>({...t, atMs:toMs(t.at)}));
+    S.transfers = V("transfers").filter(t=>["pending","rejected","accept_wait"].includes(t.status)).map(t=>({...t, atMs:toMs(t.at)}));
     S.waiting = V("waiting").filter(w=>w.session===session()&&!w.deleted).map(w=>({...w, atMs:toMs(w.at)}));
     S.users = Object.values(st.users);
     S.snapshots = V("snapshots").sort((a,b)=>a.day.localeCompare(b.day));
@@ -668,7 +671,7 @@ const Fire = {
     on(m.collection(db,"strength"), q=>{ S.strength=Object.fromEntries(q.docs.map(d=>{ const x=d.data(); return [d.id,{d:x.d||{},w:x.w||{},c:x.c||{}}]; })); got("strength"); refresh(); });
     on(m.query(m.collection(db,"transactions"), m.where("at",">=", m.Timestamp.fromMillis(Date.now()-8*864e5))),
        q=>{ S.recentTx=q.docs.map(d=>{const x=data(d); x.atMs=toMs(x.at); return x;}).sort((a,b)=>b.atMs-a.atMs); refresh(); });
-    on(m.query(m.collection(db,"transfers"), m.where("status","in",["pending","rejected"])),
+    on(m.query(m.collection(db,"transfers"), m.where("status","in",["pending","rejected","accept_wait"])),
        q=>{ S.transfers=q.docs.map(d=>{const x=data(d); x.atMs=toMs(x.at); return x;}); refresh(); });
     on(m.collection(db,"waiting"), q=>{ this.waitAll=q.docs.map(d=>{const x=data(d); x.atMs=toMs(x.at); return x;}); waitNow(); refresh(); });
     on(m.query(m.collection(db,"snapshots"), m.where("day",">=", isoDay(Date.now()-400*864e5))), q=>{ S.snapshots=q.docs.map(data).sort((a,b)=>a.day.localeCompare(b.day)); refresh(); });
@@ -765,7 +768,7 @@ function patchStuCache(ops){
    ===================================================================== */
 const NAV = [
   ["dash","Dashboard",()=>true],
-  ["entry","Entry",()=>isSA()||role()==="clerk"],
+  ["entry","Entry",()=>isSA()||role()==="hq"||role()==="clerk"],
   ["students","Students",()=>true],
   ["waiting","Applicants",()=>role()!=="viewer"],
   ["transfers","Transfers",()=>role()!=="viewer"],
@@ -803,7 +806,7 @@ function applyRoute(force){
 }
 function goBack(){ if(S.navStack.length>1) history.back(); else go(homeView()); }
 
-function boot(){ setTimeout(actLogin,1200);
+function boot(){ setTimeout(actLogin,1200); setTimeout(()=>{ if(S.user&&role()!=="viewer") apprLoad(); },1500);
   const app=$("#app"); applyTheme();
   if(!S.ready){ app.innerHTML=`<div class="login"><div class="panel">Loading…</div></div>`; return; }
   if(!S.user){ app.innerHTML = loginHtml(); return; }
@@ -833,7 +836,7 @@ function boot(){ setTimeout(actLogin,1200);
 function navHtml(){
   const inc=S.transfers.filter(t=>t.status==="pending" && (isSA()||role()==="hq"||t.to===mySchool())).length;
   const back=S.navStack.length>1||HIDDEN.some(x=>x[0]===S.view);
-  return NAV.filter(n=>n[2]()).map(([k,l])=>`<a href="#${k}" class="${S.view===k?"on":""}">${l}${k==="transfers"&&inc?`<span class="badge">${inc}</span>`:""}</a>`).join("")+
+  return NAV.filter(n=>n[2]()).map(([k,l])=>`<a href="#${k}" class="${S.view===k?"on":""}">${l}${k==="transfers"&&inc?`<span class="badge">${inc}</span>`:""}${k==="approvals"&&canDecide()&&apprPending().length?`<span class="badge">${apprPending().length}</span>`:""}</a>`).join("")+
     (back?`<button class="navback" data-act="back" title="Back to where you came from (Alt+←)">← Back</button>`:"");
 }
 function renderView(){
@@ -982,7 +985,7 @@ function consTable(codes){
 }
 
 /* ---------- Entry (clerk / super admin) — includes manual waiting counts + Excel import ---------- */
-const entrySchool = () => isSA() ? (S.entrySchool || schoolList()[0]?.code) : mySchool();
+const entrySchool = () => canDecide() ? (S.entrySchool || schoolList()[0]?.code) : mySchool();
 function csOptions(code){ const sc=S.schools[code]; if(!sc) return [];
   return sc.classes.flatMap(c=>c.secs.map(x=>({cl:c.cl,s:x.s,label:`${c.cl} - ${x.s}`,keys:[norm(c.cl+x.s),norm(arab(c.cl)+x.s),norm(arab(c.cl)+x.s.replace(/-.*/,""))]}))); }
 function csMatch(code,q){ const o=csOptions(code); q=norm(q); if(!q) return o;
@@ -992,7 +995,7 @@ const entryActions = () => actions().filter(a=>a.on!==false);
 VIEWS.entry = {
   shell(){ const code=entrySchool(); if(!code||!S.schools[code]) return `<div class="panel empty">No school assigned to your account.</div>`;
     return `<div id="eStat"></div><div class="panel"><div class="ph"><h2>Fast entry — ${h(code)} ${h(S.schools[code].name)}</h2>
-      <div class="pills"><button class="btn" data-act="formDlg" title="Photograph a parent's handwritten form; the portal fills this entry for you to check">📷 Read admission form</button>${isSA()?`<select class="in" style="width:auto" data-chg="entrySchool">${schoolList().map(s=>`<option value="${h(s.code)}" ${s.code===code?"selected":""}>${h(s.code)} — ${h(s.name)}</option>`).join("")}</select>`:""}</div></div>
+      <div class="pills"><button class="btn" data-act="formDlg" title="Photograph a parent's handwritten form; the portal fills this entry for you to check">📷 Read admission form</button>${canDecide()?`<select class="in" style="width:auto" data-chg="entrySchool">${schoolList().map(s=>`<option value="${h(s.code)}" ${s.code===code?"selected":""}>${h(s.code)} — ${h(s.name)}</option>`).join("")}</select>`:""}</div></div>
       <form data-form="entry" class="entry" autocomplete="off"><div class="grid">
         <div class="f"><label for="fAct">Action</label><select id="fAct" data-chg="entryAct">${entryActions().map(a=>`<option value="${h(a.code)}">${h(a.label)} (${KIND_D[a.kind]>0?"+1":KIND_D[a.kind]<0?"−1":"0"})</option>`).join("")}</select></div>
         <div class="f"><label for="fDate">Date</label><input id="fDate" type="date" value="${isoDay(Date.now())}" max="${isoDay(Date.now())}"></div>
@@ -1050,15 +1053,15 @@ function entryAdmLookup(){
 }
 const tTime = t => t.effMs || t.atMs;
 function txLabel(t){ const d=AD(t.action); const cls=d>0?"t-in":d<0?"t-out":"t-mid"; return `<span class="tag ${cls}">${h(AL(t.action))}</span>`; }
-function canVoid(t){ if(t.status!=="ok" || (t.action==="APEI_OUT" && t.tfrId)) return false; if(isSA()||role()==="hq") return true;
+function canVoid(t){ if(t.status!=="ok") return false; if(t.action==="APEI_OUT" && t.tfrId){ const tr=S.transfers.find(x=>x.id===t.tfrId); return (isSA()||role()==="hq") && (!tr || ["pending","rejected"].includes(tr.status)); } if(isSA()||role()==="hq") return true;
   return role()==="clerk" && (t.by===me().uid||(me().prevUids||[]).includes(t.by)) && !t.tfrId && Date.now()-t.atMs < voidMinutes()*60e3; }
 const TX_ST = { pending:["t-mid","waiting for approval"], rejected:["t-out","rejected"], cancelled:["t-n","cancelled"], void:["t-out","void"] };
 function txTable(rows, actions, sel){
   if(!rows.length) return `<div class="empty">No entries.</div>`;
   return `<table><tr>${sel?`<th><input type="checkbox" data-selall="1" title="Select all" style="width:18px;height:18px"></th>`:""}<th>#</th><th>Date</th><th>Entered</th><th>School</th><th>Action</th><th>Class – Sec</th><th>Student</th><th>Father</th><th>G/B</th><th>Category</th><th>Adm No</th><th>By</th><th>Remarks</th>${actions?"<th></th>":""}</tr>${rows.map((t,ti)=>{ const ts=TX_ST[t.status];
     return `<tr class="click ${["void","rejected","cancelled"].includes(t.status)?"void":""}" data-act="openTx" data-id="${h(t.id)}" title="Open this student's record">${sel?`<td><input type="checkbox" data-sel="${h(t.id)}" style="width:18px;height:18px"></td>`:""}<td class="mute">${ti+1}</td><td>${fmtD(tTime(t))}</td><td class="mute">${fmtDT(t.atMs)}</td><td>${h(t.school)}</td><td>${txLabel(t)}</td><td>${h(t.cl)} - ${h(t.sec)}${t.toSec?` → ${h(t.toSec)}`:""}${t.toSchool?` → ${h(t.toSchool==="__other"?t.ext:t.toSchool)}`:""}${t.fromSchool?` ← ${h(t.fromSchool)}`:""}${t.action==="APEI_IN"&&t.ext?` ← ${h(t.ext)}`:""}</td>
-    <td>${h(t.name)}</td><td>${h(t.father)}</td><td>${t.gender==="g"?"G":"B"}</td><td>${h(catLabel(t.cat))}</td><td>${h(t.admNo)}</td><td>${h(t.byName)}</td><td>${h(t.remarks)}${ts?` <span class="tag ${ts[0]}">${ts[1]}${t.voidReason||t.rejReason?": "+h(t.voidReason||t.rejReason):""}</span>`:""}${t.status==="ok"&&t.rev===false?` <span class="tag t-mid">not reviewed</span>`:""}${t.approvedBy?` <span class="mute" title="approved ${h(fmtDT(toMs(t.approvedAt)))}">✓ ${h(t.approvedBy)}</span>`:""}</td>
-    ${actions?`<td>${canVoid(t)?`<button class="btn s r" data-act="voidTx" data-id="${h(t.id)}">${isSA()||role()==="hq"?"Void":"Undo"}</button>`:t.status==="pending"&&t.by===me().uid?`<button class="btn s" data-act="txCancel" data-id="${h(t.id)}">Cancel</button>`:""}</td>`:""}</tr>`; }).join("")}</table>`;
+    <td>${h(t.name)}</td><td>${h(t.father)}</td><td>${t.gender==="g"?"G":"B"}</td><td>${h(catLabel(t.cat))}</td><td>${h(t.admNo)}</td><td>${h(t.byName)}${hqUids().has(t.by)?` <span class="tag t-mid" title="Entered by the DQ Office itself — not through Approvals">DQ entry</span>`:""}</td><td>${h(t.remarks)}${ts?` <span class="tag ${ts[0]}">${ts[1]}${t.voidReason||t.rejReason?": "+h(t.voidReason||t.rejReason):""}</span>`:""}${t.status==="ok"&&t.rev===false?` <span class="tag t-mid">not reviewed</span>`:""}${t.approvedBy?` <span class="mute" title="approved ${h(fmtDT(toMs(t.approvedAt)))}">✓ ${h(t.approvedBy)}</span>`:""}</td>
+    ${actions?`<td style="white-space:nowrap">${canDecide()&&t.status==="ok"&&!t.tfrId?`<button class="btn s" data-act="txFix" data-id="${h(t.id)}" title="Correct this entry">✎</button> `:""}${canVoid(t)?`<button class="btn s r" data-act="voidTx" data-id="${h(t.id)}">${isSA()||role()==="hq"?"Void":"Undo"}</button>`:t.status==="pending"&&t.by===me().uid?`<button class="btn s" data-act="txCancel" data-id="${h(t.id)}">Cancel</button>`:""}</td>`:""}</tr>`; }).join("")}</table>`;
 }
 
 function wireCombo(){
@@ -1142,8 +1145,8 @@ VIEWS.transfers = {
   shell:()=>`<div class="panel"><h2>Incoming — waiting for acceptance</h2><div class="scroll" id="tIn"></div></div><div class="panel"><h2>Outgoing — sent by your school</h2><div class="scroll" id="tOut"></div>
    <p class="hint">Transfers between the schools of this portal are two-step: the sender records <b>${h(AL("APEI_OUT"))}</b> (−1 there), the receiver accepts here and picks the section (+1 there). Transfers to or from an APEI outside the portal are a single entry on the Entry tab.</p></div>`,
   regions:{
-    tIn(){ const all=isSA()||role()==="hq"; const Lr=S.transfers.filter(t=>t.status==="pending" && (all || t.to===mySchool()));
-      return tfrTable(Lr, t=>canEnter(t.to)?`<button class="btn s p" data-act="acceptTfr" data-id="${h(t.id)}">Accept</button> <button class="btn s r" data-act="rejectTfr" data-id="${h(t.id)}">Reject</button>`:""); },
+    tIn(){ const all=isSA()||role()==="hq"; const Lr=S.transfers.filter(t=>["pending","accept_wait"].includes(t.status) && (all || t.to===mySchool()));
+      return tfrTable(Lr, t=>t.status==="accept_wait"?`<span class="tag t-mid">accepted — waiting DQ approval</span>${all?` <button class="btn s" data-act="go" data-id="approvals">Open Approvals</button>`:""}`:canEnter(t.to)?`<button class="btn s p" data-act="acceptTfr" data-id="${h(t.id)}">Accept</button> <button class="btn s r" data-act="rejectTfr" data-id="${h(t.id)}">Reject</button>`:""); },
     tOut(){ const all=isSA()||role()==="hq"; const Lr=S.transfers.filter(t=>all || t.from===mySchool());
       return tfrTable(Lr, t=>canEnter(t.from)?`<button class="btn s r" data-act="cancelTfr" data-id="${h(t.id)}">${t.status==="rejected"?"Restore student":"Cancel transfer"}</button>`:""); }
   }
@@ -1227,7 +1230,7 @@ VIEWS.log = {
     ${t==="rev"?`<div class="f"><label for="lgRv">Show</label><select id="lgRv" data-chg="logAuto"><option value="">Waiting for a decision</option><option value="dec" ${p.rv==="dec"?"selected":""}>Decided (approved / rejected)</option><option value="all" ${p.rv==="all"?"selected":""}>All entries</option></select></div>`:""}
     ${t==="tx"?`<div class="f"><label for="lgSt">Status</label><select id="lgSt" data-chg="logAuto"><option value="">All entries</option>${[["ok","Counted"],["void","Voided only"],["rejected","Rejected only"],["pending","Waiting for approval"]].map(([k,l])=>`<option value="${k}" ${p.st===k?"selected":""}>${l}</option>`).join("")}</select></div>`:""}
     ${t==="tx"?`<div class="f"><label for="lgAct">Action</label><select id="lgAct" data-chg="logAuto"><option value="">All</option>${actions().map(a=>`<option value="${h(a.code)}" ${p.act===a.code?"selected":""}>${h(a.label)}</option>`).join("")}</select></div>`:""}
-    ${t!=="acc"&&isSA()?`<div class="f"><label for="lgBy">Entered by (account)</label><select id="lgBy" data-chg="logAuto"><option value="">All accounts</option>${userOpts(p.by)}</select></div>`:""}
+    ${t!=="acc"&&isSA()?`<div class="f"><label for="lgBy">Entered by (account)</label><select id="lgBy" data-chg="logAuto"><option value="">All accounts</option><option value="__hq" ${p.by==="__hq"?"selected":""}>★ All DQ Office entries</option>${userOpts(p.by)}</select></div>`:""}
     ${t!=="acc"?`<div class="f"><label for="lgQ">Search name / adm no</label><input id="lgQ" value="${h(p.q||"")}" data-chg="logAuto"></div>`:""}
     ${t==="tx"&&isSA()?`<label class="ck"><input type="checkbox" id="lgNoSA" data-chg="logAuto" ${p.sa?"":"checked"}> hide Super Admin's own entries</label>`:""}
     <button class="btn" hidden>Show</button></form></div>
@@ -1240,13 +1243,13 @@ VIEWS.log = {
     if(t==="sys") return sysHtml();
     if(!S.logRows) return `<div class="empty">Loading…</div>`; const r=logFiltered(), sel=isSA()||role()==="hq";
     if(t==="rev") return reviewHtml(r);
-    return `<div class="ph" style="margin-bottom:6px"><p class="hint" style="margin:0">${r.length} entries · ${r.filter(t=>t.status==="void").length} voided${sel?" · tick entries (or the box in the heading for all) to void several at once":""}</p>${sel?`<button class="btn s r" data-act="bulkVoid">Void selected</button>`:""}</div>`+txTable(r,true,sel); } },
+    return `<div class="ph" style="margin-bottom:6px"><p class="hint" style="margin:0">${r.length} entries · ${r.filter(t=>t.status==="void").length} voided${sel?" · tick entries (or the box in the heading for all) to void several at once":""}</p><div class="pills">${sel?`<button class="btn s r" data-act="bulkVoid">Void selected</button>`:""}${isSA()?`<button class="btn s r" data-act="txPurge" title="Only entries already voided, rejected or cancelled">🗑 Delete selected for ever</button>`:""}</div></div>`+txTable(r,true,sel); } },
   after(){ runLog(); }
 };
 function logFiltered(){ const sch=$("#lgSch")?.value, act=$("#lgAct")?.value, by=$("#lgBy")?.value, noSA=$("#lgNoSA")?.checked, q=norm($("#lgQ")?.value||""), sa=new Set(S.users.filter(u=>u.role==="superadmin").map(u=>u.uid));
-  const byU=by?S.users.find(u=>u.uid===by):null, bys=new Set(by?[by,...(byU?.prevUids||[])]:[]);
+  const byU=by&&by!=="__hq"?S.users.find(u=>u.uid===by):null, bys=new Set(by==="__hq"?S.users.filter(u=>u.role==="hq").flatMap(u=>[u.uid,...(u.prevUids||[])]):by?[by,...(byU?.prevUids||[])]:[]);
   const rv=$("#lgRv")?.value; const tab=logTab(), stF=$("#lgSt")?.value||"";
-  return (S.logRows||[]).filter(t=>(!stF||tab!=="tx"||t.status===stF)&&(tab!=="rev"||rv==="all"||(rv==="dec"?(!!t.approvedBy||t.status==="rejected"||t.rev===true):(t.status==="pending"||(t.status==="ok"&&t.rev===false))))&&(!sch||t.school===sch)&&(!act||t.action===act)&&(!by||bys.has(t.by))&&(!noSA||!sa.has(t.by)||!isSA())&&(!q||norm(t.name+t.admNo+t.father).includes(q))); }
+  return (S.logRows||[]).filter(t=>(!stF||tab!=="tx"||t.status===stF)&&(tab!=="rev"||rv==="all"||(rv==="dec"?(!!t.approvedBy||t.status==="rejected"||t.rev===true):(t.status==="pending"||(t.status==="ok"&&t.rev===false))))&&(!sch||t.school===sch)&&(!act||t.action===act)&&(!by||bys.has(t.by))&&(!noSA||!sa.has(t.by)||!isSA()||t.corrects)&&(!q||norm(t.name+t.admNo+t.father).includes(q))); }
 function accountsModel(){ const sch=$("#lgSch")?.value, U=S.users.length?S.users.filter(u=>u.role!=="superadmin"):[...new Map((S.logRows||[]).map(t=>[t.by,{uid:t.by,name:t.byName,role:"",school:t.school}])).values()];
   const rows=U.filter(u=>(!sch||u.school===sch)&&!u.replacedBy).map(u=>{ const ids=new Set([u.uid,...(u.prevUids||[])]); const T=(S.logRows||[]).filter(t=>ids.has(t.by)), E=(S.editRows||[]).filter(e=>ids.has(e.by)), last=Math.max(0,...T.map(t=>t.atMs),...E.map(e=>toMs(e.at)));
     return {c:[u.name||"",ROLES[u.role]||u.role||"",u.school||"",num(T.filter(t=>t.status==="ok").length,"n"),num(T.filter(t=>t.status==="void").length,"n"),num(E.length,"n"),last?fmtDT(last):"—",u.active===false?"inactive":""]}; });
@@ -1437,7 +1440,7 @@ function stuPageHtml(){ const sp=S.sp; if(!sp) return ""; if(sp.err) return `<di
       ${may?`<label class="btn s" style="margin-top:4px">${ph?"Change":"Add"} photo<input type="file" accept="image/*" capture="user" data-chg="photoOne" hidden></label>`:""}</div>`;
   return `<div class="panel ${ed?"editing":""}"><div class="sp-head" style="align-items:flex-start">${phBox}<div style="flex:1"><h2>${sp.isNew?"Add a student to the data bank":h(r.name)}</h2>
       <div class="sub">${h(code)} — ${h(sc?.name||"")} · ${h(r.cl)}-${h(r.sec)} · ${r.status==="On roll"?"On roll":`<span class="tag t-out">${h(r.status)}</span>`}${r.admNo?` · Adm ${h(r.admNo)}`:""}${r.cat?` · ${h(catLabel(r.cat))}`:""}${fee?` · Monthly fee Rs ${nf(fee)}`:""}</div></div>
-      <div class="pills"><button class="btn" data-act="back">← Back</button>${editBtn}${!sp.isNew?expBar("stuOne")+formBar("one"):""}${!sp.isNew&&canDecide()?`<button class="btn r" data-act="stuDel" data-id="${h(r.id)}" title="Moves the record to Trash; it can be restored">🗑 Move to Trash</button>`:""}</div></div>
+      <div class="pills"><button class="btn" data-act="back">← Back</button>${editBtn}${!sp.isNew?expBar("stuOne")+formBar("one"):""}${!sp.isNew&&r.status==="On roll"&&(canEnter(code)||canDecide())?`<button class="btn" data-act="classReq" title="Move the student to another class (parent's request etc.)">⇅ Change of class</button>`:""}${!sp.isNew&&canDecide()?`<button class="btn r" data-act="stuDel" data-id="${h(r.id)}" title="Moves the record to Trash; it can be restored">🗑 Move to Trash</button>`:""}</div></div>
       ${!sp.isNew?verBox(r,may):""}${r.cv&&!sp.isNew?`<div class="note" style="border-color:#d97706">⚠ <b>Category to re-verify.</b> This school's categories came in against the old list. Check the category${may?` — correct it with ✎ Edit, or if it is already right press <button class="btn s g" data-act="cvOk" data-id="${h(r.id)}">✓ Category is correct</button>`:""}.</div>`:""}
     ${sp.isNew?`<div class="note" style="margin-top:10px">Use this for students already on roll. A <b>new admission</b> should be entered on the Entry tab — that adds the student to strength and creates the record by itself.</div>`:""}
     ${!may&&!sp.isNew?`<p class="hint">Read-only for your account${role()==="clerk"?` — this student belongs to ${h(code)}`:""}.</p>`:""}
@@ -1454,7 +1457,7 @@ function stuPageHtml(){ const sp=S.sp; if(!sp) return ""; if(sp.err) return `<di
     <div class="panel"><h2>Movement history</h2><div class="scroll">${!sp.hist?`<p class="mute">Loading…</p>`:sp.hist.length?txTable(sp.hist,false):`<p class="mute">No admissions, transfers or withdrawals recorded for this student since go-live.</p>`}</div></div>`}`; }
 function stuEditConfirm(){ const r=S.sp?.rec; if(!r||!canEditStu(r)||S.sp.editing) return; if(canEditDirect()){ S.sp.editing=true; fillRegion("spBody",true); return; }
   modal(`<h3>⚠ Edit an official student record?</h3><div class="warnbox"><p style="margin:0 0 6px"><b>${h(r.name)}</b> — ${h(r.school)} ${h(r.cl)}-${h(r.sec)}</p>
-     <p style="margin:0">Only correct genuine mistakes. Every change is saved in the edit log with your name, the time, the old value and the new value, and the Super Admin can see it.</p></div>
+     <p style="margin:0">Only correct genuine mistakes. Every change is saved in the edit log with your name, the time, the old value and the new value, and the Super Admin can see it.</p>${apprOn("field")?`<p style="margin:6px 0 0">Changes to <b>Adm No, name, class, section, gender or category</b> are sent to the DQ Office for approval, with your reason.</p>`:""}</div>
      <div class="row"><button class="btn" data-act="closeModal">Cancel</button><button class="btn r" data-act="stuEditYes">Yes, I want to edit</button></div>`); }
 async function stuSave(f){
   const sp=S.sp, id=f.dataset.id, old=sp.rec, code=old.school, d={};
@@ -1467,8 +1470,11 @@ async function stuSave(f){
   const sc=S.schools[code]; if(!sc.classes.some(c=>c.cl===d.cl&&c.secs.some(x=>x.s===d.sec))){ toast("Pick a class and section that exist.",true); return; }
   if(d.admNo){ const dup=idxAll().find(x=>x.id!==id && x.school===code && norm(x.admNo)===norm(d.admNo)); if(dup){ toast(`Adm No ${d.admNo} already belongs to ${dup.name}.`,true); return; } }
   const ops=opsNew();
-  if(id){ const ch=activeFields().filter(fl=>d[fl.key]!==undefined && String(old[fl.key]??"")!==String(d[fl.key]??"")).map(fl=>({k:fl.key,l:fl.label,from:fl.key==="cat"?catLabel(old[fl.key]):String(old[fl.key]??""),to:fl.key==="cat"?catLabel(d[fl.key]):String(d[fl.key]??"")}));
+  if(id){ let ch=activeFields().filter(fl=>d[fl.key]!==undefined && String(old[fl.key]??"")!==String(d[fl.key]??"")).map(fl=>({k:fl.key,l:fl.label,from:fl.key==="cat"?catLabel(old[fl.key]):String(old[fl.key]??""),to:fl.key==="cat"?catLabel(d[fl.key]):String(d[fl.key]??"")}));
     if(!ch.length){ toast("Nothing was changed."); S.sp.editing=canEditDirect(); fillRegion("spBody",true); return; }
+    if(role()==="clerk" && apprOn("field")){ const mc=ch.filter(c=>MAND.has(c.k)); if(mc.length){ const req=mc.map(c=>({...c,v:d[c.k]})); for(const c of mc) delete d[c.k]; ch=ch.filter(c=>!MAND.has(c.k));
+        apprReasonDlg("Change of main details needs approval",`<p>${req.map(c=>`<b>${h(c.l)}</b>: ${h(c.from||"—")} → <b>${h(c.to)}</b>`).join("<br>")}</p><p class="hint">Adm No, name, class, section, gender and category are changed only after the DQ Office approves.</p>`,why=>apprSend([apprNew("field",old,{changes:req},why)]));
+        if(!ch.length){ S.sp.editing=false; fillRegion("spBody",true); return; } } }
     ops.upd.push({col:"students",id,data:{...d,...(old.cv?{cv:DEL}:{}),updatedAt:TS,updatedBy:me().name||""}});
     ops.set.push({col:"edits",id:newId(),data:{stuId:id,school:code,stuName:d.name||old.name,admNo:d.admNo||old.admNo||"",changes:ch,at:TS,day:isoDay(Date.now()),by:me().uid,byName:me().name||"",role:role()}});
     await DB.apply(ops); toast(`${d.name} updated — ${ch.length} change${ch.length>1?"s":""} logged.`);
@@ -1563,7 +1569,7 @@ function tfrTableHtml(){ const R=tfrList(), X=extraFields("tfrFields"); if(!R.le
      <td>${ed?`<select class="in" data-tf="status" data-id="${h(t.id)}">${tfrSts().map(s=>`<option ${s===t.status?"selected":""}>${h(s)}</option>`).join("")}</select>`:h(t.status)}</td>
      <td>${ed&&role()!=="hq"?`<input class="in" data-tf="remarks" data-id="${h(t.id)}" value="${h(t.remarks)}">`:h(t.remarks)}</td>
      <td>${isSA()||role()==="hq"?`<input class="in" data-tf="dqRemarks" data-id="${h(t.id)}" value="${h(t.dqRemarks)}">`:h(t.dqRemarks)}</td>
-     <td>${isSA()?`<button class="btn s" data-act="tfrEdit" data-id="${h(t.id)}">Edit</button> <button class="btn s r" data-act="tfrDel" data-id="${h(t.id)}">Delete</button>`:""}</td></tr>`; }).join("")}</table>`; }
+     <td class="stick">${ed?`<button class="btn s" data-act="tfrEdit" data-id="${h(t.id)}">✎ Edit</button> <button class="btn s r" data-act="tfrDel" data-id="${h(t.id)}">Remove</button>`:""}</td></tr>`; }).join("")}</table>`; }
 function tfrModels(){ const R=tfrList(), X=extraFields("tfrFields"); return {name:"Transfer_requests",title:"INTER-APEI TRANSFER REQUESTS — BY SENIORITY",sub:[S.params.tch&&"1st choice "+S.params.tch,S.params.tcl&&"Class "+S.params.tcl,S.params.tst||"Pending / Approved"].filter(Boolean).join(" · "),orientation:"landscape",
   models:[tbl(`TRANSFER REQUESTS (${R.length})`,["Seniority","No.","Appl date","Name","Father","Class","G","Category","Contact","Studying at","1st choice","2nd",...X.map(f=>f.label),"Status","Remarks","DQ remarks"],
     R.map(t=>({c:[String(t.rank||""),t.id,isoToDmy(t.appDate),t.name,t.father||"",t.cl,gTxt(t.gender),catLabel(t.cat),t.contact||"",t.curSchool==="__other"?t.curExt||"Other APEI":t.curSchool,t.choice1,t.choice2||"",...X.map(f=>String((t.x||{})[f.key]??"")),t.status,t.remarks||"",t.dqRemarks||""]})))]}; }
@@ -2273,6 +2279,9 @@ function notes(){ const out=[], today=isoDay(Date.now()), seen=seenSet();
   const inc=S.transfers.filter(t=>t.status==="pending" && (canDecide()||t.to===mySchool())); if(inc.length) out.push({id:"tf", urgent:role()==="clerk", html:`🔁 ${inc.length} inter-APEI transfer${inc.length>1?"s":""} waiting to be accepted`, go:"transfers"});
   if(canDecide()){ const late=todayStatus().filter(x=>x.state==="none"); if(late.length) out.push({id:"late_"+today, urgent:false, html:`⏰ Past the ${h(ST().dailyDeadline||"09:00")} deadline with nothing entered: ${late.map(x=>h(x.code)).join(", ")}`, go:"dash"}); }
   if(canDecide()&&canSeeStudents()){ const n=dupGroups().filter(g=>g.flagged).length; if(n) out.push({id:"dup", urgent:true, html:`👥 ${n} possible duplicate entr${n===1?"y":"ies"} saved by clerks — please review`, go:"students", gop:"tab=dup"}); }
+  if(isSA()){ const d=(S.recentTx||[]).filter(t=>hqUids().has(t.by)&&t.atMs>Date.now()-3*864e5); if(d.length) out.push({id:"hq_"+d.map(t=>t.id).sort().join("").slice(-24), urgent:!seen.has("hq_"+d.map(t=>t.id).sort().join("").slice(-24)), html:`★ ${d.length} entr${d.length>1?"ies":"y"} made by the DQ Office itself in the last 3 days`, go:"log", gop:"by=__hq&from="+isoDay(Date.now()-2*864e5)}); }
+  if(canDecide()){ const n=apprPending().length; if(n) out.push({id:"appr", urgent:true, html:`✅ ${n} request${n>1?"s":""} from schools waiting for your approval`, go:"approvals"}); }
+  if(role()==="clerk") for(const a of (S.apprs||[]).filter(a=>a.status!=="pending"&&a.by===me().uid)) out.push({id:"ap_"+a.id, urgent:!seen.has("ap_"+a.id), html:`${a.status==="approved"?"✅ Approved":a.status==="returned"?"↩ Returned for correction":"❌ Not approved"}: ${h(APPR_T[a.type]?.[0]||a.type)} — ${h(a.stuName)}${a.decNote?`<br><span class="mute">${h(a.decidedByName||"")}: ${h(a.decNote)}</span>`:""}`, go:"approvals"});
   return out; }
 const seenSet = () => { try{ return new Set(JSON.parse(localStorage.getItem("apeis_seen")||"[]")); }catch(e){ return new Set(); } };
 function bellPaint(){ const b=$("#bellN"); if(!b) return; const N=notes(), n=N.filter(x=>x.urgent).length; b.textContent=n||""; b.hidden=!n; const L=$("#bellList"); if(L && !L.hidden) L.innerHTML=bellHtml(N); }
@@ -2423,7 +2432,7 @@ function progRows(){ const dl=ST().dbDeadline||{}; return schoolList().map(s=>{ 
   const full=R.filter(stuFull).length; return {s, st, n:R.length, inc, full, ver:R.filter(r=>r.ver).length, pfull:R.length?full/R.length*100:0, cv:R.filter(r=>r.cv).length, pf, pc, d, left, done:pf>=99.5&&inc===0}; }); }
 function progHtml(){ const P=progRows();
   return `<h3 style="margin:4px 0 8px;font-size:16px">Progress & deadlines</h3><div class="scroll"><table><tr><th>School</th><th class="n">Strength</th><th class="n">In data bank</th><th style="min-width:160px">Filled</th><th class="n">Required fields filled</th><th class="n">Every field filled</th><th class="n">Verified</th><th class="n">Category to re-verify</th><th>Deadline</th><th>Status</th></tr>
-   ${P.map(x=>`<tr><td><b>${h(x.s.code)}</b> <span class="mute">${h(x.s.name)}</span></td><td class="n">${nf(x.st)}</td><td class="n">${nf(x.n)}</td><td><div class="bar" style="margin:0"><i style="width:${Math.min(100,x.pf).toFixed(1)}%" class="${x.pf<50?"over":""}"></i></div><span class="mini">${x.pf.toFixed(1)}%</span></td><td class="n">${x.n?x.pc.toFixed(1)+"%":"–"}</td><td class="n">${x.n?`<b class="${x.pfull<100?"neg":"pos"}">${x.pfull.toFixed(1)}%</b> <span class="mute">(${nf(x.full)})</span>`:"–"}</td><td class="n">${x.n?`${(x.ver/x.n*100).toFixed(1)}% <span class="mute">(${nf(x.ver)})</span>`:"–"}</td><td class="n">${x.cv?`<span class="dn neg" data-act="go" data-id="find" data-p="${h(qs({school:x.s.code,cv:"1",st:"On roll"}))}">${nf(x.cv)}</span>`:""}</td>
+   ${P.map(x=>`<tr class="click" data-act="ckSchool" data-id="${h(x.s.code)}" title="Click for this school's students and sections"><td><b>${h(x.s.code)}</b> <span class="mute">${h(x.s.name)}</span> ›</td><td class="n">${nf(x.st)}</td><td class="n">${nf(x.n)}</td><td><div class="bar" style="margin:0"><i style="width:${Math.min(100,x.pf).toFixed(1)}%" class="${x.pf<50?"over":""}"></i></div><span class="mini">${x.pf.toFixed(1)}%</span></td><td class="n">${x.n?x.pc.toFixed(1)+"%":"–"}</td><td class="n">${x.n?`<b class="${x.pfull<100?"neg":"pos"}">${x.pfull.toFixed(1)}%</b> <span class="mute">(${nf(x.full)})</span>`:"–"}</td><td class="n">${x.n?`${(x.ver/x.n*100).toFixed(1)}% <span class="mute">(${nf(x.ver)})</span>`:"–"}</td><td class="n">${x.cv?`<span class="dn neg" data-act="go" data-id="find" data-p="${h(qs({school:x.s.code,cv:"1",st:"On roll"}))}">${nf(x.cv)}</span>`:""}</td>
      <td>${isSA()||role()==="hq"?`<input type="date" class="in" style="width:auto;min-height:30px" value="${h(x.d)}" data-chg="dbDeadline" data-k="${h(x.s.code)}">`:x.d?fmtD(Date.parse(x.d+"T12:00")):"—"}</td>
      <td>${x.done?`<span class="tag t-in">✓ complete</span>`:x.d?(x.left<0?`<span class="tag t-out">overdue ${-x.left} day${x.left===-1?"":"s"}</span>`:`<span class="tag t-mid">${x.left} day${x.left===1?"":"s"} left</span>`):`<span class="mute">no deadline</span>`}</td></tr>`).join("")}</table></div>`; }
 const missingOf = r => fullFields(r).filter(k=>!MED_KEYS.has(k)&&!String(r[k]??"").trim()).map(k=>stuFields().find(f=>f.key===k)?.label||k);
@@ -2433,10 +2442,10 @@ function chkHtml(){ if(!schoolList().every(s=>stuOf(s.code))) return `<p class="
   const ALL=schoolList().flatMap(s=>(stuOf(s.code)||[]).filter(r=>r.status==="On roll"&&(!chkScope().code||r.school===chkScope().code))), FULL=ALL.filter(stuFull).length, VER=ALL.filter(r=>r.ver).length;
   const pc=(a,b)=>b?(a/b*100).toFixed(1):"0", show=p.ckShow==="all"?R:R.filter(r=>!r.ok), open=S.ckOpen, L1=p.ckList;
   const K=(k,lab,val,sub,cls)=>`<div class="kpi click ${L1===k?"kg3":""}" data-act="ckList" data-id="${k}" role="button" tabindex="0" title="Click for the list of these students"><span>${lab}</span><b class="${cls||""}">${val}</b><i>${sub}</i></div>`;
-  const list = L1&&CKL[L1] ? (()=>{ const X=sortStu(ALL.filter(CKL[L1][1])); return `<div class="panel" style="border:2px solid #7c3aed"><div class="ph"><h3 style="margin:0">${h(CKL[L1][0])} — ${nf(X.length)} students</h3><div class="pills">${L1==="unver"&&X.length?`<button class="btn s g" data-act="ckVerAll">✓ Mark all ${nf(Math.min(X.length,500))} shown as verified</button>`:""}<button class="btn s" data-act="ckList" data-id="">Close list ✕</button></div></div>
+  const list = L1&&CKL[L1] ? (()=>{ const X=sortStu(ALL.filter(CKL[L1][1])); return `<div class="panel" style="border:2px solid #7c3aed"><div class="ph"><h3 style="margin:0">${h(CKL[L1][0])} — ${nf(X.length)} students</h3><div class="pills">${L1==="unver"&&X.length?`<button class="btn s g" data-act="ckVerAll">${role()==="clerk"?"Send all shown for verification":`✓ Mark all ${nf(Math.min(X.length,500))} shown as verified`}</button>`:""}<button class="btn s" data-act="ckList" data-id="">Close list ✕</button></div></div>
      <p class="hint" style="margin-top:0">Click a student to open the full record and correct it.${L1==="unver"?" Verify only after checking the record against the school register / admission form.":""}</p>
      <div class="scroll" style="max-height:520px;overflow:auto"><table><tr><th>#</th><th>School</th><th>Class – Sec</th><th>Adm No</th><th>Name</th><th>Father / Guardian</th><th>G/B</th><th>Category</th><th>Missing</th><th>Verified</th></tr>
-     ${X.slice(0,1500).map((r,i)=>`<tr class="click" data-act="openStu" data-id="${h(r.id)}"><td class="mute">${i+1}</td><td>${h(r.school)}</td><td>${h(r.cl)}-${h(r.sec)}</td><td>${h(r.admNo)}</td><td><b>${h(r.name)}</b></td><td>${h(parentOf(r))}</td><td>${gTxt(r.gender)}</td><td>${h(catLabel(r.cat))}</td><td class="neg" style="white-space:normal;min-width:180px">${r.cv?"Category to re-verify; ":""}${h(missingOf(r).join(", "))}</td><td>${r.ver?`<span class="pos">✓ ${h(String(r.ver).split("|")[0])}</span>`:""}</td></tr>`).join("")}</table>${X.length>1500?`<p class="hint">First 1,500 shown — choose one school above.</p>`:""}</div></div>`; })() : "";
+     ${X.slice(0,1500).map((r,i)=>`<tr class="click" data-act="openStu" data-id="${h(r.id)}"><td class="mute">${i+1}</td><td>${h(r.school)}</td><td>${h(r.cl)}-${h(r.sec)}</td><td>${h(r.admNo)}</td><td><b>${h(r.name)}</b></td><td>${h(parentOf(r))}</td><td>${gTxt(r.gender)}</td><td>${h(catLabel(r.cat))}</td><td class="neg" style="white-space:normal;min-width:180px">${r.cv?"Category to re-verify; ":""}${h(missingOf(r).join(", "))}</td><td>${r.ver?`<span class="pos">✓ ${h(String(r.ver).split("|")[0])}</span>`:r.vreq?`<span class="tag t-mid">waiting DQ</span>`:""}</td></tr>`).join("")}</table>${X.length>1500?`<p class="hint">First 1,500 shown — choose one school above.</p>`:""}</div></div>`; })() : "";
   const det=r=>{ const keys=[...new Set([...Object.keys(r.sm.cat),...Object.keys(r.bc)])].sort((a,b)=>(catNo(a)||99)-(catNo(b)||99)), B=sortStu((stuOf(r.school)||[]).filter(x=>x.status==="On roll"&&x.cl===r.cl&&x.sec===r.sec)), may=canEditStu({school:r.school});
     return `<tr id="ckDet"><td colspan="9" style="background:var(--soft);white-space:normal"><div class="pills" style="margin-bottom:6px">${keys.map(k=>{ const a=r.sm.cat[k]||0, b=r.bc[k]||0; return `<span class="fchip ${a!==b?"neg":""}" title="summary ${a} · data bank ${b}">${h(catLabel(k)||k)}: <b>${a}</b> / ${b}</span>`; }).join("")||`<span class="mute">No category figures.</span>`}</div>
       <p class="mute" style="margin:0 0 6px">Chips: summary / data bank. ${r.bg!==r.sm.g?`<b class="neg">Girls: summary ${r.sm.g}, data bank ${r.bg}.</b> `:""}${r.sm.est?`The girls/boys split of this section is an <b>estimate</b> from the category sheet — if the data bank is right, correct it in Setup → Opening strength.`:""}</p>
@@ -2445,7 +2454,7 @@ function chkHtml(){ if(!schoolList().every(s=>stuOf(s.code))) return `<p class="
         <td>${may?`<select class="in" style="width:auto;min-height:28px;padding:1px 4px" data-q="${h(x.id)}" data-f="gender"><option value="b" ${x.gender!=="g"?"selected":""}>B</option><option value="g" ${x.gender==="g"?"selected":""}>G</option></select>`:gTxt(x.gender)}</td>
         <td>${may?`<select class="in" style="width:auto;max-width:230px;min-height:28px;padding:1px 4px" data-q="${h(x.id)}" data-f="cat">${catOptions(x.cat,"—")}</select>`:h(catLabel(x.cat))}</td>
         <td class="neg mini" style="white-space:normal;min-width:140px">${x.cv?"category to re-verify; ":""}${h(missingOf(x).join(", "))}</td>
-        <td style="text-align:center">${may?`<input type="checkbox" data-q="${h(x.id)}" data-f="ver" ${x.ver?"checked":""} style="width:18px;height:18px" title="${x.ver?h("Verified by "+String(x.ver).replace("|"," on ")):"Tick after checking this record"}">`:(x.ver?"✓":"")}</td></tr>`).join("")||`<tr><td colspan="8" class="mute">No students of this section in the data bank yet.</td></tr>`}</table></div>
+        <td style="text-align:center">${x.vreq&&!x.ver?`<span class="tag t-mid" title="Sent to the DQ Office">waiting</span> `:""}${may?`<input type="checkbox" data-q="${h(x.id)}" data-f="ver" ${x.ver||x.vreq?"checked":""} style="width:18px;height:18px" title="${x.ver?h("Verified by "+String(x.ver).replace("|"," on ")):"Tick after checking this record"}">`:(x.ver?"✓":"")}</td></tr>`).join("")||`<tr><td colspan="8" class="mute">No students of this section in the data bank yet.</td></tr>`}</table></div>
       ${may&&B.length?`<div class="row" style="justify-content:flex-start;margin-top:6px"><button class="btn p">Save changes to this section</button><button type="button" class="btn s" data-act="ckTickAll">Tick all as verified</button><span class="mute mini">Gender and category changes are kept in the edit log. Strength figures are not changed.</span></div>`:""}</form></td></tr>`; };
   return (mySchool()?"":progHtml())+`<h3 style="margin:14px 0 8px;font-size:16px">${mySchool()?"Your school":"Section by section"} <span class="mute" style="font-weight:400;font-size:13px">— click any box for the list of students</span></h3><div class="kpis">
      ${K("all","In the data bank",nf(T.n),`${pc(T.n,T.sm)}% of strength ${nf(T.sm)}`)}
@@ -2456,7 +2465,7 @@ function chkHtml(){ if(!schoolList().every(s=>stuOf(s.code))) return `<p class="
     ${list}
     <p class="hint"><b>How to work:</b> ① clerks enter every student (Register → Import / Add); ② fill every field; ③ check each record once more against the register and tick <b>✓ Verified</b> (here per section, or on the student's page). A section is <b>complete</b> when its data bank matches its strength exactly — click a red row: its students open right there, change gender or category in place and save.</p>
     <div class="scroll">${show.length?`<table><tr><th>School</th><th>Class – Sec</th><th class="n">Summary</th><th class="n">Data bank</th><th class="n">Diff</th><th class="n">Girls (sum / bank)</th><th class="n">Boys (sum / bank)</th><th class="n">Categories differing</th><th class="n">Incomplete</th></tr>
-      ${show.map(r=>{ const k=r.school+"|"+r.cl+"|"+r.sec; return `<tr class="click ${r.ok?"":"bad"}" data-act="ckOpen" data-id="${h(k)}"><td>${h(r.school)}</td><td><b>${h(r.cl)} - ${h(r.sec)}</b> <span class="mute">${open===k?"▾":"▸"}</span>${r.sm.est?` <span class="tag t-mid" title="girls/boys estimated">est</span>`:""}</td><td class="n">${r.sm.n}</td><td class="n">${r.n}</td><td class="n">${sg(r.n-r.sm.n)}</td>
+      ${show.map(r=>{ const k=r.school+"|"+r.cl+"|"+r.sec; return `<tr class="click ${r.ok?"":"bad"}" data-act="ckOpen" data-id="${h(k)}"><td>${h(r.school)}</td><td><b>${h(r.cl)} - ${h(r.sec)}</b> <span class="mute" style="font-size:12px">${open===k?"▾ close":"▸ open"}</span>${r.sm.est?` <span class="tag t-mid" title="girls/boys estimated">est</span>`:""}</td><td class="n">${r.sm.n}</td><td class="n">${r.n}</td><td class="n">${sg(r.n-r.sm.n)}</td>
         <td class="n ${r.bg!==r.sm.g?"neg":""}">${r.sm.g} / ${r.bg}</td><td class="n ${r.bb!==r.sm.b?"neg":""}">${r.sm.b} / ${r.bb}</td><td class="n ${r.bad.length?"neg":""}">${r.sm.hasCat?r.bad.length:"–"}</td><td class="n ${r.inc?"neg":""}">${r.inc||""}</td></tr>${open===k?det(r):""}`; }).join("")}</table>`:`<div class="empty">Every section matches. ✓</div>`}</div>`; }
 function chkModel(){ const R=chkRows(); return tbl("DATA BANK CHECK",["School","Class – Sec","Summary","Data bank","Diff","Girls summary","Girls bank","Boys summary","Boys bank","Categories differing","Incomplete records","Match"],
   R.map(r=>({c:[r.school,`${r.cl}-${r.sec}`,num(r.sm.n,"n"),num(r.n,"n"),num(r.n-r.sm.n,"sd"),num(r.sm.g,"n"),num(r.bg,"n"),num(r.sm.b,"n"),num(r.bb,"n"),r.bad.map(k=>`${catLabel(k)}: ${r.sm.cat[k]||0}/${r.bc[k]||0}`).join("; "),num(r.inc,"n"),r.ok?"✓":"✕"]}))); }
@@ -2479,9 +2488,8 @@ function catOneHtml(cat, codes){ const rows=[], bySch={}; let tot=0;
     <table><caption class="scap">SCHOOL WISE</caption><tr><th>School</th><th class="n">By strength figures (summary)</th><th class="n">Entered in the data bank</th><th class="n">Difference</th></tr>
       ${codes.map(c=>`<tr><td>${h(c)} — ${h(S.schools[c].name)}</td><td class="n">${nf(bySch[c]||0)}</td><td class="n">${lnk({school:c},rb[c]||0)}</td><td class="n">${sg((rb[c]||0)-(bySch[c]||0))}</td></tr>`).join("")}
       <tr class="tot"><td>${h(L("gtotal"))}</td><td class="n">${nf(tot)}</td><td class="n">${nf(R.length)}</td><td class="n">${sgt(R.length-tot)}</td></tr></table><br>
-    ${catSecHtml(cat,codes,R)}
     <div class="two"><div><table><caption class="scap">CLASS WISE — BY STRENGTH FIGURES</caption><tr><th>School</th><th>Class</th><th class="n">Students</th></tr>${rows.map(r=>`<tr><td>${h(r.c)}</td><td>${h(r.cl)}</td><td class="n">${lnk({school:r.c,cl:r.cl},r.n)}</td></tr>`).join("")||`<tr><td colspan="3" class="mute">None.</td></tr>`}<tr class="tot"><td>${h(L("total"))}</td><td></td><td class="n">${nf(tot)}</td></tr></table></div>
-    ${canSeeStudents()?`<div><table><caption class="scap">STUDENTS ENTERED IN THE DATA BANK (${nf(R.length)}) — BY SCHOOL, CLASS & SECTION</caption><tr><th>#</th><th>Adm No</th><th>Name</th><th>Father</th><th>G/B</th></tr>${catGroupRows(R.slice(0,600))||`<tr><td colspan="5" class="mute">None entered yet.</td></tr>`}</table>${R.length>600?`<p class="hint">First 600 shown — use the link in the school table for the rest.</p>`:""}</div>`:""}</div>`; }
+    ${canSeeStudents()?`<div><table><caption class="scap">STUDENTS ENTERED IN THE DATA BANK (${nf(R.length)}) — BY SCHOOL, CLASS & SECTION</caption><tr><th>#</th><th>Adm No</th><th>Name</th><th>Father</th><th>G/B</th></tr>${catGroupRows(R.slice(0,600))||`<tr><td colspan="5" class="mute">None entered yet.</td></tr>`}</table>${R.length>600?`<p class="hint">First 600 shown — use the link in the school table for the rest.</p>`:""}</div>`:""}</div>`+"<br>"+catSecHtml(cat,codes,R); }
 function catSecHtml(cat,codes,R){ const out=[]; const bk={}; for(const r of R){ const k=r.school+"|"+r.cl+"|"+r.sec; bk[k]=(bk[k]||0)+1; }
   for(const c of codes){ const sc=S.schools[c]; for(const cl of sc.classes) for(const x of cl.secs){ const sm=secSummary(c,cl,x), a=sm.cat?.[cat]||0, b=bk[c+"|"+cl.cl+"|"+x.s]||0; if(a||b) out.push({c,cl:cl.cl,s:x.s,a,b}); } }
   if(!out.length) return "";
@@ -2718,7 +2726,20 @@ Present school & Adm No:
 2nd choice school:
 Contact number:
 Reason for transfer:`;
-const TP_MAP = [["name",/student'?s?\s*name|name of (the )?(student|child)|^name/i],["father",/father'?s?\s*name|^father$|f\/name|guardian/i],["cnic",/cnic/i],["cl",/class/i],["gender",/gender|boy\s*\/\s*girl|sex/i],["cat",/rank|category|cat/i],["cur",/present|current|now\s*(at|in)|studying at|school & adm|adm\s*no/i],["c1",/1st|first\s*choice|choice\s*1/i],["c2",/2nd|second\s*choice|choice\s*2/i],["contact",/contact|phone|mobile|cell|whats\s*app/i],["reason",/reason|remarks/i]];
+const NEW_MSG = `*APEIs Peshawar — Application for new admission*
+Please copy this message, fill it in and send it back:
+
+Student name:
+Father name:
+Father CNIC:
+Date of birth (dd-mm-yyyy):
+Class applying for:
+Gender (Boy / Girl):
+Father's rank / category (e.g. Serving Army NCO, Civilian):
+Unit / department:
+Contact number:
+Remarks:`;
+const TP_MAP = [["name",/student'?s?\s*name|name of (the )?(student|child)|^name/i],["father",/father'?s?\s*name|^father$|f\/name|guardian/i],["cnic",/cnic/i],["dob",/birth|dob/i],["cl",/class/i],["gender",/gender|boy\s*\/\s*girl|sex/i],["cat",/rank|category|cat/i],["cur",/present|current|now\s*(at|in)|studying at|school & adm|adm\s*no/i],["c1",/1st|first\s*choice|choice\s*1/i],["c2",/2nd|second\s*choice|choice\s*2/i],["contact",/contact|phone|mobile|cell|whats\s*app/i],["unit",/unit|department/i],["reason",/reason|remarks/i]];
 function tfrParseText(t){ const o={}; for(const line of String(t).split(/\n/)){ const m=line.replace(/[*_]/g,"").match(/^\s*([^:：\-–]{2,40})\s*[:：\-–]\s*(.+)$/); if(!m) continue; const lab=m[1].trim(), v=m[2].trim(); if(!v) continue;
     for(const [k,re] of TP_MAP){ if(o[k]) continue; if(re.test(lab)){ o[k]=v; break; } } }
   if(!o.contact){ const ph=String(t).match(/(?:\+?92|0)3\d{2}[-\s]?\d{7}/); if(ph) o.contact=ph[0]; }
@@ -2756,8 +2777,8 @@ Object.assign(EXTRA_ACT,{
   dupNot: el => { const ids=el.dataset.id.split(","); ask("Mark as different children?","These records will no longer be shown as duplicates.","Not a duplicate",async()=>{ const ops=opsNew(); for(const id of ids){ const r=idxFind(id); if(r) ops.upd.push({col:"students",id,data:{dupOk:"1",dup:DEL}}); } await DB.apply(ops); toast("Marked as different children."); fillRegion("dupBody",true); }); },
   medPrint: () => medPrint(),
   tfrPaste: () => tfrPasteDlg(), tfrPasteGo: () => tfrPasteGo(),
-  tfrFormat: () => modal(`<h3>Format message for parents</h3><p>Send this to parents (WhatsApp group, school circular). When they send it back filled in, paste their reply with “📋 Paste parent's WhatsApp message”.</p><textarea id="tfMsg" rows="14" style="width:100%">${h(TFR_MSG)}</textarea>
-    <div class="row"><button class="btn" data-act="closeModal">Close</button><a class="btn" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(TFR_MSG)}">Open in WhatsApp</a><button class="btn p" data-act="tfrFormatCopy">Copy</button></div>`),
+  tfrFormat: el => { const nw=el?.dataset?.id==="new", M=nw?NEW_MSG:TFR_MSG; modal(`<h3>Format message for parents — ${nw?"new admission":"inter-APEI transfer"}</h3><p>Send this to parents (WhatsApp group, school circular). When they send it back filled in, paste their reply in the 📋 paste box.</p><textarea id="tfMsg" rows="14" style="width:100%">${h(M)}</textarea>
+    <div class="row"><button class="btn" data-act="closeModal">Close</button><a class="btn" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(M)}">Open in WhatsApp</a><button class="btn p" data-act="tfrFormatCopy">Copy</button></div>`); },
   tfrFormatCopy: async () => { try{ await navigator.clipboard.writeText($("#tfMsg").value); toast("Copied."); }catch(e){ $("#tfMsg").select(); toast("Press Ctrl+C to copy."); } },
 });
 
@@ -2791,20 +2812,21 @@ function sysHtml(){ if(!S.sysRows) return `<div class="empty">Loading…</div>`;
 
 /* ---------- data check: open a section in place, quick corrections, verification ---------- */
 const verTag = () => `${me().name||""}|${isoDay(Date.now())}`;
-function verBox(r, may){ if(!r?.id) return ""; return r.ver ? `<div class="note" style="border-color:#16a34a">✓ <b>Verified</b> by ${h(String(r.ver).split("|")[0])} on ${h(fmtD(Date.parse((String(r.ver).split("|")[1]||isoDay(Date.now()))+"T12:00")))}.${may?` <button class="btn s" data-act="stuVer" data-id="0">Undo verification</button>`:""}</div>`
-  : may ? `<div class="note">This record is <b>not yet verified</b>. After checking every field against the school register / admission form: <button class="btn s g" data-act="stuVer" data-id="1">✓ Mark as verified</button></div>` : ""; }
-async function ckSecSave(f){ const [code]=f.dataset.k.split("|"); const B=stuOf(code)||[], ops=opsNew(), logs=[]; let n=0;
+function verBox(r, may){ if(!r?.id) return ""; if(!r.ver&&r.vreq) return `<div class="note">⏳ <b>Sent for verification</b> — waiting for the DQ Office.</div>`; return r.ver ? `<div class="note" style="border-color:#16a34a">✓ <b>Verified</b> by ${h(String(r.ver).split("|")[0])} on ${h(fmtD(Date.parse((String(r.ver).split("|")[1]||isoDay(Date.now()))+"T12:00")))}.${may?` <button class="btn s" data-act="stuVer" data-id="0">Undo verification</button>`:""}</div>`
+  : may ? `<div class="note">This record is <b>not yet verified</b>. After checking every field against the school register / admission form: <button class="btn s g" data-act="stuVer" data-id="1">${role()==="clerk"?"✓ Checked — send for verification":"✓ Mark as verified"}</button></div>` : ""; }
+async function ckSecSave(f){ const [code]=f.dataset.k.split("|"); const B=stuOf(code)||[], ops=opsNew(), logs=[], reqs=[]; let n=0;
   const by={}; for(const el of f.querySelectorAll("[data-q]")) (by[el.dataset.q] ||= {})[el.dataset.f]=el.type==="checkbox"?el.checked:el.value;
   for(const [id,v] of Object.entries(by)){ const r=B.find(x=>x.id===id); if(!r||!canEditStu(r)) continue; const d={}, ch=[];
     if(v.gender!==undefined && v.gender!==(r.gender==="g"?"g":"b")){ d.gender=v.gender; ch.push({k:"gender",l:"Gender",from:r.gender==="g"?"G":"B",to:v.gender==="g"?"G":"B"}); }
     if(v.cat!==undefined && v.cat && canonCat(v.cat)!==canonCat(r.cat)){ d.cat=v.cat; ch.push({k:"cat",l:"Category",from:catLabel(r.cat),to:catLabel(v.cat)}); if(r.cv) d.cv=DEL; }
-    if(v.ver!==undefined && v.ver!==!!r.ver){ d.ver=v.ver?verTag():DEL; ch.push({k:"ver",l:"Verified",from:r.ver?"yes":"no",to:v.ver?"yes":"no"}); }
-    if(!ch.length) continue; n++; ops.upd.push({col:"students",id,data:{...d,updatedAt:TS,updatedBy:me().name||""}});
+    if(v.ver!==undefined && v.ver!==!!(r.ver||r.vreq)){ if(role()==="clerk"){ if(v.ver&&!r.ver&&!r.vreq){ d.vreq="1"; reqs.push(apprNew("verify",r,{})); } } else { d.ver=v.ver?verTag():DEL; if(r.vreq) d.vreq=DEL; ch.push({k:"ver",l:"Verified",from:r.ver?"yes":"no",to:v.ver?"yes":"no"}); } }
+    if(!ch.length){ if(d.vreq){ ops.upd.push({col:"students",id,data:{vreq:"1"}}); n++; } continue; } n++; ops.upd.push({col:"students",id,data:{...d,updatedAt:TS,updatedBy:me().name||""}});
     ops.set.push({col:"edits",id:newId(),data:{stuId:id,school:code,stuName:r.name,admNo:r.admNo||"",changes:ch,at:TS,day:isoDay(Date.now()),by:me().uid,byName:me().name||"",role:role()}}); }
-  if(!n){ toast("Nothing was changed."); return; } await DB.apply(ops); await ensureStu(code,true); toast(`${n} record${n>1?"s":""} updated.`); fillRegion("chkBody",true); setTimeout(()=>$("#ckDet")?.scrollIntoView({block:"nearest"}),60); }
+  ops.set.push(...reqs); if(!n){ toast("Nothing was changed."); return; } await DB.apply(ops); await ensureStu(code,true); toast(`${n} record${n>1?"s":""} updated.${reqs.length?` ${reqs.length} sent to the DQ Office for verification.`:""}`); if(reqs.length) apprLoad(); fillRegion("chkBody",true); setTimeout(()=>$("#ckDet")?.scrollIntoView({block:"nearest"}),60); }
 async function ckVerAll(){ const p=S.params, code=chkScope().code; const X=schoolList().flatMap(s=>(stuOf(s.code)||[]).filter(r=>r.status==="On roll"&&!r.ver&&(!code||r.school===code)&&canEditStu(r))).slice(0,500);
   if(!X.length){ toast("Nothing to verify that you may change.",true); return; }
-  ask(`Mark ${X.length} records as verified?`,`Do this only if these records have been checked against the register. Your name and today's date are recorded on each.`,"Mark verified",async()=>{ const ops=opsNew(); for(const r of X) ops.upd.push({col:"students",id:r.id,data:{ver:verTag()}}); await DB.apply(ops); for(const c of new Set(X.map(r=>r.school))) await ensureStu(c,true); audit("Bulk verification",`${X.length} records`); fillRegion("chkBody",true); toast("Marked as verified."); }); }
+  if(role()==="clerk"){ const Y=X.filter(r=>!r.vreq); if(!Y.length){ toast("All of these are already waiting for the DQ Office.",true); return; } return ask(`Send ${Y.length} records for verification?`,"Only send records you have checked against the register. The DQ Office approves them.","Send",async()=>{ const ops=opsNew(); for(const r of Y){ ops.upd.push({col:"students",id:r.id,data:{vreq:"1"}}); ops.set.push(apprNew("verify",r,{})); } await DB.apply(ops); for(const c of new Set(Y.map(r=>r.school))) await ensureStu(c,true); apprLoad(); fillRegion("chkBody",true); toast(`${Y.length} sent for verification.`); }); }
+  ask(`Mark ${X.length} records as verified?`,`Do this only if these records have been checked against the register. Your name and today's date are recorded on each.`,"Mark verified",async()=>{ const ops=opsNew(); for(const r of X) ops.upd.push({col:"students",id:r.id,data:{ver:verTag(),vreq:DEL}}); await DB.apply(ops); for(const c of new Set(X.map(r=>r.school))) await ensureStu(c,true); audit("Bulk verification",`${X.length} records`); fillRegion("chkBody",true); toast("Marked as verified."); }); }
 
 /* ---------- duplicates: move every extra copy to Trash ---------- */
 const filled = r => stuFields().filter(f=>String(r[f.key]??"").trim()).length;
@@ -2863,14 +2885,14 @@ function feePayList(){ const p=S.params, from=p.pf||isoDay(Date.now()-29*864e5),
    ${!S.payRows?`<p class="mute">Loading…</p>`:R.length?`<div class="scroll"><table><tr><th>#</th><th>Paid on</th><th>School</th><th>Class – Sec</th><th>Adm No</th><th>Name</th><th>For month(s)</th><th class="n">Amount</th><th>Receipt</th><th>Slip</th></tr>${R.map((x,i)=>`<tr class="click" data-act="openStu" data-id="${h(x.stuId)}"><td class="mute">${i+1}</td><td>${fmtD(Date.parse(x.date+"T12:00"))}</td><td>${h(x.school)}</td><td>${h(x.cl)}-${h(x.sec)}</td><td>${h(x.admNo)}</td><td><b>${h(x.name)}</b></td><td>${h(x.months)}</td><td class="n">${nf(x.amount)}</td><td>${h(x.receipt||"")}</td><td>${x.slip?`<button class="btn s" data-act="slipView" data-id="${h(x.id)}">View</button>`:""}</td></tr>`).join("")}<tr class="tot"><td colspan="7">${h(L("total"))} (${R.length})</td><td class="n">${nf(R.reduce((a,x)=>a+(Number(x.amount)||0),0))}</td><td colspan="2"></td></tr></table></div>`:`<div class="empty">No payments in these dates.</div>`}</div>`; }
 
 /* ---------- applicants: a box to paste the parent's message straight into the form ---------- */
-const pasteBox = kind => `<div class="panel" style="border:2px dashed #0f766e;margin-bottom:10px"><div class="ph" style="margin:0 0 6px"><h3 style="margin:0;font-size:15px">📋 Paste the parent's message (WhatsApp / SMS / email)</h3><button type="button" class="btn s" data-act="tfrFormat">Format message for parents</button></div>
+const pasteBox = kind => `<div class="panel" style="border:2px dashed #0f766e;margin-bottom:10px"><div class="ph" style="margin:0 0 6px"><h3 style="margin:0;font-size:15px">📋 Paste the parent's message (WhatsApp / SMS / email)</h3><button type="button" class="btn s" data-act="tfrFormat" data-id="${kind}">Format message for parents</button></div>
   <textarea id="pb_${kind}" rows="4" style="width:100%" placeholder="Paste here, then press “Fill the form below”. Check every field before saving."></textarea>
   <div class="row" style="justify-content:flex-start;margin-top:6px"><button type="button" class="btn p s" data-act="pasteFill" data-id="${kind}">Fill the form below</button><span class="mute mini">Reads the format message exactly; free-form messages are read by AI when Form reading is switched on in Setup.</span></div></div>`;
 async function pasteFill(kind){ const t=$("#pb_"+kind)?.value||""; if(!t.trim()){ toast("Paste the message first.",true); return; }
   if(kind==="tfr"){ const tp=document.createElement("textarea"); tp.id="tpText"; tp.value=t; tp.hidden=true; document.body.appendChild(tp); try{ await tfrPasteGo(); }finally{ tp.remove(); } return; }
   let o=tfrParseText(t); if(Object.keys(o).length<4){ try{ const a=await aiText(`Extract a new-admission application from this message from a parent in Pakistan (English, Urdu or Roman Urdu). Return ONLY JSON with keys name, father, cl (class applied for, like EYS-I, Pre-I, I…XII), gender ("B" or "G"), cat (father's rank/category in words), contact (all phone numbers, comma separated), dob (dd-mm-yyyy), reason. Empty string if missing.\nMessage:\n${t}`); if(a) o={...a,...Object.fromEntries(Object.entries(o).filter(([,v])=>v))}; }catch(e){ toast("AI could not read it: "+e.message,true); } }
   const set=(id,v)=>{ const el=$("#"+id); if(el&&v) el.value=v; };
-  set("wName",o.name); set("wFather",o.father); set("wCon",o.contact?fmtPhones(o.contact):""); set("wDob",o.dob); set("wRem",o.reason);
+  set("wName",o.name); set("wFather",o.father); if(o.unit&&!o.cat) set("wUnit",o.unit); if(o.cnic) set("wRem",[o.reason,"Father CNIC "+o.cnic].filter(Boolean).join(" · ")); set("wCon",o.contact?fmtPhones(o.contact):""); set("wDob",o.dob); set("wRem",[o.reason,o.cnic?"Father CNIC "+o.cnic:""].filter(Boolean).join(" · "));
   if(o.gender) set("wGen",/^g|girl|f/i.test(o.gender)?"g":"b");
   if(o.cat){ const c=cats().find(c=>norm(c)===norm(o.cat))||cats().find(c=>norm(o.cat).includes(norm(c))||norm(c).includes(norm(o.cat))); if(c) set("wCat",c); else set("wUnit",o.cat); }
   if(o.cl){ const el=$("#wCl"); const want=lvlOf({cl:String(o.cl).replace(/^class\s*/i,"").trim()}); const v=[...(el?.options||[])].map(x=>x.value).find(l=>norm(l)===norm(o.cl)||lvlOf({cl:l})===want||norm(lvlOf({cl:l}))===norm(want)); if(v) el.value=v; }
@@ -2900,7 +2922,8 @@ Object.assign(EXTRA_ACT,{
   ckList: el => { setParams({ckList:el.dataset.id||""}); },
   ckVerAll: () => ckVerAll(),
   ckTickAll: el => { el.closest("form").querySelectorAll('[data-f="ver"]').forEach(x=>x.checked=true); toast("All ticked — press Save changes to keep."); },
-  stuVer: async el => { const r=S.sp?.rec; if(!r) return; const on=el.dataset.id==="1"; const ops=opsNew(); ops.upd.push({col:"students",id:r.id,data:{ver:on?verTag():DEL}});
+  stuVer: async el => { const r=S.sp?.rec; if(!r) return; const on=el.dataset.id==="1";
+    if(role()==="clerk"){ if(!on){ toast("Only the DQ Office can remove a verification.",true); return; } if(r.vreq){ toast("Already sent for verification.",true); return; } const ops=opsNew(); ops.upd.push({col:"students",id:r.id,data:{vreq:"1"}}); ops.set.push(apprNew("verify",r,{})); await DB.apply(ops); r.vreq="1"; toast("Sent to the DQ Office for verification."); apprLoad(); fillRegion("spBody",true); return; } const ops=opsNew(); ops.upd.push({col:"students",id:r.id,data:{ver:on?verTag():DEL}});
     ops.set.push({col:"edits",id:newId(),data:{stuId:r.id,school:r.school,stuName:r.name,admNo:r.admNo||"",changes:[{k:"ver",l:"Verified",from:on?"no":"yes",to:on?"yes":"no"}],at:TS,day:isoDay(Date.now()),by:me().uid,byName:me().name||"",role:role()}});
     await DB.apply(ops); if(on) r.ver=verTag(); else delete r.ver; const L2=S.stu[r.school]?.rows.find(x=>x.id===r.id); if(L2){ if(on) L2.ver=r.ver; else delete L2.ver; } toast(on?"Marked as verified.":"Verification removed."); fillRegion("spBody",true); },
   dupTrashAll: () => { const G=dupGroups().filter(g=>g.sure); if(!G.length){ toast("No sure duplicates.",true); return; } ask(`Move the extra copies of ${G.length} sure duplicate groups to Trash?`,`In each group the most complete record (verified first, then most fields filled, then the oldest) is kept; the others go to <b>Trash</b>, from where they can be restored. “Probable” groups are not touched — check those one by one.`,"Move to Trash",()=>dupTrash(G)); },
@@ -2912,6 +2935,174 @@ const EXTRA_FORMS = { wEdit: f => wEditSave(f), ckSec: f => ckSecSave(f), feePay
   waitOpt: async () => { await saveSettings({waitTyped:$("#sWt").value!=="off"},"Waiting list setting saved."); } };
 
 Object.assign(EXTRA_CHG,{ wAddSch: el => { S.wAddSch=el.value; renderView(); } });
+
+/* ---------- v4.15: empty the data bank, delete dead log entries, register bulk Trash ---------- */
+function emptyBankHtml(){ if(!isSA()) return ""; const n=c=>idxAll().filter(r=>!c||r.school===c).length;
+  return `<div class="panel" style="border:2px solid #b91c1c"><h2>Empty the student data bank</h2>
+   <p class="hint" style="margin-top:0">Removes the students of the data bank so that schools can enter them again (e.g. with the final categories). <b>Strength figures, entries in the Log, applicants and fee returns are not touched.</b></p>
+   <div class="row" style="justify-content:flex-start;flex-wrap:wrap;gap:8px"><select class="in" id="ebSch" style="width:auto"><option value="">All schools (${nf(n())} students)</option>${schoolList().map(s=>`<option value="${h(s.code)}">${h(s.code)} — ${h(s.name)} (${nf(n(s.code))})</option>`).join("")}</select>
+   <select class="in" id="ebMode" style="width:auto"><option value="trash">Move to Trash (can be restored)</option><option value="purge">Delete for ever (cannot be undone)</option></select>
+   <button class="btn r" data-act="emptyBank">Empty…</button></div>
+   <p class="hint">Take a backup first (below). Photos of the students are removed too with “Delete for ever”.</p></div>`; }
+async function emptyBank(code, mode){ const codes=code?[code]:schoolList(true).map(s=>s.code); let n=0;
+  for(const c of codes){ const R=await ensureStu(c,true); if(!R.length) continue; const ops=opsNew(); ops.noIdx=true;
+    for(const r of R){ if(mode==="trash"){ const d={...r}; delete d.id; ops.set.push({col:"trash",id:r.id,data:{...d,delAt:TS,delAtMs:Date.now(),delBy:me().uid,delByName:me().name||"",delReason:"data bank emptied"}}); }
+      (ops.del||=[]).push({col:"students",id:r.id}); if(mode!=="trash") ops.del.push({col:"photos",id:r.id}); n++; }
+    ops.set.push({col:"stuIdx",id:c,data:{i:{}},_idx:1}); await DB.apply(ops,true); S.stu[c]={rows:[],at:Date.now()}; }
+  S.trash=null; audit("Data bank emptied",`${code||"all schools"} · ${n} students · ${mode==="trash"?"moved to Trash":"deleted for ever"}`);
+  toast(`${nf(n)} student records ${mode==="trash"?"moved to Trash":"deleted"}. Schools can now import again.`); fillRegion("stBody",true); }
+Object.assign(EXTRA_ACT,{
+  emptyBank: () => { const code=$("#ebSch").value, mode=$("#ebMode").value, n=idxAll().filter(r=>!code||r.school===code).length;
+    modal(`<h3>Empty the data bank — ${h(code||"ALL SCHOOLS")}</h3><p><b>${nf(n)} student records</b> will be ${mode==="trash"?"moved to <b>Trash</b> (you can restore them)":"<b>deleted for ever</b> — this cannot be undone"}. Strength figures and the Log are not changed.</p>
+      <div class="f"><label for="ebOk">Type <b>EMPTY</b> to confirm</label><input id="ebOk" autocomplete="off"></div><div class="row"><button class="btn" data-act="closeModal">Cancel</button><button class="btn r" data-act="emptyBankGo" data-id="${h(code)}" data-m="${h(mode)}">Empty the data bank</button></div>`); },
+  emptyBankGo: async el => { if(($("#ebOk")?.value||"").trim().toUpperCase()!=="EMPTY"){ toast("Type EMPTY to confirm.",true); return; } closeModal(); toast("Working… please wait."); try{ await emptyBank(el.dataset.id, el.dataset.m); }catch(e){ toast("Stopped: "+e.message,true); } },
+  txPurge: () => { if(!isSA()) return; const L0=selectedTx().filter(t=>["void","rejected","cancelled"].includes(t.status)); if(!L0.length){ toast("Tick voided / rejected / cancelled entries first. A counted entry must be voided before it can be deleted.",true); return; }
+    ask(`Delete ${L0.length} entr${L0.length===1?"y":"ies"} for ever?`,`Only entries that no longer count (voided, rejected, cancelled) are deleted, so strength does not change. They disappear from the Log for good.`,"Delete for ever",async()=>{ const ops=opsNew(); ops.del=L0.map(t=>({col:"transactions",id:t.id})); await DB.apply(ops); audit("Log entries deleted",`${L0.length}: ${L0.slice(0,15).map(t=>t.name).join(", ")}`); toast(`${L0.length} entries deleted.`); runLog(); }); },
+  regTrash: () => { const ids=$$("#sList [data-sel]").filter(x=>x.checked).map(x=>x.dataset.sel); if(!ids.length){ toast("Tick the students first.",true); return; }
+    ask(`Move ${ids.length} student${ids.length>1?"s":""} to Trash?`,"They leave the data bank and wait in Students → Trash, from where they can be restored. Strength is not changed.","Move to Trash",async()=>{ const all=schoolList().flatMap(s=>stuOf(s.code)||[]), ops=opsNew(); let n=0; for(const id of ids){ const r=all.find(x=>x.id===id); if(!r) continue; const o=stuToTrash(r,"removed from register"); ops.set.push(...o.set); (ops.del||=[]).push(...(o.del||[])); n++; }
+      await DB.apply(ops); for(const c of new Set(ids.map(id=>all.find(x=>x.id===id)?.school).filter(Boolean))) await ensureStu(c,true); S.trash=null; audit("Students moved to Trash",`${n} from the register`); toast(`${n} moved to Trash.`); fillRegion("sList",true); }); },
+  ckSchool: el => setParams({ckSch:el.dataset.id, ckList:"all"}),
+});
+
+/* ---------- v4.16: Approvals — clerks request, DQ Office (with reason) / Super Admin decide ---------- */
+const MAND = new Set(["admNo","name","cl","sec","gender","cat"]);
+const APPR_T = { verify:["✓ Verify record","t-in"], field:["✎ Change of main details","t-mid"], class:["⇅ Change of class","t-mid"], tfr:["🔁 Inter-APEI transfer in","t-n"] };
+const apprOn = k => (ST().apprOff||[]).indexOf(k)<0;
+S.apprs = S.apprs || null;
+async function apprLoad(){ try{ if(canDecide()) S.apprs=await DB.query("approvals","status","==","pending");
+    else if(mySchool()) S.apprs=(await DB.query("approvals","school","==",mySchool())).filter(a=>a.status==="pending"||(a.decidedMs||0)>Date.now()-7*864e5);
+    else S.apprs=[]; }catch(e){ S.apprs=S.apprs||[]; } bellPaint?.(); const b=document.querySelector('nav a[href="#approvals"] .badge'); if(S.view==="approvals") fillRegion("apBody",true); else renderNavOnly(); }
+function renderNavOnly(){ const n=$("nav"); if(n&&typeof navHtml==="function") n.innerHTML=navHtml(); }
+const apprPending = () => (S.apprs||[]).filter(a=>a.status==="pending");
+setInterval(()=>{ if(S.user&&!S.user.pending&&role()!=="viewer") apprLoad(); },120e3);
+
+/* a clerk's request */
+function apprNew(type, rec, extra, reason){ const u=me(); return {col:"approvals",id:newId(),data:{type,status:"pending",school:rec.school,stuId:rec.id||"",stuName:rec.name||"",admNo:rec.admNo||"",cl:rec.cl||"",sec:rec.sec||"",reason:reason||"",...extra,at:TS,atMs:Date.now(),by:u.uid,byName:u.name||""}}; }
+async function apprSend(items){ const ops=opsNew(); ops.set.push(...items); await DB.apply(ops); toast(`Sent to the DQ Office for approval (${items.length}). You will see the decision in the 🔔 bell.`); apprLoad(); }
+
+/* deciding */
+async function apprDecide(list, how, note){ if(!list.length) return; if(role()==="hq"&&!String(note||"").trim()){ toast("The DQ Office must write a reason / remarks.",true); return; }
+  const ops=opsNew(), done=[], skip=[], me0=me().name||"", day=isoDay(Date.now());
+  for(const a of list){ const dec={status:how,decidedBy:me().uid,decidedByName:me0,decidedAt:TS,decidedMs:Date.now(),decNote:note||""};
+    if(how==="approved"){ try{ await apprApply(ops,a); }catch(e){ skip.push(`${a.stuName}: ${e.message}`); continue; } }
+    else { if(a.type==="verify"&&a.stuId) ops.upd.push({col:"students",id:a.stuId,data:{vreq:DEL}});
+      if(a.type==="tfr"&&a.tfrId) ops.upd.push({col:"transfers",id:a.tfrId,data:how==="rejected"?{status:"rejected",rejReason:note||"",rejBy:me0,rejAt:TS}:{status:"pending",accNote:note||""}}); }
+    ops.upd.push({col:"approvals",id:a.id,data:dec}); done.push(a); }
+  if(ops.set.length||ops.upd.length) await DB.apply(ops);
+  audit(`Approvals ${how}`,`${done.length}: ${done.slice(0,15).map(a=>`${APPR_T[a.type]?.[0]||a.type} ${a.stuName}`).join("; ")}${note?" — "+note:""}`);
+  toast(`${done.length} ${how==="approved"?"approved":how==="returned"?"returned for correction":"rejected"}.`+(skip.length?` Not done: ${skip.join("; ")}`:""),!!skip.length); apprLoad(); }
+async function apprApply(ops, a){ const day=isoDay(Date.now()), by=me().name||"";
+  const rec = a.stuId ? ((await ensureStu(a.school)).find(r=>r.id===a.stuId)) : null;
+  if(a.type==="verify"){ if(!rec) throw new Error("record not found"); ops.upd.push({col:"students",id:a.stuId,data:{ver:`${by}|${day}`,vreq:DEL}}); return; }
+  if(a.type==="field"){ if(!rec) throw new Error("record not found"); const d={}; for(const c of a.changes||[]) d[c.k]=c.v; ops.upd.push({col:"students",id:a.stuId,data:{...d,updatedAt:TS,updatedBy:by}});
+    ops.set.push({col:"edits",id:newId(),data:{stuId:a.stuId,school:a.school,stuName:rec.name,admNo:rec.admNo||"",changes:(a.changes||[]).map(c=>({k:c.k,l:c.l,from:c.from,to:c.to})),at:TS,day,by:me().uid,byName:by,role:role(),note:`approved request of ${a.byName}${a.reason?": "+a.reason:""}`}}); return; }
+  if(a.type==="class"){ if(!rec) throw new Error("record not found"); if(rec.cl!==a.cl||rec.sec!==a.sec) throw new Error("the student is no longer in "+a.cl+"-"+a.sec);
+    const tx={school:a.school,action:"SEC",cl:a.cl,sec:a.sec,toCl:a.toCl,toSec:a.toSec,gender:rec.gender,cat:rec.cat||"",name:rec.name,father:rec.father||"",admNo:rec.admNo||"",studentId:rec.id,remarks:`Class change${a.reason?": "+a.reason:""} (requested by ${a.byName})`,eff:a.date||""}; const e=effFromDate(tx.eff); if(e) tx.effMs=e; buildTxOps(ops,tx); return; }
+  if(a.type==="tfr"){ const t=S.transfers.find(x=>x.id===a.tfrId); if(!t) throw new Error("transfer not found"); tfrAcceptOps(ops,t,a.toCl,a.toSec,a.newAdm||"",a.date||""); return; } }
+function tfrAcceptOps(ops,t,cl,sec,adm,date){ const sid=newId();
+  ops.set.push({col:"students",id:sid,data:{...(t.stu||{name:t.name,father:t.father||"",dob:t.dob||"",gender:t.gender,cat:t.cat||""}),school:t.to,admNo:adm||t.stu?.admNo||t.admNo||"",cl,sec,status:"On roll",admDate:date||isoDay(Date.now()),prevSchool:t.from,leftDate:"",leftReason:"",createdAt:TS,updatedAt:TS,by:me().name||""}});
+  const tx={school:t.to,action:"APEI_IN",cl,sec,gender:t.gender,cat:t.cat,name:t.name,father:t.father||"",dob:t.dob||"",admNo:adm,remarks:t.remarks||"",fromSchool:t.from,tfrId:t.id,studentId:sid,eff:date||""}; const e=effFromDate(tx.eff); if(e) tx.effMs=e;
+  const inId=txToOps(ops,tx); ops.upd.push({col:"transfers",id:t.id,data:{status:"accepted",inTx:inId,toCl:cl,toSec:sec,accBy:me().name||"",accAt:TS}}); }
+
+/* ---------- the Approvals page ---------- */
+NAV.splice(NAV.findIndex(n=>n[0]==="log"),0,["approvals","Approvals",()=>role()!=="viewer"&&role()!=="principal"]);
+VIEWS.approvals = {
+  shell(){ const p=S.params, dec=canDecide();
+    return `<div class="panel"><div class="ph"><h2>${dec?"Approvals — requests from the schools":"My requests to the DQ Office"}</h2><div class="pills">
+      ${dec?`<select class="in" style="width:auto" data-chg="setPsel" data-k="apSch"><option value="">All schools</option>${schoolList().map(s=>`<option ${p.apSch===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select>`:""}
+      <select class="in" style="width:auto" data-chg="setPsel" data-k="apT"><option value="">All kinds</option>${Object.entries(APPR_T).map(([k,v])=>`<option value="${k}" ${p.apT===k?"selected":""}>${h(v[0])}</option>`).join("")}</select>
+      <button class="btn s" data-act="apprReload">⟳</button></div></div>
+      <p class="hint" style="margin-top:0">${dec?`Tick requests (or the box in the heading for all), then <b>Approve</b>, <b>Return for correction</b> or <b>Reject</b>. ${role()==="hq"?"The DQ Office writes a reason for every decision; the clerk sees it.":"As Super Admin a reason is optional."}`:"Changes to the main details (Adm No, name, class, section, gender, category), class changes, record verification and incoming transfers wait here until the DQ Office or Super Admin decides. The decision and its reason appear here and in the 🔔 bell."}</p>
+      <div class="scroll" id="apBody"></div></div>`; },
+  regions:{ apBody(){ if(S.apprs===null){ apprLoad(); return `<p class="mute">Loading…</p>`; } const p=S.params, dec=canDecide();
+    const R=(S.apprs||[]).filter(a=>(!p.apSch||a.school===p.apSch)&&(!p.apT||a.type===p.apT)).sort((a,b)=>(a.status==="pending"?0:1)-(b.status==="pending"?0:1)||(a.atMs||0)-(b.atMs||0));
+    if(!R.length) return `<div class="empty">${dec?"Nothing waiting for a decision. ✓":"No requests in the last 7 days."}</div>`;
+    const det=a=> a.type==="field"?(a.changes||[]).map(c=>`<b>${h(c.l)}</b>: ${h(c.from||"—")} → <b>${h(c.to)}</b>`).join("<br>")
+      : a.type==="class"?`${h(a.cl)}-${h(a.sec)} → <b>${h(a.toCl)}-${h(a.toSec)}</b>${a.date?` from ${fmtD(Date.parse(a.date+"T12:00"))}`:""}`
+      : a.type==="tfr"?`from <b>${h(a.from)}</b> into ${h(a.toCl)}-${h(a.toSec)}${a.date?`, joined ${fmtD(Date.parse(a.date+"T12:00"))}`:""}${a.newAdm?` · Adm ${h(a.newAdm)}`:""}`
+      : `record checked by the school`;
+    return `${dec?`<div class="pills" style="margin-bottom:8px"><button class="btn s g" data-act="apprBulk" data-id="approved">✓ Approve ticked</button><button class="btn s" data-act="apprBulk" data-id="returned">↩ Return ticked for correction</button><button class="btn s r" data-act="apprBulk" data-id="rejected">✕ Reject ticked</button></div>`:""}
+     <table><tr>${dec?`<th><input type="checkbox" data-selall="1" style="width:18px;height:18px"></th>`:""}<th>#</th><th>Kind</th><th>School</th><th>Student</th><th>What is asked</th><th>Reason given</th><th>Asked by</th><th>Status</th>${dec?"<th></th>":""}</tr>
+     ${R.map((a,i)=>`<tr>${dec?`<td>${a.status==="pending"?`<input type="checkbox" data-sel="${h(a.id)}" style="width:18px;height:18px">`:""}</td>`:""}<td class="mute">${i+1}</td><td><span class="tag ${APPR_T[a.type]?.[1]||""}">${h(APPR_T[a.type]?.[0]||a.type)}</span></td><td>${h(a.school)}</td>
+       <td>${a.stuId?`<span class="dn" data-act="openStu" data-id="${h(a.stuId)}">${h(a.stuName)}</span>`:h(a.stuName)}<br><span class="mute">${h(a.cl)}-${h(a.sec)}${a.admNo?" · Adm "+h(a.admNo):""}</span></td>
+       <td style="white-space:normal;min-width:200px">${det(a)}</td><td style="white-space:normal;max-width:240px">${h(a.reason||"")}</td><td>${h(a.byName)}<br><span class="mute">${fmtDT(a.atMs)}</span></td>
+       <td>${a.status==="pending"?`<span class="tag t-mid">waiting</span>`:`<span class="tag ${a.status==="approved"?"t-in":"t-out"}">${a.status==="returned"?"returned":a.status}</span><br><span class="mute">${h(a.decidedByName||"")}${a.decNote?": "+h(a.decNote):""}</span>`}</td>
+       ${dec?`<td style="white-space:nowrap">${a.status==="pending"?`<button class="btn s g" data-act="apprOne" data-id="${h(a.id)}" data-m="approved">✓</button> <button class="btn s" data-act="apprOne" data-id="${h(a.id)}" data-m="returned" title="Return for correction">↩</button> <button class="btn s r" data-act="apprOne" data-id="${h(a.id)}" data-m="rejected">✕</button>`:""}</td>`:""}</tr>`).join("")}</table>`; } },
+  after(){ apprLoad(); }
+};
+function apprAsk(list, how){ const verb=how==="approved"?"Approve":how==="returned"?"Return for correction":"Reject";
+  ask(`${verb} ${list.length} request${list.length>1?"s":""}?`, `${list.slice(0,6).map(a=>h(`${APPR_T[a.type]?.[0]||a.type} — ${a.stuName} (${a.school})`)).join("<br>")}${list.length>6?"<br>…":""}${role()==="hq"?"<br><b>Write the reason / remarks below (required for the DQ Office).</b>":""}`, verb, r=>apprDecide(list,how,r), true); }
+
+/* clerk side: buttons on the student page / data check */
+function apprReasonDlg(title, body, onOk){ modal(`<h3>${h(title)}</h3>${body}<div class="f"><label for="apWhy">Reason (seen by the DQ Office) *</label><textarea id="apWhy" rows="3" placeholder="e.g. Adm No was typed wrong; register shows 16386"></textarea></div><div class="row"><button class="btn" data-act="closeModal">Cancel</button><button class="btn p" id="apGo">Send for approval</button></div>`);
+  $("#apGo").onclick=()=>{ const r=$("#apWhy").value.trim(); if(!r){ toast("Write the reason.",true); return; } closeModal(); onOk(r); }; }
+function classReqDlg(){ const r=S.sp?.rec; if(!r) return; const sc=S.schools[r.school];
+  modal(`<h3>⇅ Change of class — ${h(r.name)}</h3><p>Now in <b>${h(r.cl)}-${h(r.sec)}</b>. Strength moves from that class to the new one ${canDecide()?"at once":"when the DQ Office approves"}.</p>
+    <div class="grid" style="grid-template-columns:1fr 1fr"><div class="f"><label for="crCl">New class</label><select id="crCl" data-chg="crCl">${sc.classes.map(c=>`<option ${c.cl===r.cl?"selected":""}>${h(c.cl)}</option>`).join("")}</select></div>
+    <div class="f"><label for="crSec">Section</label><select id="crSec">${secOpts(r.school,sc.classes.find(c=>c.cl===r.cl)||sc.classes[0])}</select></div>
+    <div class="f"><label for="crDate">From date</label><input id="crDate" type="date" value="${isoDay(Date.now())}"></div></div>
+    <div class="f"><label for="apWhy">Reason${canDecide()?"":" *"}</label><textarea id="apWhy" rows="2" placeholder="e.g. parent's request: child is weak, moved back to class II"></textarea></div>
+    <div class="row"><button class="btn" data-act="closeModal">Cancel</button><button class="btn p" data-act="classReqGo">${canDecide()?"Change class now":"Send for approval"}</button></div>`); }
+
+Object.assign(EXTRA_ACT,{
+  apprReload: () => { S.apprs=null; fillRegion("apBody",true); },
+  apprOne: el => { const a=(S.apprs||[]).find(x=>x.id===el.dataset.id); if(a) apprAsk([a],el.dataset.m); },
+  apprBulk: el => { const ids=$$("#apBody [data-sel]").filter(x=>x.checked).map(x=>x.dataset.sel), L2=(S.apprs||[]).filter(a=>ids.includes(a.id)&&a.status==="pending"); if(!L2.length){ toast("Tick the requests first.",true); return; } apprAsk(L2,el.dataset.id); },
+  classReq: () => classReqDlg(),
+  classReqGo: async () => { const r=S.sp?.rec, toCl=$("#crCl").value, toSec=$("#crSec").value, date=$("#crDate").value, why=$("#apWhy").value.trim();
+    if(toCl===r.cl&&toSec===r.sec){ toast("Choose a different class or section.",true); return; } if(!canDecide()&&!why){ toast("Write the reason.",true); return; }
+    closeModal(); const a=apprNew("class",r,{toCl,toSec,date},why);
+    if(canDecide()){ const ops=opsNew(); await apprApply(ops,{...a.data,id:a.id}); a.data.status="approved"; a.data.decidedBy=me().uid; a.data.decidedByName=me().name||""; a.data.decidedMs=Date.now(); ops.set.push(a); await DB.apply(ops); toast("Class changed."); loadStuPage(); }
+    else await apprSend([a]); },
+});
+Object.assign(EXTRA_CHG,{ crCl: el => { const r=S.sp?.rec, sc=S.schools[r.school], c=sc.classes.find(x=>x.cl===el.value); $("#crSec").innerHTML=secOpts(r.school,c); } });
+
+
+/* ---------- Unverified / Verified lists (the "quarantine") ---------- */
+function verListHtml(t){ const p=S.params, sch=mySchool()||p.vlSch||"", R=sortStu(idxAll().filter(r=>r.status==="On roll"&&(!sch||r.school===sch)&&(t==="verd"?!!r.ver:!r.ver)&&(!p.vlW||(p.vlW==="w"?r.vreq:!r.vreq)))), lim=S.vlLim||500, dec=canDecide();
+  const all=idxAll().filter(r=>r.status==="On roll"&&(!sch||r.school===sch)), nV=all.filter(r=>r.ver).length;
+  return `<div class="ph"><h2>${t==="verd"?"✅ Verified records":"📥 Unverified records"} — ${nf(R.length)}</h2><div class="pills">${mySchool()?"":`<select class="in" style="width:auto" data-chg="setPsel" data-k="vlSch"><option value="">All schools</option>${schoolList().map(s=>`<option ${p.vlSch===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select>`}
+    ${t==="unv"?`<select class="in" style="width:auto" data-chg="setPsel" data-k="vlW"><option value="">All unverified</option><option value="n" ${p.vlW==="n"?"selected":""}>Not yet sent</option><option value="w" ${p.vlW==="w"?"selected":""}>Waiting for the DQ Office</option></select>`:""}</div></div>
+   <p class="hint" style="margin-top:0">${nf(nV)} of ${nf(all.length)} records verified (${all.length?(nV/all.length*100).toFixed(1):"0"}%). ${t==="unv"?(dec?"Every record entered or imported stays here until it is verified. Tick and verify, or approve the schools' requests in <b>Approvals</b>.":"Every record you enter or import stays here until the DQ Office verifies it. Check each against the register, tick it and press <b>Send for verification</b>."):"Records checked by the school and approved by the DQ Office / Super Admin."}</p>
+   ${t==="unv"&&R.length?`<div class="pills" style="margin-bottom:6px"><button class="btn s g" data-act="vlGo">${dec?"✓ Verify ticked":"Send ticked for verification"}</button></div>`:""}
+   ${R.length?`<table><tr>${t==="unv"?`<th><input type="checkbox" data-selall="1" style="width:18px;height:18px"></th>`:""}<th>#</th><th>School</th><th>Class – Sec</th><th>Adm No</th><th>Name</th><th>Father / Guardian</th><th>G/B</th><th>Category</th><th>${t==="verd"?"Verified by":"Status"}</th></tr>
+   ${R.slice(0,lim).map((r,i)=>`<tr class="click" data-act="openStu" data-id="${h(r.id)}">${t==="unv"?`<td>${r.vreq&&!dec?"":`<input type="checkbox" data-sel="${h(r.id)}" style="width:18px;height:18px">`}</td>`:""}<td class="mute">${i+1}</td><td>${h(r.school)}</td><td>${h(r.cl)}-${h(r.sec)}</td><td>${h(r.admNo)}</td><td><b>${h(r.name)}</b></td><td>${h(parentOf(r))}</td><td>${gTxt(r.gender)}</td><td>${h(catLabel(r.cat))}</td><td>${t==="verd"?h(String(r.ver).replace("|"," · ")):r.vreq?`<span class="tag t-mid">waiting DQ</span>`:`<span class="mute">not sent</span>`}</td></tr>`).join("")}</table>${R.length>lim?`<div class="row" style="justify-content:flex-start"><button class="btn" data-act="vlMore">Show all ${nf(R.length)}</button></div>`:""}`:`<div class="empty">None.</div>`}`; }
+Object.assign(EXTRA_ACT,{
+  vlMore: () => { S.vlLim=1e6; fillRegion("vlBody",true); },
+  vlGo: async () => { const ids=$$("#vlBody [data-sel]").filter(x=>x.checked).map(x=>x.dataset.sel); if(!ids.length){ toast("Tick the records first.",true); return; }
+    const R=ids.map(idxFind).filter(Boolean), ops=opsNew();
+    if(canDecide()){ for(const r of R) ops.upd.push({col:"students",id:r.id,data:{ver:verTag(),vreq:DEL}}); const pend=apprPending().filter(a=>a.type==="verify"&&ids.includes(a.stuId)); for(const a of pend) ops.upd.push({col:"approvals",id:a.id,data:{status:"approved",decidedBy:me().uid,decidedByName:me().name||"",decidedAt:TS,decidedMs:Date.now(),decNote:"verified from the list"}}); }
+    else for(const r of R.filter(r=>!r.vreq)){ ops.upd.push({col:"students",id:r.id,data:{vreq:"1"}}); ops.set.push(apprNew("verify",r,{})); }
+    if(!ops.upd.length){ toast("Already sent.",true); return; } await DB.apply(ops); toast(canDecide()?`${R.length} verified.`:`${ops.set.length} sent to the DQ Office for verification.`); apprLoad(); fillRegion("vlBody",true); },
+});
+
+/* ---------- Super Admin / DQ: correct an entry already made (old one voided, corrected one saved, both logged) ---------- */
+function txFixDlg(id){ const t=[...(S.logRows||[]),...S.recentTx].find(x=>x.id===id); if(!t) return; const opts=csOptions(t.school);
+  modal(`<h3>✎ Correct entry — ${h(AL(t.action))}, ${h(t.name)}</h3><p class="hint" style="margin-top:0">${h(t.school)} · entered ${fmtDT(t.atMs)} by ${h(t.byName||"")}. The old entry is voided and the corrected one saved, so strength stays right; both stay in the Log.</p>
+   <form data-form="txFix" data-id="${h(id)}"><div class="grid" style="grid-template-columns:1fr 1fr">
+   <div class="f"><label for="xfAct">Action</label><select id="xfAct">${actions().filter(a=>!["apei_out","apei_in"].includes(a.kind)||a.code===t.action).map(a=>`<option value="${h(a.code)}" ${a.code===t.action?"selected":""}>${h(a.label)}</option>`).join("")}</select></div>
+   <div class="f"><label for="xfDate">Date</label><input id="xfDate" type="date" value="${isoDay(tTime(t))}" max="${isoDay(Date.now())}"></div>
+   <div class="f"><label for="xfCs">Class – Section</label><select id="xfCs">${opts.map(o=>`<option value="${h(o.cl+"|"+o.s)}" ${o.cl===t.cl&&o.s===t.sec?"selected":""}>${h(o.label)}</option>`).join("")}</select></div>
+   ${actDef(t.action).kind==="sec"?`<div class="f"><label for="xfTo">To section</label><input id="xfTo" value="${h(t.toSec||"")}"></div>`:""}
+   <div class="f"><label for="xfAdm">Adm / Reg No</label><input id="xfAdm" value="${h(t.admNo||"")}"></div>
+   <div class="f"><label for="xfName">Student name</label><input id="xfName" value="${h(t.name||"")}" required></div>
+   <div class="f"><label for="xfFather">Father name</label><input id="xfFather" value="${h(t.father||"")}"></div>
+   <div class="f"><label for="xfGen">Gender</label><select id="xfGen"><option value="b" ${t.gender!=="g"?"selected":""}>Boy</option><option value="g" ${t.gender==="g"?"selected":""}>Girl</option></select></div>
+   <div class="f"><label for="xfCat">Category</label><select id="xfCat">${catOptions(t.cat||"","—")}</select></div>
+   <div class="f"><label for="xfRem">Remarks</label><input id="xfRem" value="${h(t.remarks||"")}"></div></div>
+   <div class="f"><label for="xfWhy">Reason for the correction${role()==="hq"?" *":""}</label><input id="xfWhy" placeholder="e.g. wrong section typed by the school"></div>
+   <div class="row"><button type="button" class="btn" data-act="closeModal">Cancel</button><button class="btn p">Save correction</button></div></form>`,"wide"); }
+async function txFixSave(f){ const t=[...(S.logRows||[]),...S.recentTx].find(x=>x.id===f.dataset.id); if(!t) return; const why=$("#xfWhy").value.trim(); if(role()==="hq"&&!why){ toast("Write the reason.",true); return; }
+  const [cl,sec]=$("#xfCs").value.split("|"); const nt={school:t.school,action:$("#xfAct").value,cl,sec,gender:$("#xfGen").value,cat:$("#xfCat").value,name:$("#xfName").value.trim(),father:$("#xfFather").value.trim(),admNo:$("#xfAdm").value.trim(),remarks:$("#xfRem").value.trim(),dob:t.dob||"",eff:$("#xfDate").value,corrects:t.id,studentId:t.studentId||undefined};
+  if($("#xfTo")) nt.toSec=$("#xfTo").value.trim(); const e=effFromDate(nt.eff); if(e) nt.effMs=e; if(!nt.studentId) delete nt.studentId;
+  const ops=opsNew(); voidToOps(ops,t,`Corrected${why?": "+why:""}`); buildTxOps(ops,nt); closeModal(); await DB.apply(ops);
+  audit("Entry corrected",`${t.school} ${AL(t.action)} ${t.name} → ${AL(nt.action)} ${nt.name} ${cl}-${sec}${why?" — "+why:""}`); toast("Entry corrected: the old one is voided, the corrected one saved."); if(S.view==="log") runLog(); }
+Object.assign(EXTRA_ACT,{ txFix: el => txFixDlg(el.dataset.id) });
+Object.assign(EXTRA_FORMS,{ txFix: f => txFixSave(f) });
+
+/* entries made by the DQ Office itself are marked, listed and reported to the Super Admin */
+let hqMemo={src:null,set:new Set()};
+function hqUids(){ if(hqMemo.src===S.users) return hqMemo.set; hqMemo={src:S.users,set:new Set((S.users||[]).filter(u=>u.role==="hq").flatMap(u=>[u.uid,...(u.prevUids||[])]))}; return hqMemo.set; }
 
 /* =====================================================================
    8) REPORTS — designer (tick what to show), presets, print/PDF, Excel, WhatsApp
@@ -3390,7 +3581,7 @@ const SETUP = {
         <div class="row" style="justify-content:flex-start"><button class="btn p" data-act="qrPng">Download QR (PNG)</button><button class="btn" data-act="qrPrint">Print QR card</button><button class="btn" data-act="qrCopy">Copy link</button></div></div>
       <div><h3>How it works</h3><ol class="steps"><li>Create a login with role <b>Senior / Viewer</b> in Users & roles.</li><li>Give your senior the QR card and the login.</li><li>He scans with the phone camera, signs in once, and stays signed in on that phone.</li><li>The Dashboard updates by itself every time a clerk saves; no refresh needed. He can also open Reports and print or download any preset.</li></ol>
       <p class="hint">A viewer cannot change anything — the database rules block it, not just the screen.</p></div></div></div>`; },
-  data(){ return cvPanelHtml()+`<div class="panel"><h2>Student search index</h2><p>The search box, siblings and drill-downs use a small index of the data bank (updated by itself on every change). If search ever misses students that are in a school's register, rebuild it.</p><button class="btn" data-act="rebuildIdx">Rebuild search index</button></div>
+  data(){ return emptyBankHtml()+cvPanelHtml()+`<div class="panel"><h2>Student search index</h2><p>The search box, siblings and drill-downs use a small index of the data bank (updated by itself on every change). If search ever misses students that are in a school's register, rebuild it.</p><button class="btn" data-act="rebuildIdx">Rebuild search index</button></div>
      <div class="panel"><h2>Backup</h2><p>Download everything — schools, sections, opening and live strength, users, waiting list, transfers and the full log of this session.</p>
      <div class="row" style="justify-content:flex-start"><button class="btn p" data-act="backupXlsx">Backup as Excel</button><button class="btn" data-act="backup">Backup as JSON (complete, for restore)</button></div>
      <p class="hint">Do it weekly and before any session change. The Excel file is for reading and archiving; the JSON file holds everything exactly.</p></div>
@@ -3444,17 +3635,18 @@ function stuOpsForTx(ops, tx, st){
     else { const id=newId(); tx.studentId=id; ops.set.push({col:"students",id,data:{school:tx.school,admNo:tx.admNo||"",name:tx.name,father:tx.father||"",gender:tx.gender,dob:tx.dob||"",cat:tx.cat||"",cl:tx.cl,sec:tx.sec,admDate:day,status:"On roll",
       prevSchool:tx.ext||tx.fromSchool||"",...(tx.stuExtra||{}),createdAt:TS,updatedAt:TS,by:me().name||""}}); }
   } else if(st){ tx.studentId=st.id;
-    if(k==="sec") ops.upd.push({col:"students",id:st.id,data:{sec:tx.toSec,updatedAt:TS}});
+    if(k==="sec") ops.upd.push({col:"students",id:st.id,data:{sec:tx.toSec,...(tx.toCl&&tx.toCl!==tx.cl?{cl:tx.toCl}:{}),updatedAt:TS}});
     else if(k==="out") ops.upd.push({col:"students",id:st.id,data:{status:"Left",leftDate:day,leftReason:AL(tx.action)+(tx.remarks?" — "+tx.remarks:""),updatedAt:TS}});
     else if(k==="apei_out") ops.upd.push({col:"students",id:st.id,data:{status:"Transferred out",leftDate:day,leftReason:`${AL(tx.action)} → ${tx.toSchool==="__other"?(tx.ext||"other APEI"):tx.toSchool}`,updatedAt:TS}});
   }
 }
 
-function stuRegHtml(){ const code=stuSchool(); if(!code) return `<div class="panel empty">No school.</div>`; const ed=code!=="ALL"&&canEnter(code);
+function stuRegHtml(){ const code=stuSchool(); if(!code) return `<div class="panel empty">No school.</div>`; const ed=code!=="ALL"&&(canEnter(code)||role()==="hq");
     const sc=scOf(code);
     return `<div class="panel"><div class="ph"><h2>Student data bank — ${code==="ALL"?"all schools":h(code)+" "+h(sc.name)}</h2>
       <div class="pills">${mySchool()?"":`<select class="in" style="width:auto" data-chg="stuSchool"><option value="ALL" ${code==="ALL"?"selected":""}>All schools</option>${schoolList().map(s=>`<option value="${h(s.code)}" ${s.code===code?"selected":""}>${h(s.code)}</option>`).join("")}</select>`}
       ${ed?`<button class="btn" data-act="formDlg">📷 Read admission form</button><button class="btn p" data-act="go" data-id="student" data-p="new=1&school=${h(code)}">+ Add student</button><button class="btn" data-act="tplStudents">Excel template</button><label class="btn">Import Excel <input type="file" accept=".xlsx,.xls,.csv" data-chg="impStudents" hidden></label><label class="btn" title="Pictures named by Adm No, e.g. 16045.jpg">📷 Upload photos <input type="file" accept="image/*" multiple data-chg="photosBulk" hidden></label>`:""}${canDL()&&canSD()?`<button class="btn" data-act="stuExport">Export Excel</button>`:""}</div></div>
+      ${code==="ALL"&&canDecide()?`<p class="hint" style="margin-top:0">To <b>add</b> a student or <b>import</b> an Excel file, choose the school in the box above.</p>`:""}
       <div class="grid"><div class="f"><label for="sQ">Search name, father, Adm No, B-Form, contact</label><input id="sQ" data-sf="q" value="${h(S.stuQ||"")}" placeholder="type to search…"></div>
         <div class="f"><label for="sCl">${h(L("cl"))}</label><select id="sCl" data-sf="cl"><option value="">All classes</option>${sc.classes.map(c=>`<option ${S.stuCl===c.cl?"selected":""}>${h(c.cl)}</option>`).join("")}</select></div>
         <div class="f"><label for="sSt">Status</label><select id="sSt" data-sf="st">${["On roll","All",...STU_STATUS.slice(1)].map(x=>`<option ${(S.stuSt||"On roll")===x?"selected":""}>${x}</option>`).join("")}</select></div>
@@ -3465,23 +3657,24 @@ function stuRegHtml(){ const code=stuSchool(); if(!code) return `<div class="pan
         <p class="hint" style="margin-top:0">Strength comes from the entries; this shows how many of those students are already in the data bank. Fill it school by school with the Excel import — nothing here changes strength.</p><div class="scroll" id="sReg"></div></div>`;}
 const stuTab = () => { const t=S.params.tab||"reg"; return canSeeStudents()?t:"cat"; };
 VIEWS.students = {
-  shell(){ const T=[["reg","Register"],["chk","Data check"],["cat","Category-wise strength"],["sib","Siblings in APEIs"],["con","Contacts"],["dup",`👥 Duplicates${canSeeStudents()&&dupGroups().length?` (${dupGroups().length})`:""}`],["health","❤ Health"],["trash","🗑 Trash"]].filter(([k])=>k==="con"?isSA():k==="trash"?canDecide()&&canSeeStudents():k==="health"?canSeeStudents()&&canSD():k==="cat"||canSeeStudents()); const t=stuTab();
+  shell(){ const T=[["reg","Register"],["chk","Data check"],["cat","Category-wise strength"],["sib","Siblings in APEIs"],["con","Contacts"],["unv",`📥 Unverified`],["verd","✅ Verified"],["dup",`👥 Duplicates${canSeeStudents()&&dupGroups().length?` (${dupGroups().length})`:""}`],["health","❤ Health"],["trash","🗑 Trash"]].filter(([k])=>k==="con"?isSA():k==="trash"?canDecide()&&canSeeStudents():k==="health"?canSeeStudents()&&canSD():k==="cat"||canSeeStudents()); const t=stuTab();
     return `<div class="subtabs">${T.map(([k,l])=>`<button class="pill ${t===k?"on":""}" data-act="setP" data-p="tab=${k}">${l}</button>`).join("")}${canSeeStudents()?`<span class="hint" style="margin:0 0 0 auto;align-self:center">Tip: the search box at the top finds any student in all schools — press <kbd>/</kbd></span>`:""}</div>`
-      + (t==="dup" ? `<div class="panel" id="dupBody"></div>` : t==="health" ? `<div class="panel" id="hlBody"></div>` : t==="trash" && canDecide() ? `<div class="panel"><div class="scroll" id="trBody"></div></div>` : t==="chk" ? chkShell() : t==="con" && isSA() ? contactsHtml() : t==="cat" ? catPanelHtml() : t==="sib" ? `<div class="panel"><div class="ph"><h2>Siblings across all APEIs</h2><div class="pills"><select class="in" style="width:auto" data-chg="setPsel" data-k="sibSch"><option value="">All schools</option>${schoolList().map(s=>`<option ${S.params.sibSch===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select><label class="ck"><input type="checkbox" data-chg="setPck" data-k="sibX" ${S.params.sibX?"checked":""}> only families in 2+ campuses</label><label class="ck"><input type="checkbox" data-chg="setPck" data-k="sibAll" ${S.params.sibAll?"checked":""}> include students who left</label>${expBar("siblings")}</div></div><div class="scroll" id="sibBody"></div></div>` : stuRegHtml()); },
+      + (t==="unv"||t==="verd" ? `<div class="panel" id="vlBody"></div>` : t==="dup" ? `<div class="panel" id="dupBody"></div>` : t==="health" ? `<div class="panel" id="hlBody"></div>` : t==="trash" && canDecide() ? `<div class="panel"><div class="scroll" id="trBody"></div></div>` : t==="chk" ? chkShell() : t==="con" && isSA() ? contactsHtml() : t==="cat" ? catPanelHtml() : t==="sib" ? `<div class="panel"><div class="ph"><h2>Siblings across all APEIs</h2><div class="pills"><select class="in" style="width:auto" data-chg="setPsel" data-k="sibSch"><option value="">All schools</option>${schoolList().map(s=>`<option ${S.params.sibSch===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select><label class="ck"><input type="checkbox" data-chg="setPck" data-k="sibX" ${S.params.sibX?"checked":""}> only families in 2+ campuses</label><label class="ck"><input type="checkbox" data-chg="setPck" data-k="sibAll" ${S.params.sibAll?"checked":""}> include students who left</label>${expBar("siblings")}</div></div><div class="scroll" id="sibBody"></div></div>` : stuRegHtml()); },
   regions:{
     sibBody(){ return sibHtml(); },
     chkBody(){ return chkHtml(); },
     trBody(){ return trashHtml(); },
     dupBody(){ return dupHtml(); },
+    vlBody(){ return verListHtml(stuTab()); },
     hlBody(){ return healthHtml(); },
     cTbl(){ return catTblHtml(); },
     sList(){ const code=stuSchool(), R=stuOf(code); if(!R) return `<div class="empty">Loading the register…</div>`;
       const L2=stuFiltered(code);
       if(!L2.length) return `<div class="empty">${R.length?"No student matches.":"No students in the data bank yet — add them one by one or import the Excel template."}</div>`;
       const F=activeFields().filter(f=>f.list&&!["cl","sec"].includes(f.key)), lim=S.stuLimit||200;
-      const cell=(r,f)=>f.key==="gender"?(r.gender==="g"?"G":"B"):f.type==="date"?isoToDmy(r[f.key]):h(r[f.key]??"");
-      return `<p class="hint" style="margin-top:0">${L2.length} student${L2.length===1?"":"s"}${L2.length>lim?` — showing first ${lim}`:""}. Click a row to open the full record.</p><table><tr><th>#</th>${code==="ALL"?"<th>School</th>":""}<th>Class – Sec</th>${F.map(f=>`<th>${h(f.label)}</th>`).join("")}</tr>
-        ${L2.slice(0,lim).map((r,i)=>`<tr class="click" data-act="openStu" data-id="${h(r.id)}"><td class="mute">${i+1}</td>${code==="ALL"?`<td>${h(r.school)}</td>`:""}<td>${h(r.cl)} - ${h(r.sec)}</td>${F.map(f=>`<td>${f.key==="status"&&r.status!=="On roll"?`<span class="tag t-out">${h(r.status)}</span>`:f.key==="cat"?h(catLabel(r.cat)):cell(r,f)}</td>`).join("")}</tr>`).join("")}</table>
+      const cell=(r,f)=>f.key==="gender"?(r.gender==="g"?"G":"B"):f.type==="date"?isoToDmy(r[f.key]):PHONE_KEYS.has(f.key)?h(fmtPhones(r[f.key]||"")):/Cnic$/.test(f.key)&&digits(r[f.key]).length===13?h(fmtCnic(r[f.key])):h(r[f.key]??""), sel=canDecide();
+      return `<p class="hint" style="margin-top:0">${L2.length} student${L2.length===1?"":"s"}${L2.length>lim?` — showing first ${lim}`:""}. Click a row to open the full record.${sel?" Tick students to move them to Trash together.":""}</p>${sel?`<div class="pills" style="margin-bottom:6px"><button class="btn s r" data-act="regTrash">🗑 Move ticked students to Trash</button></div>`:""}<table><tr>${sel?`<th><input type="checkbox" data-selall="1" style="width:18px;height:18px" title="Tick all shown"></th>`:""}<th>#</th>${code==="ALL"?"<th>School</th>":""}<th>Class – Sec</th>${F.map(f=>`<th>${h(f.label)}</th>`).join("")}</tr>
+        ${L2.slice(0,lim).map((r,i)=>`<tr class="click" data-act="openStu" data-id="${h(r.id)}">${sel?`<td><input type="checkbox" data-sel="${h(r.id)}" style="width:18px;height:18px"></td>`:""}<td class="mute">${i+1}</td>${code==="ALL"?`<td>${h(r.school)}</td>`:""}<td>${h(r.cl)} - ${h(r.sec)}</td>${F.map(f=>`<td>${f.key==="status"&&r.status!=="On roll"?`<span class="tag t-out">${h(r.status)}</span>`:f.key==="cat"?h(catLabel(r.cat)):cell(r,f)}</td>`).join("")}</tr>`).join("")}</table>
         ${L2.length>lim?`<div class="row" style="justify-content:flex-start"><button class="btn" data-act="stuMore">Show all ${L2.length}</button></div>`:""}`; },
     sReg(){ const code=stuSchool(), R=stuOf(code); if(!R) return ""; const on=R.filter(r=>r.status==="On roll");
       if(code==="ALL"){ let T=0,B=0; const rows=schoolList().map(s=>{ const st=schoolStats(s.code).str, n=on.filter(r=>r.school===s.code).length; T+=st; B+=n; const p=st?Math.round(n/st*100):0; return `<tr><td>${h(s.code)} — ${h(s.name)}</td><td class="n">${nf(st)}</td><td class="n">${nf(n)}</td><td class="n">${sg(n-st)}</td><td><div class="bar" style="margin:0;min-width:120px"><i style="width:${Math.min(100,p)}%"></i></div></td><td class="n">${p}%</td></tr>`; }).join("");
@@ -3699,7 +3892,7 @@ const ACT = {
   toggleAll: () => { const code=S.dashSchool||mySchool()||schoolList()[0]?.code; const keys=S.schools[code].classes.map(c=>code+"|"+c.cl); const any=keys.some(k=>S.open.has(k)); keys.forEach(k=>any?S.open.delete(k):S.open.add(k)); fillRegion("dSchool",true); },
   voidTx: el => { const t=[...S.recentTx,...(S.logRows||[])].find(x=>x.id===el.dataset.id); if(!t) return;
     ask(isSA()?"Void this entry?":"Undo this entry?", `${h(AL(t.action))} — ${h(t.name)} (${h(t.cl)}-${h(t.sec)}). Strength is reversed; the entry stays in the log marked void.`, isSA()?"Void":"Undo", async r=>{
-      const ops=opsNew(); voidToOps(ops,t,r); if(t.action==="APEI_IN"&&t.tfrId) ops.upd.push({col:"transfers",id:t.tfrId,data:{status:"pending",inTx:null}});
+      const ops=opsNew(); voidToOps(ops,t,r); if(t.action==="APEI_IN"&&t.tfrId) ops.upd.push({col:"transfers",id:t.tfrId,data:{status:"pending",inTx:null}}); if(t.action==="APEI_OUT"&&t.tfrId) ops.upd.push({col:"transfers",id:t.tfrId,data:{status:"cancelled",cancelBy:me().name||"",cancelAt:TS}});
       await DB.apply(ops); toast("Entry reversed."); if(S.view==="log") runLog(); }, isSA()); },
   saveWaitCounts: async () => { const code=entrySchool(); const w=$$("[data-wc]").map(el=>({school:code, cl:el.dataset.wc, n:Math.max(0,Number(el.value)||0)})).filter(x=>x.n!==manualWait(code,x.cl));
     if(!w.length){ toast("No changes."); return; } await DB.apply({set:[],upd:[],inc:[],wait:w}); toast(`Waiting counts saved for ${w.length} class${w.length>1?"es":""}.`); },
@@ -3707,8 +3900,10 @@ const ACT = {
     modal(`<h3>Accept ${h(t.name)} from ${h(t.from)}</h3><form data-form="acceptTfr" data-id="${h(t.id)}"><div class="grid" style="grid-template-columns:1fr 1fr">
       <div class="f"><label for="aCl">Class</label><select id="aCl" data-chg="acceptCl">${sc.classes.map(c=>`<option ${c===c0?"selected":""}>${h(c.cl)}</option>`).join("")}</select></div>
       <div class="f"><label for="aSec">Section</label><select id="aSec">${secOpts(t.to,c0)}</select></div>
-      <div class="f" style="grid-column:1/-1"><label for="aAdm">New Adm / Reg No (optional)</label><input id="aAdm" value="${h(t.admNo)}"></div></div>
-      <div class="row"><button type="button" class="btn" data-act="closeModal">Cancel</button><button class="btn p">Accept (+1 to ${h(t.to)})</button></div></form>`); },
+      <div class="f"><label for="aAdm">New Adm / Reg No</label><input id="aAdm" value="${h(t.admNo)}"></div>
+      <div class="f"><label for="aDate">Date of joining</label><input id="aDate" type="date" value="${isoDay(Date.now())}" max="${isoDay(Date.now())}"></div></div>
+      ${role()==="clerk"&&apprOn("tfr")?`<p class="hint">Your acceptance goes to the DQ Office; the student is added to ${h(t.to)}'s strength when they approve.</p>`:""}
+      <div class="row"><button type="button" class="btn" data-act="closeModal">Cancel</button><button class="btn p">${role()==="clerk"&&apprOn("tfr")?"Accept — send for approval":`Accept (+1 to ${h(t.to)})`}</button></div></form>`); },
   rejectTfr: el => { const t=S.transfers.find(x=>x.id===el.dataset.id);
     ask("Reject transfer?", `${h(t.name)} from ${h(t.from)} will not be added. ${h(t.from)} can then restore the student.`, "Reject", async r=>{ await DB.apply({set:[],inc:[],upd:[{col:"transfers",id:t.id,data:{status:"rejected",rejReason:r,rejBy:me().name||"",rejAt:TS}}]}); toast("Transfer rejected."); }, true); },
   cancelTfr: el => { const t=S.transfers.find(x=>x.id===el.dataset.id);
@@ -3794,10 +3989,10 @@ const ACT = {
     try{ await adminCall({action:"ping"},url); }catch(e){ toast("The helper did not answer correctly: "+e.message,true); return; } await saveSettings({adminFn:url},"Server helper connected — you can now set passwords and delete logins completely."); fillRegion("stBody",true); },
   adminFnOff: async () => { await saveSettings({adminFn:""},"Server helper disconnected."); fillRegion("stBody",true); },
   logPreset: el => { const d0=new Date(); d0.setHours(0,0,0,0); const k=el.dataset.id, D=n=>isoDay(d0.getTime()-n*864e5); let f=D(0), t=D(0);
-    if(k==="yday"){ f=t=D(1); } else if(k==="d7") f=D(6); else if(k==="d30") f=D(29); else if(k==="month"){ const m=new Date(d0); m.setDate(1); f=isoDay(m.getTime()); } else if(k==="all") f="2020-01-01";
+    if(k==="yday"){ f=t=D(1); } else if(k==="d7") f=D(6); else if(k==="d30") f=D(29); else if(k==="month"){ const m=new Date(d0); m.setDate(1); f=isoDay(m.getTime()); } else if(k==="all") f=ST().baseFrom||ST().goLive||isoDay(Math.min(...(S.recentTx||[]).map(t=>t.atMs).filter(Boolean),Date.now()-365*864e5));
     $("#lgFrom").value=f; $("#lgTo").value=t; FORMS.log(); },
   bulkVoid: () => { const L0=selectedTx().filter(canVoid); if(!L0.length){ toast("Tick the entries to void first (only entries that can still be voided).",true); return; }
-    ask(`Void ${L0.length} entr${L0.length===1?"y":"ies"}?`,`Strength is reversed for each; they stay in the log marked void.`,`Void ${L0.length}`,async r=>{ const ops=opsNew(); for(const t of L0){ voidToOps(ops,t,r); if(t.action==="APEI_IN"&&t.tfrId) ops.upd.push({col:"transfers",id:t.tfrId,data:{status:"pending",inTx:null}}); } await DB.apply(ops); toast(`${L0.length} entries voided.`); runLog(); },true); },
+    ask(`Void ${L0.length} entr${L0.length===1?"y":"ies"}?`,`Strength is reversed for each; they stay in the log marked void.`,`Void ${L0.length}`,async r=>{ const ops=opsNew(); for(const t of L0){ voidToOps(ops,t,r); if(t.action==="APEI_IN"&&t.tfrId) ops.upd.push({col:"transfers",id:t.tfrId,data:{status:"pending",inTx:null}}); if(t.action==="APEI_OUT"&&t.tfrId) ops.upd.push({col:"transfers",id:t.tfrId,data:{status:"cancelled",cancelBy:me().name||"",cancelAt:TS}}); } await DB.apply(ops); toast(`${L0.length} entries voided.`); runLog(); },true); },
   revOk: async () => { const L0=selectedTx().filter(t=>t.status==="pending"||(t.status==="ok"&&t.rev===false)); if(!L0.length){ toast("Tick the entries to approve.",true); return; } await approveTx(L0); runLog(); },
   revNo: () => { const L0=selectedTx().filter(t=>t.status==="pending"||(t.status==="ok"&&t.rev===false)); if(!L0.length){ toast("Tick the entries to reject.",true); return; }
     ask(`Reject ${L0.length} entr${L0.length===1?"y":"ies"}?`,"Pending entries never reach strength; counted ones are reversed. The clerk sees your reason.","Reject",async r=>{ await rejectTx(L0,r); runLog(); },true); },
@@ -3869,9 +4064,9 @@ const ACT = {
   tplTfr: async () => { const X=extraFields("tfrFields"); await writeBook("Transfer_requests_template.xlsx",[["Requests",[[...TFR_COLS.map(c=>c[1]),...X.map(f=>f.label)],[isoToDmy(isoDay(Date.now())),"Example Student (delete this row)","Father Name","IV","B","1","0300-1234567",schoolList()[0].code,schoolList()[1]?.code||"","","",""]]],
       ["Valid values",[["Class","","School codes","","Category no.","Category"],...Array.from({length:Math.max(allLevels().length,schoolList().length,cats().length)},(_,i)=>[allLevels()[i]||"","",schoolList()[i]?`${schoolList()[i].code} — ${schoolList()[i].name}`:"","",cats()[i]?String(i+1):"",cats()[i]||""])]],
       ["How to fill",[["One row per request."],["Date of Application: dd-mm-yyyy. "+(isSA()?"As Super Admin you may enter earlier dates.":"Only the Super Admin can back-date; other dates become today.")],["Class: as in 'Valid values' (e.g. IV, IX). Category: its number."],["Currently Studying At: a school code, or the name of an APEI outside the cluster."],["1st / 2nd Choice School: school code."],["Numbers TR-… are given in order of the application date."]]]],{template:true}); },
-  tfrDel: el => ask("Delete this request?",`${h(el.dataset.id)} will be removed from the seniority list (kept in backup only).`,"Delete",async()=>{ await DB.apply({set:[],inc:[],upd:[{col:"tfrapps",id:el.dataset.id,data:{deleted:true,delBy:me().name||"",delAt:TS}}]}); toast("Request deleted."); }),
+  tfrDel: el => ask("Remove this request?",`${h(el.dataset.id)} will be removed from the seniority list (kept in backup only).`,"Delete",async()=>{ await DB.apply({set:[],inc:[],upd:[{col:"tfrapps",id:el.dataset.id,data:{deleted:true,delBy:me().name||"",delAt:TS}}]}); toast("Request deleted."); }),
   tfrEdit: el => { const t=S.tfrapps.find(x=>x.id===el.dataset.id); modal(`<h3>Edit ${h(t.id)} — ${h(t.name)}</h3><form data-form="tfrEdit" data-id="${h(t.id)}"><div class="grid" style="grid-template-columns:1fr 1fr">
-      <div class="f"><label for="teDate">Date of application</label><input id="teDate" type="date" value="${h(t.appDate)}" max="${isoDay(Date.now())}"></div>
+      <div class="f"><label for="teDate">Date of application</label><input id="teDate" type="date" value="${h(t.appDate)}" max="${isoDay(Date.now())}" ${isSA()?"":"disabled title=\"Only the Super Admin can change the application date (it decides seniority)\""}></div>
       <div class="f"><label for="teCl">Class</label><select id="teCl">${allLevels().map(l=>`<option ${l===t.cl?"selected":""}>${h(l)}</option>`).join("")}</select></div>
       <div class="f"><label for="teName">Name</label><input id="teName" value="${h(t.name)}"></div><div class="f"><label for="teFather">Father</label><input id="teFather" value="${h(t.father)}"></div>
       <div class="f"><label for="teCon">Contact</label><input id="teCon" value="${h(t.contact)}"></div><div class="f"><label for="teCat">Category</label><select id="teCat">${catOptions(t.cat,"—")}</select></div>
@@ -3973,7 +4168,7 @@ document.addEventListener("change", async e => {
 document.addEventListener("click", e => {
   const bl=$("#bellList"); if(bl && !bl.hidden && !e.target.closest("#bellList") && !e.target.closest("[data-act=bell]")) bl.hidden=true;
   const um=$("#umenu"); if(um && !um.hidden && !e.target.closest(".umenu")) um.hidden=true; else if(um && e.target.closest("#umenu [data-act]")) um.hidden=true;
-  const el=e.target.closest("[data-act]"); if(!el || !ACT[el.dataset.act]) return;
+  const el=e.target.closest("[data-act]"); if(!el || !ACT[el.dataset.act]) return; if(el.tagName==="TR" && e.target!==el && e.target.closest("input,select,textarea,label,button")) return;
   if((el.tagName==="A" && el.dataset.act!=="waEdit") || el.tagName==="BUTTON") e.preventDefault();
   Promise.resolve(ACT[el.dataset.act](el,e)).catch(err=>toast(err.message,true));
 });
@@ -4001,8 +4196,9 @@ const FORMS = {
   admit: async f => { const w=S.waiting.find(x=>x.id===f.dataset.id); const ops=opsNew(), sec=$("#adSec").value;
     const txId=txToOps(ops,{school:w.school,action:"NEW",cl:w.cl,sec,gender:$("#adGen").value,cat:$("#adCat").value,name:w.name,father:w.father||"",dob:parseDob(w.dob)||"",admNo:$("#adAdm").value.trim(),remarks:"From waiting list",waitId:w.id});
     ops.upd.push({col:"waiting",id:w.id,data:{status:"Admitted",admittedTx:txId,updatedAt:TS,updatedBy:me().name||""}}); await DB.apply(ops); closeModal(); toast(`${w.name} admitted to ${w.cl} - ${sec}.`); },
-  acceptTfr: async f => { const t=S.transfers.find(x=>x.id===f.dataset.id); const ops=opsNew(); const cl=$("#aCl").value, sec=$("#aSec").value, adm=$("#aAdm").value.trim();
-    try{ await ensureStu(t.to); }catch(e){}
+  acceptTfr: async f => { const t=S.transfers.find(x=>x.id===f.dataset.id); const ops=opsNew(); const cl=$("#aCl").value, sec=$("#aSec").value, adm=$("#aAdm").value.trim(), date=$("#aDate")?.value||"";
+    if(role()==="clerk"&&apprOn("tfr")){ const a=apprNew("tfr",{school:t.to,name:t.name,admNo:t.admNo,cl:t.fromCl,sec:t.fromSec},{tfrId:t.id,from:t.from,toCl:cl,toSec:sec,newAdm:adm,date}); ops.set.push(a); ops.upd.push({col:"transfers",id:t.id,data:{status:"accept_wait",toCl:cl,toSec:sec,accBy:me().name||"",accAt:TS}}); await DB.apply(ops); closeModal(); toast(`${t.name}: acceptance sent to the DQ Office.`); apprLoad(); return; }
+    try{ await ensureStu(t.to); }catch(e){} if(date){ tfrAcceptOps(ops,t,cl,sec,adm,date); await DB.apply(ops); closeModal(); toast(`${t.name} joined ${t.to} ${cl}-${sec}.`); return; }
     const sid=newId(); ops.set.push({col:"students",id:sid,data:{...(t.stu||{name:t.name,father:t.father||"",dob:t.dob||"",gender:t.gender,cat:t.cat||""}),school:t.to,admNo:adm||t.stu?.admNo||"",cl,sec,status:"On roll",admDate:isoDay(Date.now()),prevSchool:t.from,leftDate:"",leftReason:"",createdAt:TS,updatedAt:TS,by:me().name||""}});
     const inId=txToOps(ops,{school:t.to,action:"APEI_IN",cl,sec,gender:t.gender,cat:t.cat,name:t.name,father:t.father||"",dob:t.dob||"",admNo:adm,remarks:t.remarks||"",fromSchool:t.from,tfrId:t.id,studentId:sid});
     ops.upd.push({col:"transfers",id:t.id,data:{status:"accepted",inTx:inId,toCl:cl,toSec:sec,accBy:me().name||"",accAt:TS}}); await DB.apply(ops); closeModal(); toast(`${t.name} joined ${t.to} ${cl}-${sec}.`); },
@@ -4024,7 +4220,7 @@ const FORMS = {
     if(d.choice1===d.curSchool){ toast("1st choice is the same as the present school.",true); return; } d.backdated=d.appDate<isoDay(Date.now());
     const dup=S.tfrapps.find(t=>tfrOpen(t.status)&&norm(t.name)===norm(d.name)&&norm(t.father)===norm(d.father)&&t.cl===d.cl); if(dup && !confirm(`${dup.id} already exists for ${dup.name} (${dup.cl}). Register again?`)) return;
     await tfrCreate([d]); toast(`Registered as ${tfrId(nextTfrNo()-1)}.`); for(const id of ["taName","taFather","taCon","taAdm","taRem"]) $("#"+id).value=""; $("#taName").focus(); },
-  tfrEdit: async f => { const d={appDate:$("#teDate").value,cl:$("#teCl").value,name:$("#teName").value.trim(),father:$("#teFather").value.trim(),contact:$("#teCon").value.trim(),cat:$("#teCat").value,choice1:$("#teC1").value,choice2:$("#teC2").value,updatedAt:TS,updatedBy:me().name||""}; d.backdated=d.appDate<isoDay(Date.now());
+  tfrEdit: async f => { const t0=S.tfrapps.find(x=>x.id===f.dataset.id); const d={appDate:isSA()?$("#teDate").value:t0.appDate,cl:$("#teCl").value,name:$("#teName").value.trim(),father:$("#teFather").value.trim(),contact:$("#teCon").value.trim(),cat:$("#teCat").value,choice1:$("#teC1").value,choice2:$("#teC2").value,updatedAt:TS,updatedBy:me().name||""}; d.backdated=d.appDate<isoDay(Date.now());
     await DB.apply({set:[],inc:[],upd:[{col:"tfrapps",id:f.dataset.id,data:d}]}); closeModal(); toast("Request updated."); },
   dcSave: async f => { const code=f.dataset.id, use=!!$("#dcUse").value; const d={cap:Math.max(0,Number($("#dcCap").value)||0),fee:Math.max(0,Number($("#dcFee").value)||0),useReg:use,remarks:$("#dcRem").value.trim(),updatedAt:TS,byName:me().name||""}; if(!use) d.str=Math.max(0,Number($("#dcStr").value)||0);
     await DB.apply({set:[{col:"dcare",id:code,data:d,merge:"deep"}],upd:[],inc:[]}); toast(`Day care figures saved for ${code}.`); renderView(); },
