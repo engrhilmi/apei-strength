@@ -1965,7 +1965,7 @@ async function impWaiting(file){ const code=waitSchool(); const X=extraFields("w
     if(!c) E("cl",v.cl?`"${v.cl}" is not a class of ${code}`:"missing"); if(!v.name) E("name","missing"); const ad=chkDate(v,"appl",E,{future:false}); const dob=chkDate(v,"dob",E,{future:false});
     let st=waitSts()[0].name; if(v.status){ const s=waitSts().find(s=>norm(s.name)===norm(v.status)); if(!s) E("status",`"${v.status}" — use ${waitSts().map(s=>s.name).join(" / ")}`); else st=s.name; }
     r.d={school:code,cl:c?.cl,date:ad||isoDay(Date.now()),name:v.name,father:v.father||"",unit:v.unit||"",contact:fmtPhones(v.contact),dob:dob?isoToDmy(dob):"",status:st,marks:v.marks||"",dqRemarks:v.dq||"",admsn:v.admsn||"",schRemarks:v.sch||"",x:Object.fromEntries(X.map(f=>[f.key,v[f.key]||""])),session:session(),at:TS,by:me().uid,byName:me().name||""}; }
-  impSet({kind:"wait", region:"wImp", file:file.name, cols:cols.map(c=>[c[0],c[1]]), rows, commit: async good=>{ const ops=opsNew(); for(const r of good) ops.set.push({col:"waiting",id:newId(),data:r.d}); await DB.apply(ops); toast(`${good.length} applicants imported into ${code}.`); } }); }
+  impSet({kind:"wait", region:"wImp", school:code, file:file.name, cols:cols.map(c=>[c[0],c[1]]), rows, commit: async good=>{ const ops=opsNew(); for(const r of good) ops.set.push({col:"waiting",id:newId(),data:r.d}); await DB.apply(ops); toast(`${good.length} applicants imported into ${code}.`); } }); }
 
 /* ---- transfer requests ---- */
 const TFR_COLS = [["appl","Date of Application",["dateofapplication","appldate","applicationdate","date"]],["name","Student Name",["studentname","name"]],["father","Father Name",["fathername","father"]],["cl","Class",["class","cl"]],["gender","Gender (B/G or 1/2)",["gender","genderbg"]],["cat","Category (number or name)",["category","cat","categoryno"]],["contact","Contact No",["contact","contactno","phone","mobile"]],["cur","Currently Studying At (code or APEI name)",["currentlystudyingat","currentschool","currentschoolstudying","studyingat","from"]],["c1","1st Choice School",["1stchoiceschool","choiceofschool","choice","1stchoice","choice1"]],["c2","2nd Choice School",["2ndchoiceschool","2ndchoice","choice2"]],["adm","Present Adm No",["presentadmno","admno"]],["rem","Remarks",["remarks","reason"]]];
@@ -1986,7 +1986,7 @@ async function impDc(file){ const code=dcSchool(); const rows=await readTable(fi
   for(const r of rows){ const v=r.v, [E]=mkRow(r); if(!v.name) E("name","missing"); const g=v.gender?chkGender(v,E):"b"; const dob=chkDate(v,"dob",E,{future:false}); const ad=chkDate(v,"adm",E,{future:false});
     if(v.fee && isNaN(Number(String(v.fee).replace(/,/g,"")))) E("fee",`"${v.fee}" is not a number`); if(v.status && !["present","left"].includes(norm(v.status))) E("status","use Present or Left");
     r.d={name:v.name,gender:g||"b",dob:dob||"",parent:v.parent||"",desig:v.desig||"",contact:fmtPhones(v.contact),admDate:ad||"",fee:Number(String(v.fee||"").replace(/,/g,""))||0,status:norm(v.status)==="left"?"Left":"Present"}; }
-  impSet({kind:"dc", region:"dcImp", file:file.name, cols:DC_COLS, rows, commit: async good=>{ if(!canDecide()){ for(const r of good) await dcReqSend(code,{kind:"kid",kidId:newId(),kid:r.d,isNew:true}); toast(`${good.length} children sent to the DQ Office for approval.`); return; } const kids={}; for(const r of good) kids[newId()]=r.d; await DB.apply({set:[{col:"dcare",id:code,data:{kids,updatedAt:TS,byName:me().name||""},merge:"deep"}],upd:[],inc:[]}); toast(`${good.length} children added to ${code} day care.`); } }); }
+  impSet({kind:"dc", region:"dcImp", school:code, file:file.name, cols:DC_COLS, rows, commit: async good=>{ if(!canDecide()){ for(const r of good) await dcReqSend(code,{kind:"kid",kidId:newId(),kid:r.d,isNew:true}); toast(`${good.length} children sent to the DQ Office for approval.`); return; } const kids={}; for(const r of good) kids[newId()]=r.d; await DB.apply({set:[{col:"dcare",id:code,data:{kids,updatedAt:TS,byName:me().name||""},merge:"deep"}],upd:[],inc:[]}); toast(`${good.length} children added to ${code} day care.`); } }); }
 
 /* ---- fee defaulters list ---- */
 const FEE_COLS = [["adm","Adm No",["admno","adm","admregno","admissionno"]],["name","Student Name (optional, for checking)",["studentname","name","studentnameoptionalforchecking"]],["m","Months Unpaid",["monthsunpaid","months","month","noofmonths"]],["amt","Amount (blank = months × fee)",["amount","amountblankmonthsfee","amountrs","dues"]]];
@@ -1997,9 +1997,9 @@ async function impFee(file){ const code=S.fd.code; const rows=await readTable(fi
     const m=Number(v.m); if(!m||m<1||m>36||!Number.isInteger(m)) E("m",`"${v.m}" — a whole number of months (1 or more)`);
     const amt=v.amt?Number(String(v.amt).replace(/,/g,"")):null; if(v.amt && (isNaN(amt)||amt<0)) E("amt",`"${v.amt}" is not an amount`);
     r.st=st; r.m=m; r.amt=amt; if(st) r.v.name=r.v.name||st.name; }
-  impSet({kind:"fee", region:"feBody", file:file.name, cols:FEE_COLS, rows, commit: async good=>{ for(const r of good){ feeAddStu(r.st,r.m); if(r.amt!==null) S.fd.rows[r.st.id].amt=r.amt; } toast(`${good.length} defaulters added — check and press Save.`); } }); }
+  impSet({kind:"fee", region:"feBody", school:code, file:file.name, cols:FEE_COLS, rows, commit: async good=>{ for(const r of good){ feeAddStu(r.st,r.m); if(r.amt!==null) S.fd.rows[r.st.id].amt=r.amt; } toast(`${good.length} defaulters added — check and press Save.`); } }); }
 
-async function impGo(){ const I=S.imp; if(!I) return; const good=I.rows.filter(r=>!r.errs.length); try{ await I.commit(good); S.imp=null; }catch(e){ if(fsFail(e)) toast("Not imported — the database connection stopped. Press “Reload now” in the red box, then import the file again.",true); else toast("Import failed, nothing saved: "+e.message,true); return; }
+async function impGo(){ const I=S.imp; if(!I) return; const good=I.rows.filter(r=>!r.errs.length); try{ await I.commit(good); S.imp=null; uploadLog(I,good); }catch(e){ if(fsFail(e)) toast("Not imported — the database connection stopped. Press “Reload now” in the red box, then import the file again.",true); else toast("Import failed, nothing saved: "+e.message,true); return; }
   if(I.kind==="dc") fillRegion("dcList",true); fillRegion(I.region,true); }
 
 /* =====================================================================
@@ -4384,6 +4384,26 @@ document.addEventListener("change",async e=>{ const el=e.target; if(!el.matches?
   try{ toast("Saving the document…"); const img=await shrinkImage(f,1600,0.7), id=newId(), d={stuId:r.id,school:r.school,type:$("#docT")?.value||"Other",img,by:me().uid,byName:me().name||"",atMs:Date.now(),at:TS};
     await DB.apply({set:[{col:"stuDocs",id,data:d},{col:"edits",id:newId(),data:{stuId:r.id,school:r.school,stuName:r.name,admNo:r.admNo||"",changes:[{k:"_doc",l:"Document",from:"",to:"added: "+d.type}],at:TS,day:isoDay(Date.now()),by:me().uid,byName:me().name||"",role:role()}}],upd:[],inc:[],noIdx:true});
     (S.sp.docs ||= []).push({id,...d}); toast("Document saved."); fillRegion("spBody",true); }catch(x){ toast("Not saved — "+x.message,true); } });
+
+/* ---------- record of every Excel upload: who, which school, file, rows ---------- */
+const UP_KIND={entries:"Entries",students:"Students (data bank)",wait:"Applicants",tfr:"Transfer requests",dc:"Day care children",fee:"Fee defaulters",rep:"Repeaters"};
+function uploadLog(I, good){ try{ const bad=I.rows.length-good.length, schools={};
+  for(const r of good){ const sc=r.d?.school||r.d?.from||I.school||me().school||"ALL"; schools[sc]=(schools[sc]||0)+1; }
+  if(!good.length) schools[I.school||me().school||"ALL"]=0;
+  const ops=opsNew(); ops.noIdx=true; ops.noUndo=true; ops.noChk=true; const now=Date.now();
+  for(const [sc,n] of Object.entries(schools)) ops.set.push({col:"uploads",id:newId(),data:{kind:I.kind,school:sc,file:I.file||"",rows:n,rejected:sc===(I.school||sc)?bad:0,by:me().uid,byName:me().name||"",role:role(),atMs:now,day:isoDay(now),at:TS}});
+  DB.apply(ops,true).then(()=>{ S.upRows=null; }).catch(()=>{}); }catch(e){} }
+async function upLoad(fromDay){ try{ const R=ownOnly()?(await DB.queryW("uploads",[["school","==",me().school]])).filter(u=>u.day>=fromDay):await DB.query("uploads","day",">=",fromDay); S.upRows=hideSA(R); }catch(e){ S.upRows=[]; } fillRegion("dStatus",true); }
+function upPanel(){ const sch=schoolList(), from=isoDay(Date.now()-29*864e5); if(!S.upRows){ if(!S.upLoading){ S.upLoading=1; upLoad(from).finally(()=>{ S.upLoading=0; }); } return `<p class="mute">Loading uploads…</p>`; }
+  const now=Date.now(), t0=new Date(); t0.setHours(0,0,0,0); const W=[["Today",t0.getTime()],["Yesterday",t0.getTime()-864e5,t0.getTime()-1],["Past 7 days",now-7*864e5],["Past 30 days",now-30*864e5]];
+  const sum=(code,w)=>{ const L=S.upRows.filter(u=>(!code||u.school===code)&&u.atMs>=w[1]&&u.atMs<=(w[2]||now)); return {n:L.length,rows:L.reduce((a,u)=>a+(u.rows||0),0)}; };
+  const cell=x=>x.n?`<span class="dn" data-act="upShow">${nf(x.rows)}</span><br><span class="mini mute">${x.n} file${x.n>1?"s":""}</span>`:`<span class="mute">0</span>`;
+  const last=S.upRows.slice().sort((a,b)=>b.atMs-a.atMs).slice(0,S.upAll?500:8);
+  return `<h3 style="margin:14px 0 6px">Uploads (Excel) — rows saved</h3><table class="sttab"><tr><th>Period</th>${sch.map(s=>`<th class="n">${h(s.code)}</th>`).join("")}<th class="n">${h(L("total"))}</th></tr>
+    ${W.map(w=>`<tr><td>${w[0]}</td>${sch.map(s=>`<td class="n">${cell(sum(s.code,w))}</td>`).join("")}<td class="n"><b>${cell(sum("",w))}</b></td></tr>`).join("")}</table>
+   ${last.length?`<table style="margin-top:8px"><tr><th>When</th><th>School</th><th>What</th><th>File</th><th class="n">Rows saved</th><th class="n">Rows rejected</th><th>By</th></tr>${last.map(u=>`<tr><td>${h(fmtDT(u.atMs))}</td><td>${h(u.school)}</td><td>${h(UP_KIND[u.kind]||u.kind)}</td><td style="white-space:normal;max-width:260px">${h(u.file)}</td><td class="n"><b>${nf(u.rows||0)}</b></td><td class="n ${u.rejected?"neg":""}">${nf(u.rejected||0)}</td><td>${h(u.byName)} <span class="mute">${h(ROLES[u.role]||"")}</span></td></tr>`).join("")}</table>${S.upRows.length>8&&!S.upAll?`<button class="btn s" data-act="upShow">Show all ${S.upRows.length} uploads (30 days)</button>`:""}`:`<p class="mute">No uploads in the last 30 days.</p>`}`; }
+Object.assign(EXTRA_ACT,{ upShow: () => { S.upAll=true; fillRegion("dStatus",true); } });
+(()=>{ const o=VIEWS.dash?.regions?.dStatus; if(o) VIEWS.dash.regions.dStatus=(...a)=>o(...a)+upPanel(); })();
 
 /* =====================================================================
    13) STUDENT DATA BANK — one record per student, filled gradually.
