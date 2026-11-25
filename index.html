@@ -261,6 +261,7 @@ body.ewon :is(h1,h2,h3,h4,th,label,caption,summary,nav a,.pill,.btn,.kpi>span,.s
 #annBar{position:sticky;top:calc(var(--bandH,62px) + 44px);z-index:28}
 .ann{display:flex;align-items:center;gap:10px;background:var(--ac);color:#fff;padding:7px max(3vw,14px);font-weight:600;font-size:14.5px;border-bottom:1px solid rgba(255,255,255,.25)}
 .ann-ic{font-size:17px}.ann-tx{flex:1;min-width:0;overflow:hidden}.ann-aud{font-size:11px;background:rgba(255,255,255,.2);border-radius:99px;padding:2px 8px;white-space:nowrap}
+.ann-do{background:#fff;color:var(--ac);border:0;border-radius:99px;padding:4px 12px;font-weight:700;cursor:pointer;white-space:nowrap}.ann-do:hover{filter:brightness(.93)}.ann-ok{font-size:12px;background:rgba(255,255,255,.22);border-radius:99px;padding:3px 10px;white-space:nowrap}
 .ann-x{background:none;border:0;color:#fff;font-size:16px;cursor:pointer;opacity:.8}.ann-x:hover{opacity:1}
 .ann-flash{animation:annflash 1.1s steps(2,jump-none) infinite}
 @keyframes annflash{0%,100%{background:var(--ac)}50%{background:color-mix(in srgb,var(--ac) 55%,#fff);color:#111}}
@@ -270,6 +271,9 @@ body.ewon :is(h1,h2,h3,h4,th,label,caption,summary,nav a,.pill,.btn,.kpi>span,.s
 @media (prefers-reduced-motion:reduce){.ann-flash,.ann-run{animation:none}}
 .ann-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
 @media print{#annBar{display:none}}
+tr.tot:hover td,tr.tot td:hover,tr.tot td.dn:hover,tr.tot .dn:hover,tr.tot.click:hover td{background:color-mix(in srgb,var(--band) 85%,#fff)!important;color:#fff!important}
+tr.sub:hover td{color:inherit}
+caption.scap:hover{background:var(--band)}
 </style>
 </head>
 <body>
@@ -602,7 +606,9 @@ function txToOps(ops, tx){
   return tx.id;
 }
 function voidToOps(ops, tx, reason){
-  ops.upd.push({ col:"transactions", id:tx.id, data:{ status:"void", voidBy:me().name||me().uid, voidAt:TS, voidReason:reason||"" } });
+  const pre = tx.atMs && typeof baseStartMs==="function" && baseStartMs() && tx.atMs < baseStartMs();
+  ops.upd.push({ col:"transactions", id:tx.id, data:{ status:"void", voidBy:me().name||me().uid, voidAt:TS, voidReason:reason||"", ...(pre?{voidNoEffect:true}:{}) } });
+  if(pre) return;   // the base figures (category sheet) already include this entry — voiding only marks it
   for (const [school,cl,sec,n] of effects(tx)){ ops.inc.push({ school, key:K(cl,sec,tx.gender), n:-n }); if(tx.cat) ops.inc.push({ school, key:cl+"|"+tx.cat, n:-n, f:"c" }); }
 }
 function snapshotData(){ const d={}; for(const s of schoolList()){ const st=schoolStats(s.code); d[s.code]={str:st.str,auth:st.auth,g:st.g,b:st.b,wait:st.wait,n:st.n,w:Object.fromEntries(st.classes.filter(c=>c.wait).map(c=>[c.cl,c.wait]))}; if(hasDc(s)) d[s.code].dc=dcStr(s.code); } return d; }
@@ -957,7 +963,7 @@ const consSel = () => S.liveCons||ST().consGroup||"APSACS";
 VIEWS.dash = {
   shell:()=>`${heroHtml()}<div class="livehead"><div><h2>${h(L("hLive"))}</h2><span class="hint" style="margin:0" id="lvClock"></span></div>
      <select class="in" style="width:auto" data-chg="dashPeriod" title="Which movements count as ${h(L("net"))}">${["cutoff","today","yesterday","7d"].map(k=>`<option value="${k}" ${dashPeriod()===k?"selected":""}>Movement: ${PERIODS[k]}</option>`).join("")}</select></div>
-    <div id="dKpi"></div><div class="panel" id="dStatus"></div>
+    <div id="dKpi"></div><div class="panel" id="dStatus"></div>${canSeeStudents()?`<div class="panel"><div class="ph"><h2>Data bank — entered against strength</h2><button class="btn s" data-act="go" data-id="students" data-p="tab=chk">Open Data check ›</button></div><div class="scroll" id="dDb"></div></div>`:""}
     <div class="panel only-wide"><div class="ph"><h2>${h(L("hSum"))}</h2><span class="hint" style="margin:0">Click a school to open its classes below</span></div><div class="scroll" id="dSum"></div></div>
     <div id="dCards" class="cards only-narrow"></div>
     <div class="panel" id="dDetail"><div class="ph"><h2 id="dTitle">School detail</h2><div class="pills" id="dPills"></div></div><div class="scroll" id="dSchool"></div></div>
@@ -966,6 +972,7 @@ VIEWS.dash = {
   regions:{
     dKpi:()=>kpiHtml(schoolList().map(s=>s.code), periodWin(dashPeriod()), S.recentTx, dashPeriod()),
     dStatus:()=>entryPanel(),
+    dDb:()=>dbProgHtml(),
     dSum(){ const w=periodWin(dashPeriod()); const all=schoolList().map(s=>schoolStats(s.code,w)); const cols=["n","auth","str","g","b","sd","wait","net"];
       let body=""; for(const g of groupsList()){ const Lg=all.filter(s=>s.grp===g); body+=Lg.map(s=>statRow(`<b>${h(s.code)}</b> <span class="mute">${h(s.name)}</span>`,s,cols,"click"+(s.code===dashCode()?" sel":""),`data-act="dashSchool" data-id="${h(s.code)}"`,{school:s.code})).join(""); if(groupsList().length>1&&Lg.length>1) body+=statRow(`${h(L("total"))} ${h(g)}`,addUp(Lg),cols,"sub","",{grp:g}); }
       return `<table>${headRow(L("school"),cols)}<tbody>${body}${statRow(h(L("gtotal")),addUp(all),cols,"tot","",{all:"1"})}</tbody></table>`; },
@@ -1292,7 +1299,7 @@ function accountsModel(){ const sch=$("#lgSch")?.value, U=S.users.length?S.users
   const rows=U.filter(u=>(!sch||u.school===sch)&&!u.replacedBy).map(u=>{ const ids=new Set([u.uid,...(u.prevUids||[])]); const T=(S.logRows||[]).filter(t=>ids.has(t.by)), E=(S.editRows||[]).filter(e=>ids.has(e.by)), last=Math.max(0,...T.map(t=>t.atMs),...E.map(e=>toMs(e.at)));
     return {c:[u.name||"",ROLES[u.role]||u.role||"",u.school||"",num(T.filter(t=>t.status==="ok").length,"n"),num(T.filter(t=>t.status==="void").length,"n"),num(E.length,"n"),last?fmtDT(last):"—",u.active===false?"inactive":""]}; });
   return tbl("ACTIVITY BY ACCOUNT (Super Admin not listed)",["Account","Role","School","Entries","Voided","Record edits","Last activity",""],rows); }
-async function runLog(){ const f=$("#lgFrom"), t=$("#lgTo"); if(!f) return; const from=new Date(f.value+"T00:00").getTime(), to=new Date(t.value+"T23:59:59").getTime(); const tab=logTab();
+async function runLog(){ const f=$("#lgFrom"), t=$("#lgTo"); if(!f) return; if(!f.value) f.value="2025-01-01"; if(!t.value) t.value=isoDay(Date.now()); const from=new Date(f.value+"T00:00").getTime(), to=new Date(t.value+"T23:59:59").getTime(); const tab=logTab();
   try{ if(tab==="act"||tab==="sys"){ await (tab==="act"?actLoad(f.value,t.value):sysLoad(f.value,t.value)); fillRegion("lgRows",true); return; }
     if(tab!=="edits"){ S.logRows=await DB.fetchTx(from-8*864e5,to); S.logRows=S.logRows.filter(x=>tTime(x)>=from&&tTime(x)<=to).sort((a,b)=>tTime(b)-tTime(a)); }
     if(tab!=="tx"){ const sch=$("#lgSch")?.value, by=$("#lgBy")?.value, q=norm($("#lgQ")?.value||""); const E=await DB.query("edits","day",">=",f.value);
@@ -1634,13 +1641,15 @@ VIEWS.daycare = {
       ${ed?`<form data-form="dcSave" data-id="${h(code)}" class="grid">
         <div class="f"><label for="dcCap" title="Number of places sanctioned">Places</label><input id="dcCap" type="number" min="0" value="${h(d.cap??"")}"></div>
         <div class="f"><label for="dcStr">Children now</label><input id="dcStr" type="number" min="0" value="${h(d.useReg?dcStr(code):d.str??"")}" ${d.useReg?"disabled title=\"Counted from the register below\"":""}></div>
+        <div class="f"><label for="dcG">of them girls</label><input id="dcG" type="number" min="0" value="${h(d.useReg?dcGB(code).g:d.g??"")}" ${d.useReg?"disabled":""}></div>
+        <div class="f"><label for="dcB">boys</label><input id="dcB" type="number" min="0" value="${h(d.useReg?dcGB(code).b:d.b??"")}" ${d.useReg?"disabled":""}></div>
         <div class="f"><label for="dcFee">Fee per month (Rs)</label><input id="dcFee" type="number" min="0" value="${h(d.fee??"")}"></div>
         <div class="f"><label for="dcUse">Children now =</label><select id="dcUse"><option value="">the number I type</option><option value="1" ${d.useReg?"selected":""}>count of the register below</option></select></div>
         <div class="f wide" style="grid-column:span 2"><label for="dcRem">Remarks</label><input id="dcRem" value="${h(d.remarks||"")}"></div>
         <button class="btn p">Save</button></form>`:`<p>Places ${nf(d.cap||0)} · Children ${nf(dcStr(code))} · Fee Rs ${nf(d.fee||0)}</p>`}
       ${d.updatedAt?`<p class="hint">Last updated ${fmtDT(toMs(d.updatedAt))} by ${h(d.byName||"")}</p>`:""}</div>
      <div class="panel"><div class="ph"><h2>Register of children — ${h(code)}</h2><div class="pills">${ed?`<button class="btn" data-act="dcKid" data-id="">+ Add child</button><button class="btn" data-act="tplDc">Excel template</button><label class="btn">Import Excel <input type="file" accept=".xlsx,.xls,.csv" data-chg="impDc" hidden></label>`:""}${expBar("dcKids")}</div></div>
-      <div id="dcImp"></div><div class="scroll" id="dcList"></div></div>`; },
+      <div id="dcImp"></div><div class="scroll" id="dcList"></div></div>${dcParentsHtml(code)}`; },
   regions:{
     dcSum(){ const t=dcSumModel(); return screenTable(t); },
     dcList(){ const code=dcSchool(), K=dcKids(code).sort((a,b)=>(a.status==="Left")-(b.status==="Left")||String(a.name).localeCompare(String(b.name))); if(!K.length) return `<div class="empty">No children registered yet (optional).</div>`;
@@ -1648,9 +1657,14 @@ VIEWS.daycare = {
     dcImp(){ return S.imp?.kind==="dc" ? impTableHtml(S.imp) : ""; }
   }
 };
-function dcSumModel(){ const rows=dcSchools().map(s=>{ const d=dcOf(s.code), str=dcStr(s.code), cap=Number(d.cap)||0; return {c:[`${s.code} — ${s.name}`,num(cap,"n"),num(str,"n"),num(Math.max(0,cap-str),"n"),num(str-cap,"sd"),{v:d.fee?nf(d.fee):"–",x:Number(d.fee)||0},d.updatedAt?fmtD(toMs(d.updatedAt)):"",d.remarks||""]}; });
-  const T=dcTotals(); rows.push({c:[L("total"),num(T.cap,"n"),num(T.str,"n"),num(Math.max(0,T.cap-T.str),"n"),num(T.str-T.cap,"sd"),"","",""],cls:"tot"});
-  return tbl("DAY CARE — SCHOOL WISE (not included in strength)",[L("school"),"Places","Children","Vacant",L("sd"),"Fee / month","Updated","Remarks"],rows); }
+function dcSumModel(){ let TG=0,TB=0; const rows=dcSchools().map(s=>{ const d=dcOf(s.code), str=dcStr(s.code), cap=Number(d.cap)||0, gb=dcGB(s.code); TG+=gb.g||0; TB+=gb.b||0; return {c:[`${s.code} — ${s.name}`,num(cap,"n"),num(str,"n"),gb.known?num(gb.g,"n"):"–",gb.known?num(gb.b,"n"):"–",num(Math.max(0,cap-str),"n"),num(str-cap,"sd"),{v:d.fee?nf(d.fee):"–",x:Number(d.fee)||0},d.updatedAt?fmtD(toMs(d.updatedAt)):"",d.remarks||""]}; });
+  const T=dcTotals(); rows.push({c:[L("total"),num(T.cap,"n"),num(T.str,"n"),num(TG,"n"),num(TB,"n"),num(Math.max(0,T.cap-T.str),"n"),num(T.str-T.cap,"sd"),"","",""],cls:"tot"});
+  return tbl("DAY CARE — SCHOOL WISE (not included in strength)",[L("school"),"Places","Children",L("g"),L("b"),"Vacant",L("sd"),"Fee / month","Updated","Remarks"],rows); }
+function dcGB(code){ const d=dcOf(code); if(d.useReg){ const K=dcKids(code).filter(k=>k.status!=="Left"); const g=K.filter(k=>k.gender==="g").length; return {g,b:K.length-g,known:true}; } return {g:Number(d.g)||0,b:Number(d.b)||0,known:d.g!==undefined||d.b!==undefined}; }
+function dcParentsHtml(code){ const K=dcKids(code).filter(k=>k.status!=="Left"); if(!K.length) return ""; const M=new Map(); for(const k of K){ const key=norm(k.parent)||"(not given)"; if(!M.has(key)) M.set(key,{parent:k.parent||"(not given)",desig:k.desig||"",contact:k.contact||"",kids:[]}); M.get(key).kids.push(k); }
+  const R=[...M.values()].sort((a,b)=>b.kids.length-a.kids.length||a.parent.localeCompare(b.parent));
+  return `<div class="panel"><h2>Staff parents — ${R.length} parent${R.length>1?"s":""}, ${K.length} children</h2><table><tr><th>#</th><th>Parent (staff member)</th><th>Designation</th><th>Contact</th><th class="n">Children</th><th class="n">${h(L("g"))}</th><th class="n">${h(L("b"))}</th><th>Names</th></tr>
+   ${R.map((p,i)=>`<tr><td class="mute">${i+1}</td><td><b>${h(p.parent)}</b></td><td>${h(p.desig)}</td><td>${h(fmtPhones(p.contact))}</td><td class="n">${p.kids.length}</td><td class="n">${p.kids.filter(k=>k.gender==="g").length}</td><td class="n">${p.kids.filter(k=>k.gender!=="g").length}</td><td style="white-space:normal">${p.kids.map(k=>h(k.name)).join(", ")}</td></tr>`).join("")}</table></div>`; }
 function dcKidDlg(id){ const code=dcSchool(), k=id?dcKids(code).find(x=>x.id===id):{status:"Present",admDate:isoDay(Date.now()),fee:dcOf(code).fee||""};
   modal(`<h3>${id?"Edit":"Add"} day-care child — ${h(code)}</h3><form data-form="dcKid" data-id="${h(id||"")}"><div class="grid" style="grid-template-columns:1fr 1fr">
     <div class="f"><label for="dkName">Child's name *</label><input id="dkName" required value="${h(k.name||"")}"></div>
@@ -2482,8 +2496,12 @@ function chkHtml(){ if(!schoolList().every(s=>stuOf(s.code))) return `<p class="
   const K=(k,lab,val,sub,cls)=>`<div class="kpi click ${L1===k?"kg3":""}" data-act="ckList" data-id="${k}" role="button" tabindex="0" title="Click for the list of these students"><span>${lab}</span><b class="${cls||""}">${val}</b><i>${sub}</i></div>`;
   const list = L1&&CKL[L1] ? (()=>{ const X=sortStu(ALL.filter(CKL[L1][1])); return `<div class="panel" style="border:2px solid #7c3aed"><div class="ph"><h3 style="margin:0">${h(CKL[L1][0])} — ${nf(X.length)} students</h3><div class="pills">${L1==="unver"&&X.length?`<button class="btn s g" data-act="ckVerAll">${role()==="clerk"?"Send all shown for verification":`✓ Mark all ${nf(Math.min(X.length,500))} shown as verified`}</button>`:""}<button class="btn s" data-act="ckList" data-id="">Close list ✕</button></div></div>
      <p class="hint" style="margin-top:0">Click a student to open the full record and correct it.${L1==="unver"?" Verify only after checking the record against the school register / admission form.":""}</p>
-     <div class="scroll" style="max-height:520px;overflow:auto"><table><tr><th>#</th><th>School</th><th>Class – Sec</th><th>Adm No</th><th>Name</th><th>Father / Guardian</th><th>G/B</th><th>Category</th><th>Missing</th><th>Verified</th></tr>
-     ${X.slice(0,1500).map((r,i)=>`<tr class="click" data-act="openStu" data-id="${h(r.id)}"><td class="mute">${i+1}</td><td>${h(r.school)}</td><td>${h(r.cl)}-${h(r.sec)}</td><td>${h(r.admNo)}</td><td><b>${h(r.name)}</b></td><td>${h(parentOf(r))}</td><td>${gTxt(r.gender)}</td><td>${h(catLabel(r.cat))}</td><td class="neg" style="white-space:normal;min-width:180px">${r.cv?"Category to re-verify; ":""}${h(missingOf(r).join(", "))}</td><td>${r.ver?`<span class="pos">✓ ${h(String(r.ver).split("|")[0])}</span>`:r.vreq?`<span class="tag t-mid">waiting DQ</span>`:""}</td></tr>`).join("")}</table>${X.length>1500?`<p class="hint">First 1,500 shown — choose one school above.</p>`:""}</div></div>`; })() : "";
+     <div class="pills" style="margin-bottom:6px"><button class="btn s g" data-act="ckTickGo">${canDecide()?"✓ Verify ticked":"Send ticked for verification"}</button><span class="mute mini" style="align-self:center">Grouped by class and section; tick students (or a whole section with its box).</span></div>
+     <div class="scroll" style="max-height:560px;overflow:auto"><table class="nosort" id="ckLt"><tr><th><input type="checkbox" data-selall="1" style="width:18px;height:18px"></th><th>#</th><th>Adm No</th><th>Name</th><th>Father / Guardian</th><th>G/B</th><th>Category</th><th>Verified</th><th>Missing</th></tr>
+     ${(()=>{ let out="", key=null, sc=null, n=0; const cnt={}; for(const r of X.slice(0,1500)){ const k=r.school+"|"+r.cl+"|"+r.sec; cnt[k]=(cnt[k]||0)+1; }
+       for(const r of X.slice(0,1500)){ if(r.school!==sc&&!chkScope().code){ sc=r.school; out+=`<tr class="tot"><td colspan="9">${h(sc)} — ${h(S.schools[sc]?.name||"")}</td></tr>`; } const k=r.school+"|"+r.cl+"|"+r.sec; if(k!==key){ key=k; out+=`<tr class="sub"><td><input type="checkbox" data-secsel="${h(k)}" style="width:18px;height:18px" title="Tick the whole section"></td><td colspan="8"><b>${h(r.cl)} - ${h(r.sec)}</b> <span class="mute">(${cnt[k]})</span></td></tr>`; }
+         out+=`<tr class="click" data-act="openStu" data-id="${h(r.id)}"><td>${r.ver||(r.vreq&&!canDecide())?"":`<input type="checkbox" data-sel="${h(r.id)}" data-sk="${h(k)}" style="width:18px;height:18px">`}</td><td class="mute">${++n}</td><td>${h(r.admNo)}</td><td><b>${h(r.name)}</b></td><td>${h(parentOf(r))}</td><td>${gTxt(r.gender)}</td><td>${h(catLabel(r.cat))}</td><td>${r.ver?`<span class="pos">✓ ${h(String(r.ver).split("|")[0])}</span>`:r.vreq?`<span class="tag t-mid">waiting DQ</span>`:`<span class="mute">—</span>`}</td><td class="neg" style="white-space:normal;min-width:200px;font-size:12.5px">${r.cv?"Category to re-verify; ":""}${h(missingOf(r).join(", "))}</td></tr>`; }
+       return out; })()}</table>${X.length>1500?`<p class="hint">First 1,500 shown — choose one school above.</p>`:""}</div></div>`; })() : "";
   const det=r=>{ const keys=[...new Set([...Object.keys(r.sm.cat),...Object.keys(r.bc)])].sort((a,b)=>(catNo(a)||99)-(catNo(b)||99)), B=sortStu((stuOf(r.school)||[]).filter(x=>x.status==="On roll"&&x.cl===r.cl&&x.sec===r.sec)), may=canEditStu({school:r.school});
     return `<tr id="ckDet"><td colspan="9" style="background:var(--soft);white-space:normal"><div class="pills" style="margin-bottom:6px">${keys.map(k=>{ const a=r.sm.cat[k]||0, b=r.bc[k]||0; return `<span class="fchip ${a!==b?"neg":""}" title="summary ${a} · data bank ${b}">${h(catLabel(k)||k)}: <b>${a}</b> / ${b}</span>`; }).join("")||`<span class="mute">No category figures.</span>`}</div>
       <p class="mute" style="margin:0 0 6px">Chips: summary / data bank. ${r.bg!==r.sm.g?`<b class="neg">Girls: summary ${r.sm.g}, data bank ${r.bg}.</b> `:""}${r.sm.est?`The girls/boys split of this section is an <b>estimate</b> from the category sheet — if the data bank is right, correct it in Setup → Opening strength.`:""}</p>
@@ -2514,8 +2532,12 @@ function catBoxesHtml(){ const p=S.params, codes=p.school?[p.school]:schoolList(
   if(p.cat) return catOneHtml(p.cat, codes);
   const groups=catGroups(); const inG=new Set(groups.flatMap(g=>g.cats)); const list=[...groups.map(g=>({name:g.name,cats:g.cats})),{name:"Others",cats:[...cats(),...Object.keys(T)].filter((k,i,a)=>a.indexOf(k)===i&&!inG.has(k))}].filter(g=>g.cats.length);
   const loaded=tot>A.str*0.5;
-  return `${loaded?"":`<div class="note">The schools' category figures have <b>not been loaded yet</b> — the boxes only show admissions/withdrawals entered since go-live, so some can even be below zero. Load them once in <b>Setup → Opening strength → Replace from the category-wise sheet</b>.</div>`}<div class="kpis"><div class="kpi"><span>${h(L("str"))}</span><b>${nf(A.str)}</b><i>${h(L("g"))} ${nf(A.g)} · ${h(L("b"))} ${nf(A.b)}</i></div><div class="kpi"><span>Categorised</span><b>${nf(tot)}</b><i>${A.str?(tot/A.str*100).toFixed(1):0}% of strength</i></div><div class="kpi"><span>Not categorised</span><b class="${A.str-tot?"neg":""}">${nf(A.str-tot)}</b></div></div>
+  return `${loaded?"":`<div class="note">The schools' category figures have <b>not been loaded yet</b> — the boxes only show admissions/withdrawals entered since go-live, so some can even be below zero. Load them once in <b>Setup → Opening strength → Replace from the category-wise sheet</b>.</div>`}<div class="kpis"><div class="kpi click" role="button" tabindex="0" data-act="drill" data-m="str"><span>${h(L("str"))}</span><b>${nf(A.str)}</b><i>${h(L("g"))} ${nf(A.g)} · ${h(L("b"))} ${nf(A.b)}</i></div><div class="kpi"><span>Categorised</span><b>${nf(tot)}</b><i>${A.str?(tot/A.str*100).toFixed(1):0}% of strength</i></div><div class="kpi ${A.str-tot?"click":""}" ${A.str-tot?`role="button" tabindex="0" data-act="setP" data-p="${h(qs({nocat:p.nocat?"":"1"}))}"`:""}><span>Not categorised</span><b class="${A.str-tot?"neg":""}">${nf(A.str-tot)}</b><i>${A.str-tot?"click to see where":""}</i></div></div>${p.nocat?nocatHtml(codes):""}
     ${list.map(g=>{ const gt=g.cats.reduce((a,k)=>a+(T[k]||0),0); return `<h3 style="margin:14px 0 8px;font-size:15px">${h(g.name)} <span class="mute">— ${nf(gt)}</span></h3><div class="kpis">${g.cats.filter(k=>T[k]||cats().includes(k)).sort((a,b)=>(catNo(a)||99)-(catNo(b)||99)).map(k=>`<div class="kpi click" role="button" tabindex="0" data-act="go" data-id="drill" data-p="${h(qs({m:"cat",school:p.school,cat:k}))}"><span>${h(catLabel(k)||k)}</span><b>${nf(T[k]||0)}</b><i>${A.str?((T[k]||0)/A.str*100).toFixed(1):0}%</i></div>`).join("")}</div>`; }).join("")}`; }
+function nocatHtml(codes){ const rows=[]; for(const c of codes){ const st=schoolStats(c); for(const cl of st.classes){ const t=Object.values(cl.cats).reduce((a,v)=>a+v,0), d=cl.str-t; if(d) rows.push({c,cl:cl.cl,str:cl.str,t,d}); } }
+  return `<div class="panel" style="border:2px solid #b91c1c;margin-top:10px"><h3 style="margin:0 0 6px">Where the ${nf(rows.reduce((a,r)=>a+r.d,0))} not-categorised students are</h3>
+   <p class="hint" style="margin-top:0">Each class's strength against the total of its category figures. A difference comes from entries made <b>without a category</b>, from entries whose category is not in the current list, or from voiding entries made <b>before</b> the category sheet was loaded. Click a class for its sections and entries.</p>
+   ${rows.length?`<table><tr><th>School</th><th>Class</th><th class="n">Strength</th><th class="n">In categories</th><th class="n">Not categorised</th></tr>${rows.map(r=>`<tr class="click" data-act="go" data-id="drill" data-p="${h(qs({m:"str",school:r.c,cl:r.cl}))}"><td>${h(r.c)}</td><td><b>${h(r.cl)}</b></td><td class="n">${nf(r.str)}</td><td class="n">${nf(r.t)}</td><td class="n ${r.d<0?"neg":"amber"}">${sg(r.d)}</td></tr>`).join("")}</table>`:`<p class="mute">None.</p>`}</div>`; }
 function catOneHtml(cat, codes){ const rows=[], bySch={}; let tot=0;
   for(const c of codes){ const st=schoolStats(c); for(const cl of st.classes){ const n=cl.cats[cat]||0; if(n){ rows.push({c,cl:cl.cl,n}); tot+=n; bySch[c]=(bySch[c]||0)+n; } } }
   const R=canSeeStudents()?findRows({school:S.params.school,cat,st:"On roll"}):[], rb={}; for(const r of R) rb[r.school]=(rb[r.school]||0)+1;
@@ -3130,7 +3152,7 @@ function txFixDlg(id){ const t=[...(S.logRows||[]),...S.recentTx].find(x=>x.id==
    <div class="f"><label for="xfRem">Remarks</label><input id="xfRem" value="${h(t.remarks||"")}"></div></div>
    <div class="f"><label for="xfWhy">Reason for the correction${role()==="hq"?" *":""}</label><input id="xfWhy" placeholder="e.g. wrong section typed by the school"></div>
    <div class="row"><button type="button" class="btn" data-act="closeModal">Cancel</button><button class="btn p">Save correction</button></div></form>`,"wide"); }
-async function txFixSave(f){ const t=[...(S.logRows||[]),...S.recentTx].find(x=>x.id===f.dataset.id); if(!t) return; const why=$("#xfWhy").value.trim(); if(role()==="hq"&&!why){ toast("Write the reason.",true); return; }
+async function txFixSave(f){ const t=[...(S.logRows||[]),...S.recentTx].find(x=>x.id===f.dataset.id); if(!t) return; if(t.atMs<baseStartMs()){ toast("This entry was made before the base figures (category sheet) were loaded, so it is already inside those figures. Correct the figures in Setup → Opening strength instead.",true); return; } const why=$("#xfWhy").value.trim(); if(role()==="hq"&&!why){ toast("Write the reason.",true); return; }
   const [cl,sec]=$("#xfCs").value.split("|"); const nt={school:t.school,action:$("#xfAct").value,cl,sec,gender:$("#xfGen").value,cat:$("#xfCat").value,name:$("#xfName").value.trim(),father:$("#xfFather").value.trim(),admNo:$("#xfAdm").value.trim(),remarks:$("#xfRem").value.trim(),dob:t.dob||"",eff:$("#xfDate").value,corrects:t.id,studentId:t.studentId||undefined};
   if($("#xfTo")) nt.toSec=$("#xfTo").value.trim(); const e=effFromDate(nt.eff); if(e) nt.effMs=e; if(!nt.studentId) delete nt.studentId;
   const ops=opsNew(); voidToOps(ops,t,`Corrected${why?": "+why:""}`); buildTxOps(ops,nt); closeModal(); await DB.apply(ops);
@@ -3219,13 +3241,13 @@ const ANN_STY = [["banner","Plain banner"],["flash","Flashing (blinks to catch t
 const annList = () => ST().ann || [];
 const annSeen = () => { try{ return new Set(JSON.parse(localStorage.getItem("apeis_ann_seen")||"[]")); }catch(e){ return new Set(); } };
 function annMine(){ const d=isoDay(Date.now()), r=role(), sc=me().school, seen=annSeen();
-  return annList().filter(a=>a.on!==false && (!a.from||a.from<=d) && (!a.to||a.to>=d) && (a.aud==="all"||a.aud===r||(a.aud==="school:"+sc)||isSA()) && (a.pin||!seen.has(a.id))); }
+  return annList().filter(a=>!a.arch && a.on!==false && (!a.from||a.from<=d) && (!a.to||a.to>=d) && (a.aud==="all"||a.aud===r||(a.aud==="school:"+sc)||isSA()) && (a.pin||(a.ask&&!annDone(a.id)&&!isSA())||!seen.has(a.id))); }
 function annPaint(){ const el=document.getElementById("annBar"); if(!el) return; if(!S.user||S.user.pending){ el.innerHTML=""; return; } const L2=annMine();
-  el.innerHTML=L2.map(a=>`<div class="ann ann-${h(a.sty||"banner")}" style="--ac:${h(a.col||"#b45309")}"><span class="ann-ic">📢</span><div class="ann-tx">${a.sty==="ticker"?`<div class="ann-run"><span>${h(a.text)}</span><span aria-hidden="true">${h(a.text)}</span></div>`:`<span>${h(a.text)}</span>`}</div>${isSA()?`<span class="ann-aud">${h(a.aud.startsWith("school:")?a.aud.slice(7):(ANN_AUD.find(x=>x[0]===a.aud)||[,""])[1])}</span>`:""}${a.pin?"":`<button class="ann-x" data-act="annSeen" data-id="${h(a.id)}" title="Hide this announcement">✕</button>`}</div>`).join(""); }
+  el.innerHTML=L2.map(a=>`<div class="ann ann-${h(a.sty||"banner")}" style="--ac:${h(a.col||"#b45309")}"><span class="ann-ic">📢</span><div class="ann-tx">${a.sty==="ticker"?`<div class="ann-run"><span>${h(a.text)}</span><span aria-hidden="true">${h(a.text)}</span></div>`:`<span>${h(a.text)}</span>`}</div>${isSA()?`<span class="ann-aud">${h(a.aud.startsWith("school:")?a.aud.slice(7):(ANN_AUD.find(x=>x[0]===a.aud)||[,""])[1])}</span>`:""}${a.ask&&!isSA()?(annDone(a.id)?`<span class="ann-ok">✓ Done ${h(fmtDT(annDone(a.id).atMs))}</span>`:`<button class="ann-do" data-act="annDo" data-id="${h(a.id)}">✓ Mark done${a.due?` (by ${h(fmtD(Date.parse(a.due+"T12:00")))})`:""}</button>`):""}${isSA()&&a.ask?`<span class="ann-aud dn" data-act="go" data-id="anns" style="cursor:pointer">replies ›</span>`:""}${a.pin||(a.ask&&!annDone(a.id)&&!isSA())?"":`<button class="ann-x" data-act="annSeen" data-id="${h(a.id)}" title="Hide this announcement">✕</button>`}</div>`).join(""); if(!isSA()&&S.annR===undefined) annMyLoad(); }
 setInterval(annPaint,15e3);
-function annSetupHtml(){ const L2=annList(), e=S.annEdit?L2.find(a=>a.id===S.annEdit)||{}:{};
+function annSetupHtml(){ const L2=annList().filter(a=>!a.arch), e=S.annEdit?L2.find(a=>a.id===S.annEdit)||{}:{};
   return `<div class="panel" style="border:2px solid #b45309"><h2>📢 Announcements</h2><p class="hint" style="margin-top:0">A coloured bar under the tabs, on every page, for the people you choose. Make it flash or scroll across when it must not be missed; give dates to show it only for a period.</p>
-   ${L2.length?`<table><tr><th>#</th><th>Announcement</th><th>For</th><th>Style</th><th>Dates</th><th>Shown</th><th></th></tr>${L2.map((a,i)=>`<tr><td class="mute">${i+1}</td><td style="white-space:normal;max-width:380px"><span class="ann-dot" style="background:${h(a.col||"#b45309")}"></span>${h(a.text)}${a.pin?` <span class="tag t-mid">cannot be hidden</span>`:""}</td><td>${h(a.aud.startsWith("school:")?a.aud.slice(7)+" (school)":(ANN_AUD.find(x=>x[0]===a.aud)||[,""])[1])}</td><td>${h((ANN_STY.find(x=>x[0]===a.sty)||ANN_STY[0])[1].split(" (")[0])}</td><td>${a.from?fmtD(Date.parse(a.from+"T12:00")):"now"} – ${a.to?fmtD(Date.parse(a.to+"T12:00")):"until removed"}</td>
+   ${L2.length?`<table><tr><th>#</th><th>Announcement</th><th>For</th><th>Style</th><th>Dates</th><th>Shown</th><th></th></tr>${L2.map((a,i)=>`<tr><td class="mute">${i+1}</td><td style="white-space:normal;max-width:380px"><span class="ann-dot" style="background:${h(a.col||"#b45309")}"></span>${h(a.text)}${a.pin?` <span class="tag t-mid">cannot be hidden</span>`:""}${a.ask?` <span class="tag t-in">asks for Done${a.due?" by "+h(fmtD(Date.parse(a.due+"T12:00"))):""}</span>`:""}</td><td>${h(a.aud.startsWith("school:")?a.aud.slice(7)+" (school)":(ANN_AUD.find(x=>x[0]===a.aud)||[,""])[1])}</td><td>${h((ANN_STY.find(x=>x[0]===a.sty)||ANN_STY[0])[1].split(" (")[0])}</td><td>${a.from?fmtD(Date.parse(a.from+"T12:00")):"now"} – ${a.to?fmtD(Date.parse(a.to+"T12:00")):"until removed"}</td>
      <td><button class="btn s ${a.on!==false?"g":""}" data-act="annOn" data-id="${h(a.id)}">${a.on!==false?"On":"Off"}</button></td><td style="white-space:nowrap"><button class="btn s" data-act="annEdit" data-id="${h(a.id)}">✎</button> <button class="btn s r" data-act="annDel" data-id="${h(a.id)}">Delete</button></td></tr>`).join("")}</table>`:`<p class="mute">No announcements yet.</p>`}
    <form data-form="ann" class="grid" style="margin-top:10px">
     <div class="f" style="grid-column:1/-1"><label for="anTx">${e.id?"Edit announcement":"New announcement"}</label><textarea id="anTx" rows="2" required placeholder="e.g. Fee defaulters return due by 5 Dec. All clerks to complete the data bank by 30 Nov.">${h(e.text||"")}</textarea></div>
@@ -3234,17 +3256,90 @@ function annSetupHtml(){ const L2=annList(), e=S.annEdit?L2.find(a=>a.id===S.ann
     <div class="f"><label for="anCol">Colour</label><select id="anCol">${[["#b45309","Amber"],["#be123c","Red"],["#0b1f4b","Navy"],["#0f766e","Green"],["#7c3aed","Purple"]].map(([c,l])=>`<option value="${c}" ${e.col===c?"selected":""}>${l}</option>`).join("")}</select></div>
     <div class="f"><label for="anFrom">Show from</label><input id="anFrom" type="date" value="${h(e.from||"")}"></div>
     <div class="f"><label for="anTo">Until</label><input id="anTo" type="date" value="${h(e.to||"")}"></div>
+    <div class="f"><label for="anAsk">Ask each person to mark it Done?</label><select id="anAsk"><option value="">No — just for information</option><option value="1" ${e.ask?"selected":""}>Yes — each person ticks ✓ Done</option></select></div>
+    <div class="f"><label for="anDue">Done due by (optional)</label><input id="anDue" type="date" value="${h(e.due||"")}"></div>
     <div class="f"><label for="anPin">Can people hide it (✕)?</label><select id="anPin"><option value="">Yes</option><option value="1" ${e.pin?"selected":""}>No — always shown</option></select></div>
     <div class="row" style="justify-content:flex-start;grid-column:1/-1">${e.id?`<button type="button" class="btn" data-act="annEdit" data-id="">Cancel</button>`:""}<button class="btn p">${e.id?"Save changes":"Publish announcement"}</button></div></form></div>`; }
 async function annSave(list,msg){ await saveSettings({ann:list},msg); annPaint(); fillRegion("stBody",true); }
-Object.assign(EXTRA_FORMS,{ ann: async () => { const t=$("#anTx").value.trim(); if(!t){ toast("Write the announcement.",true); return; } const a={text:t,aud:$("#anAud").value,sty:$("#anSty").value,col:$("#anCol").value,from:$("#anFrom").value,to:$("#anTo").value,pin:$("#anPin").value==="1",on:true,by:me().name||"",atMs:Date.now()};
-  const L2=[...annList()]; if(S.annEdit){ const i=L2.findIndex(x=>x.id===S.annEdit); if(i>=0) L2[i]={...L2[i],...a,id:S.annEdit}; } else L2.unshift({...a,id:newId()}); const ed=!!S.annEdit; S.annEdit=null; await annSave(L2,ed?"Announcement updated.":"Announcement published."); } });
+Object.assign(EXTRA_FORMS,{ ann: async () => { const t=$("#anTx").value.trim(); if(!t){ toast("Write the announcement.",true); return; } const a={text:t,aud:$("#anAud").value,sty:$("#anSty").value,col:$("#anCol").value,from:$("#anFrom").value,to:$("#anTo").value,pin:$("#anPin").value==="1",ask:$("#anAsk").value==="1",due:$("#anDue").value,on:true};
+  const L2=[...annList()]; if(S.annEdit){ const i=L2.findIndex(x=>x.id===S.annEdit); if(i>=0) L2[i]={...L2[i],...a,id:S.annEdit,editMs:Date.now()}; } else L2.unshift({...a,id:newId(),by:me().name||"",atMs:Date.now()}); const ed=!!S.annEdit; S.annEdit=null; await annSave(L2,ed?"Announcement updated.":"Announcement published."); } });
 Object.assign(EXTRA_ACT,{
   annSeen: el => { const s=annSeen(); s.add(el.dataset.id); try{ localStorage.setItem("apeis_ann_seen",JSON.stringify([...s].slice(-200))); }catch(e){} annPaint(); },
   annEdit: el => { S.annEdit=el.dataset.id||null; fillRegion("stBody",true); setTimeout(()=>$("#anTx")?.focus(),50); },
   annOn: el => annSave(annList().map(a=>a.id===el.dataset.id?{...a,on:a.on===false}:a),"Saved."),
-  annDel: el => ask("Delete this announcement?","It disappears for everyone.","Delete",()=>annSave(annList().filter(a=>a.id!==el.dataset.id),"Announcement deleted.")),
+  annDel: el => ask("Remove this announcement?","It disappears for everyone but stays in the Announcements tab history, with all the Done replies.","Remove",()=>annSave(annList().map(a=>a.id===el.dataset.id?{...a,arch:true,archMs:Date.now(),on:false}:a),"Announcement removed — kept in history.")),
 });
+
+/* ---------- dashboard: data bank entered against strength ---------- */
+function dbProgHtml(){ const I=idxAll().filter(r=>r.status==="On roll"); let T={st:0,n:0,v:0};
+  const R=schoolList().map(s=>{ const st=schoolStats(s.code).str, L2=I.filter(r=>r.school===s.code), n=L2.length, v=L2.filter(r=>r.ver).length; T.st+=st; T.n+=n; T.v+=v; return {s,st,n,v}; });
+  const bar=(p,c)=>`<div class="bar" style="margin:0;min-width:110px"><i style="width:${Math.min(100,p).toFixed(1)}%;${c?`background:${c}`:""}"></i></div>`;
+  return `<table><tr><th>School</th><th class="n">Strength</th><th class="n">In data bank</th><th>Entered</th><th class="n">%</th><th class="n">Verified</th><th>Verified %</th></tr>
+   ${R.map(x=>`<tr class="click" data-act="go" data-id="students" data-p="${h(qs({tab:"chk",ckSch:x.s.code,ckList:"all"}))}"><td><b>${h(x.s.code)}</b> <span class="mute">${h(x.s.name)}</span></td><td class="n">${nf(x.st)}</td><td class="n">${nf(x.n)}</td><td>${bar(x.st?x.n/x.st*100:0)}</td><td class="n">${x.st?(x.n/x.st*100).toFixed(1):"0"}%</td><td class="n">${nf(x.v)}</td><td>${bar(x.n?x.v/x.n*100:0,"#16a34a")} <span class="mini">${x.n?(x.v/x.n*100).toFixed(1):"0"}%</span></td></tr>`).join("")}
+   <tr class="tot"><td>${h(L("gtotal"))}</td><td class="n">${nf(T.st)}</td><td class="n">${nf(T.n)}</td><td></td><td class="n">${T.st?(T.n/T.st*100).toFixed(1):"0"}%</td><td class="n">${nf(T.v)}</td><td class="n">${T.n?(T.v/T.n*100).toFixed(1):"0"}%</td></tr></table>`; }
+
+/* data check list: tick a whole section; verify / send the ticked */
+document.addEventListener("change",e=>{ const b=e.target.closest("[data-secsel]"); if(!b) return; for(const x of $$(`#ckLt [data-sk="${CSS.escape(b.dataset.secsel)}"]`)) x.checked=b.checked; });
+Object.assign(EXTRA_ACT,{ ckTickGo: async () => { const ids=$$("#ckLt [data-sel]").filter(x=>x.checked).map(x=>x.dataset.sel); if(!ids.length){ toast("Tick students first.",true); return; }
+  const all=schoolList().flatMap(s=>stuOf(s.code)||[]), R=ids.map(id=>all.find(r=>r.id===id)).filter(Boolean), ops=opsNew();
+  if(canDecide()){ for(const r of R) ops.upd.push({col:"students",id:r.id,data:{ver:verTag(),vreq:DEL}}); for(const a of apprPending().filter(a=>a.type==="verify"&&ids.includes(a.stuId))) ops.upd.push({col:"approvals",id:a.id,data:{status:"approved",decidedBy:me().uid,decidedByName:me().name||"",decidedAt:TS,decidedMs:Date.now(),decNote:"verified in Data check"}}); }
+  else for(const r of R.filter(r=>!r.vreq&&!r.ver)){ ops.upd.push({col:"students",id:r.id,data:{vreq:"1"}}); ops.set.push(apprNew("verify",r,{})); }
+  if(!ops.upd.length){ toast("Nothing to send.",true); return; } await DB.apply(ops); for(const c of new Set(R.map(r=>r.school))) await ensureStu(c,true); apprLoad(); toast(canDecide()?`${R.length} verified.`:`${ops.set.length} sent to the DQ Office for verification.`); fillRegion("chkBody",true); } });
+
+/* ---------- announcements: Done replies and history ---------- */
+const annDone = id => (S.annR||[]).find(r=>r.annId===id && r.uid===me().uid);
+async function annMyLoad(){ S.annR=[]; try{ S.annR=await DB.query("annResp","uid","==",me().uid); }catch(e){ S.annR=[]; } annPaint(); }
+function annAudOk(a,u){ if(a.aud==="all") return true; if(a.aud.startsWith("school:")) return u.school===a.aud.slice(7); return u.role===a.aud; }
+function annAudTxt(a){ return a.aud.startsWith("school:")?a.aud.slice(7)+" (school)":(ANN_AUD.find(x=>x[0]===a.aud)||[,""])[1]; }
+function annRecip(a){ const U=(S.users||[]).filter(u=>u.role!=="superadmin"&&!u.replacedBy&&!u.pending&&annAudOk(a,u)&&(!u.createdMs||u.createdMs<=(a.to?Date.parse(a.to+"T23:59"):Date.now())));
+  const R=(S.annAll||[]).filter(r=>r.annId===a.id), out=U.map(u=>({u,r:R.find(r=>r.uid===u.uid||(u.prevUids||[]).includes(r.uid))}));
+  for(const r of R) if(!out.some(x=>x.r===r)) out.push({u:{uid:r.uid,name:r.name,role:r.role,school:r.school},r});
+  return out.sort((x,y)=>(x.u.school||"").localeCompare(y.u.school||"")||(x.u.name||"").localeCompare(y.u.name||"")); }
+const annLate = (a,r) => a.due && r && r.atMs > Date.parse(a.due+"T23:59:59");
+const annStat = (a,x) => x.r ? (annLate(a,x.r)?"Done late":"Done") : (a.due && Date.now()>Date.parse(a.due+"T23:59:59") ? "Not done — overdue" : "Not done yet");
+const hrs = ms => ms<36e5?Math.max(1,Math.round(ms/6e4))+" min":ms<864e5*2?(ms/36e5).toFixed(1)+" h":(ms/864e5).toFixed(1)+" days";
+Object.assign(EXTRA_ACT,{
+  annDo: el => { const a=annList().find(x=>x.id===el.dataset.id); if(!a) return;
+    modal(`<h3>✓ Mark as done</h3><p style="white-space:pre-wrap">${h(a.text)}</p><div class="f"><label for="anNote">Remarks (optional — seen by the Super Admin)</label><textarea id="anNote" rows="2" placeholder="e.g. Data bank completed, 1,354 of 1,354 entered"></textarea></div><div class="row"><button class="btn" data-act="closeModal">Cancel</button><button class="btn g" id="anYes">✓ Done</button></div>`);
+    $("#anYes").onclick=async()=>{ const u=me(), d={annId:a.id,uid:u.uid,name:u.name||"",role:role(),school:u.school||"",note:$("#anNote").value.trim(),at:TS,atMs:Date.now()};
+      try{ await DB.apply({set:[{col:"annResp",id:a.id+"_"+u.uid,data:d}],upd:[],inc:[],noIdx:true},true); }catch(e){ toast("Could not save: "+e.message,true); return; }
+      closeModal(); (S.annR||=[]).push(d); annPaint(); toast("Marked done — the Super Admin can see it."); }; },
+  annNew: () => { S.setupTab="general"; go("setup"); },
+  annReload: async () => { S.annAll=null; fillRegion("anBody",true); },
+  annOpen: el => { S.annOpen=S.annOpen===el.dataset.id?null:el.dataset.id; fillRegion("anBody",true); },
+  annPurge: el => ask("Delete this announcement for ever?","It and all its Done replies are removed from the history. This cannot be undone.","Delete for ever",async()=>{ const id=el.dataset.id, R=(S.annAll||[]).filter(r=>r.annId===id);
+    if(R.length) await DB.apply({set:[],upd:[],inc:[],del:R.map(r=>({col:"annResp",id:r.id||r.annId+"_"+r.uid})),noIdx:true},true).catch(()=>{});
+    await saveSettings({ann:annList().filter(a=>a.id!==id)},"Deleted for ever."); S.annAll=null; fillRegion("anBody",true); }),
+  annXls: async () => { const A=annList().filter(a=>a.ask), rows=[["Published","Announcement","For","Done due by","Status of announcement","Person","Role","School","Reply","Done on","Time taken","Remarks"]];
+    for(const a of A) for(const x of annRecip(a)) rows.push([fmtDT(a.atMs),a.text,annAudTxt(a),a.due?fmtD(Date.parse(a.due+"T12:00")):"",a.arch?"Removed":a.on===false?"Off":"Showing",x.u.name||"",ROLES[x.u.role]||x.u.role||"",x.u.school||"",annStat(a,x),x.r?fmtDT(x.r.atMs):"",x.r&&a.atMs?hrs(x.r.atMs-a.atMs):"",x.r?.note||""]);
+    const P=annPeople(A), pr=[["Person","Role","School","Asked","Done on time","Done late","Not done","Average time to reply"],...P.map(p=>[p.u.name||"",ROLES[p.u.role]||p.u.role||"",p.u.school||"",p.n,p.ok,p.late,p.no,p.avg?hrs(p.avg):""])];
+    const H=[["Published","Announcement","For","Style","Shown from","Until","Asks for Done","Done due by","By","Edited","Removed"],...annList().map(a=>[fmtDT(a.atMs),a.text,annAudTxt(a),a.sty||"banner",a.from||"",a.to||"",a.ask?"Yes":"No",a.due||"",a.by||"",a.editMs?fmtDT(a.editMs):"",a.archMs?fmtDT(a.archMs):""])];
+    await writeBook(`Announcements_${isoDay(Date.now())}.xlsx`,[["Replies",rows],["By person",pr],["All announcements",H]]); toast("Excel downloaded."); },
+});
+function annPeople(A){ const M=new Map(); for(const a of A) for(const x of annRecip(a)){ const k=x.u.uid; if(!M.has(k)) M.set(k,{u:x.u,n:0,ok:0,late:0,no:0,t:0}); const p=M.get(k); p.n++; if(!x.r) p.no++; else { annLate(a,x.r)?p.late++:p.ok++; if(a.atMs) p.t+=x.r.atMs-a.atMs; } }
+  return [...M.values()].map(p=>({...p,avg:(p.ok+p.late)?p.t/(p.ok+p.late):0})).sort((a,b)=>(a.u.school||"").localeCompare(b.u.school||"")||(a.u.name||"").localeCompare(b.u.name||"")); }
+NAV.splice(NAV.findIndex(n=>n[0]==="log"),0,["anns","Announcements",()=>isSA()]);
+VIEWS.anns = {
+  shell(){ const p=S.params; return `<div class="panel"><div class="ph"><h2>📢 Announcements — history and Done replies</h2><div class="pills">
+     <select class="in" style="width:auto" data-chg="setPsel" data-k="anF"><option value="">Asking for Done</option><option value="all" ${p.anF==="all"?"selected":""}>All announcements</option><option value="pend" ${p.anF==="pend"?"selected":""}>Still waiting for replies</option></select>
+     <button class="btn s" data-act="annNew">✎ New / manage</button><button class="btn s" data-act="annXls">⬇ Excel</button><button class="btn s" data-act="annReload">⟳</button></div></div>
+     <p class="hint" style="margin-top:0">Every announcement stays here with its date, even after you remove it. For those that ask for <b>✓ Done</b>, click a row to see who has replied, when, and their remarks. <b>Done late</b> = after the due date. The Excel file has all replies, a by-person summary for comparing clerks, and the full list.</p>
+     <div id="anBody"></div></div>`; },
+  regions:{ anBody(){ if(!S.annAll){ (async()=>{ try{ S.annAll=await DB.allDocs("annResp"); }catch(e){ S.annAll=[]; toast("Replies not loaded: "+e.message,true); } fillRegion("anBody",true); })(); return `<p class="mute">Loading…</p>`; }
+    const p=S.params; let A=annList().filter(a=>p.anF==="all"||a.ask); if(p.anF==="pend") A=A.filter(a=>annRecip(a).some(x=>!x.r));
+    A=A.sort((a,b)=>(b.atMs||0)-(a.atMs||0));
+    if(!A.length) return `<div class="empty">No announcements${p.anF==="all"?"":" asking for Done"} yet. Make one in Setup → Announcements and choose “Yes — each person ticks ✓ Done”.</div>`;
+    const P=annPeople(A.filter(a=>a.ask));
+    return `<table><tr><th>#</th><th>Published</th><th>Announcement</th><th>For</th><th>Due by</th><th>State</th><th class="n">Done</th><th>Replies</th><th></th></tr>
+     ${A.map((a,i)=>{ const R=a.ask?annRecip(a):[], d=R.filter(x=>x.r).length, late=R.filter(x=>annLate(a,x.r)).length, pc=R.length?d/R.length*100:0, op=S.annOpen===a.id;
+       return `<tr class="${a.ask?"click":""}" ${a.ask?`data-act="annOpen" data-id="${h(a.id)}"`:""}><td class="mute">${i+1}</td><td style="white-space:nowrap">${h(fmtDT(a.atMs))}<br><span class="mute">${h(a.by||"")}</span></td><td style="white-space:normal;max-width:420px"><span class="ann-dot" style="background:${h(a.col||"#b45309")}"></span>${h(a.text)}</td><td>${h(annAudTxt(a))}</td><td>${a.due?h(fmtD(Date.parse(a.due+"T12:00"))):"–"}</td>
+         <td>${a.arch?`<span class="tag">removed ${h(fmtD(a.archMs))}</span>`:a.on===false?`<span class="tag">off</span>`:`<span class="tag t-in">showing</span>`}</td>
+         <td class="n">${a.ask?`<b>${d}</b> / ${R.length}${late?`<br><span class="mini" style="color:#b45309">${late} late</span>`:""}`:"–"}</td><td>${a.ask?`<div class="bar" style="margin:0;min-width:110px"><i style="width:${pc.toFixed(1)}%;background:#16a34a"></i></div><span class="mini">${pc.toFixed(0)}%</span>`:`<span class="mute">for information</span>`}</td>
+         <td style="white-space:nowrap">${a.ask?`<span class="dn">${op?"▲ hide":"▼ who"}</span>`:""} ${a.arch?`<button class="btn s r" data-act="annPurge" data-id="${h(a.id)}">Delete for ever</button>`:""}</td></tr>
+         ${op?`<tr><td></td><td colspan="8" style="background:#f8fafc"><table><tr><th>#</th><th>Person</th><th>Role</th><th>School</th><th>Reply</th><th>Done on</th><th>Time taken</th><th>Remarks</th></tr>${R.map((x,j)=>{ const st=annStat(a,x); return `<tr><td class="mute">${j+1}</td><td><b>${h(x.u.name||"")}</b></td><td>${h(ROLES[x.u.role]||x.u.role||"")}</td><td>${h(x.u.school||"")}</td><td><span class="tag ${st==="Done"?"t-in":st==="Done late"?"t-mid":"t-out"}">${st==="Done"?"✓ ":""}${h(st)}</span></td><td>${x.r?h(fmtDT(x.r.atMs)):""}</td><td>${x.r&&a.atMs?h(hrs(x.r.atMs-a.atMs)):""}</td><td style="white-space:normal">${h(x.r?.note||"")}</td></tr>`; }).join("")||`<tr><td colspan="8" class="mute">Nobody in this audience has an account.</td></tr>`}</table></td></tr>`:""}`; }).join("")}</table>
+     ${P.length?`<h2 style="margin-top:18px">By person — compare replies</h2><table><tr><th>#</th><th>Person</th><th>Role</th><th>School</th><th class="n">Asked</th><th class="n">Done on time</th><th class="n">Done late</th><th class="n">Not done</th><th>Average time to reply</th></tr>
+      ${P.map((x,i)=>`<tr><td class="mute">${i+1}</td><td><b>${h(x.u.name||"")}</b></td><td>${h(ROLES[x.u.role]||x.u.role||"")}</td><td>${h(x.u.school||"")}</td><td class="n">${x.n}</td><td class="n" style="color:#15803d">${x.ok}</td><td class="n" style="color:#b45309">${x.late}</td><td class="n" style="color:#be123c">${x.no}</td><td>${x.avg?h(hrs(x.avg)):"–"}</td></tr>`).join("")}</table>`:""}`; } },
+};
 
 /* =====================================================================
    8) REPORTS — designer (tick what to show), presets, print/PDF, Excel, WhatsApp
@@ -4144,7 +4239,7 @@ const ACT = {
     try{ await adminCall({action:"ping"},url); }catch(e){ toast("The helper did not answer correctly: "+e.message,true); return; } await saveSettings({adminFn:url},"Server helper connected — you can now set passwords and delete logins completely."); fillRegion("stBody",true); },
   adminFnOff: async () => { await saveSettings({adminFn:""},"Server helper disconnected."); fillRegion("stBody",true); },
   logPreset: el => { const d0=new Date(); d0.setHours(0,0,0,0); const k=el.dataset.id, D=n=>isoDay(d0.getTime()-n*864e5); let f=D(0), t=D(0);
-    if(k==="yday"){ f=t=D(1); } else if(k==="d7") f=D(6); else if(k==="d30") f=D(29); else if(k==="month"){ const m=new Date(d0); m.setDate(1); f=isoDay(m.getTime()); } else if(k==="all") f=ST().baseFrom||ST().goLive||isoDay(Math.min(...(S.recentTx||[]).map(t=>t.atMs).filter(Boolean),Date.now()-365*864e5));
+    if(k==="yday"){ f=t=D(1); } else if(k==="d7") f=D(6); else if(k==="d30") f=D(29); else if(k==="month"){ const m=new Date(d0); m.setDate(1); f=isoDay(m.getTime()); } else if(k==="all") f="2025-01-01";
     $("#lgFrom").value=f; $("#lgTo").value=t; FORMS.log(); },
   bulkVoid: () => { const L0=selectedTx().filter(canVoid); if(!L0.length){ toast("Tick the entries to void first (only entries that can still be voided).",true); return; }
     ask(`Void ${L0.length} entr${L0.length===1?"y":"ies"}?`,`Strength is reversed for each; they stay in the log marked void.`,`Void ${L0.length}`,async r=>{ const ops=opsNew(); for(const t of L0){ voidToOps(ops,t,r); if(t.action==="APEI_IN"&&t.tfrId) ops.upd.push({col:"transfers",id:t.tfrId,data:{status:"pending",inTx:null}}); if(t.action==="APEI_OUT"&&t.tfrId) ops.upd.push({col:"transfers",id:t.tfrId,data:{status:"cancelled",cancelBy:me().name||"",cancelAt:TS}}); } await DB.apply(ops); toast(`${L0.length} entries voided.`); runLog(); },true); },
@@ -4377,7 +4472,7 @@ const FORMS = {
     await tfrCreate([d]); toast(`Registered as ${tfrId(nextTfrNo()-1)}.`); for(const id of ["taName","taFather","taCon","taAdm","taRem"]) $("#"+id).value=""; $("#taName").focus(); },
   tfrEdit: async f => { const t0=S.tfrapps.find(x=>x.id===f.dataset.id); const d={appDate:isSA()?$("#teDate").value:t0.appDate,cl:$("#teCl").value,name:$("#teName").value.trim(),father:$("#teFather").value.trim(),contact:$("#teCon").value.trim(),cat:$("#teCat").value,choice1:$("#teC1").value,choice2:$("#teC2").value,updatedAt:TS,updatedBy:me().name||""}; d.backdated=d.appDate<isoDay(Date.now());
     await DB.apply({set:[],inc:[],upd:[{col:"tfrapps",id:f.dataset.id,data:d}]}); closeModal(); toast("Request updated."); },
-  dcSave: async f => { const code=f.dataset.id, use=!!$("#dcUse").value; const d={cap:Math.max(0,Number($("#dcCap").value)||0),fee:Math.max(0,Number($("#dcFee").value)||0),useReg:use,remarks:$("#dcRem").value.trim(),updatedAt:TS,byName:me().name||""}; if(!use) d.str=Math.max(0,Number($("#dcStr").value)||0);
+  dcSave: async f => { const code=f.dataset.id, use=!!$("#dcUse").value; const d={cap:Math.max(0,Number($("#dcCap").value)||0),fee:Math.max(0,Number($("#dcFee").value)||0),useReg:use,remarks:$("#dcRem").value.trim(),updatedAt:TS,byName:me().name||""}; if(!use){ d.str=Math.max(0,Number($("#dcStr").value)||0); const g=$("#dcG").value, b=$("#dcB").value; if(g!==""||b!==""){ d.g=Math.max(0,Number(g)||0); d.b=Math.max(0,Number(b)||0); if(d.g+d.b!==d.str){ if(!d.str) d.str=d.g+d.b; else { toast(`Girls + boys (${d.g+d.b}) must equal children (${d.str}).`,true); return; } } } }
     await DB.apply({set:[{col:"dcare",id:code,data:d,merge:"deep"}],upd:[],inc:[]}); toast(`Day care figures saved for ${code}.`); renderView(); },
   dcKid: async f => { const code=dcSchool(), id=f.dataset.id||newId(); const dob=parseDob($("#dkDob").value), ad=parseDob($("#dkAdm").value); if(dob===null||ad===null){ toast("Dates as dd-mm-yyyy.",true); return; }
     const k={name:$("#dkName").value.trim(),gender:$("#dkGen").value,dob:dob||"",admDate:ad||"",parent:$("#dkPar").value.trim(),desig:$("#dkDes").value.trim(),contact:$("#dkCon").value.trim(),fee:Math.max(0,Number($("#dkFee").value)||0),status:$("#dkSt").value};
