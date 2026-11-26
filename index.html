@@ -71,7 +71,7 @@ tr.void td{text-decoration:line-through;opacity:.55}
 .secchip button{border:0;background:none;color:var(--red);cursor:pointer;font-weight:800;padding:2px 5px}.secchip button:disabled{color:var(--mute);cursor:not-allowed}
 .toast{position:fixed;right:16px;bottom:16px;z-index:99;background:#0f1b33;color:#fff;padding:11px 15px;border-radius:8px;font-weight:700;max-width:min(440px,90vw);opacity:0;transform:translateY(8px);transition:.2s;pointer-events:none}
 .toast.on{opacity:1;transform:none}.toast.err{background:#b3122a}
-.modal{position:fixed;inset:0;background:rgba(5,10,25,.55);z-index:90;display:flex;align-items:flex-start;justify-content:center;padding:6vh 12px;overflow:auto}
+.modal{position:fixed;inset:0;background:rgba(5,10,25,.55);z-index:90;display:flex;align-items:safe center;justify-content:center;padding:6vh 12px;overflow:auto}
 .modal>div{background:var(--panel);border-radius:12px;max-width:560px;width:100%;padding:18px;border:1px solid var(--line)}
 .modal h3{font-size:18px;margin-bottom:12px}.row{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:14px}
 .login{max-width:440px;margin:8vh auto;padding:0 12px}.login .panel{padding:22px}
@@ -250,16 +250,27 @@ main caption.scap{text-align:left;padding-left:12px}
 @keyframes stflash{0%{box-shadow:0 0 0 4px rgba(245,158,11,.7)}100%{box-shadow:0 0 0 0 rgba(245,158,11,0)}}
 /* back to top */
 .modal>div.wide{max-width:980px!important;width:94vw!important}
+#snipOv{position:fixed;inset:0;z-index:9000;cursor:crosshair;background:rgba(15,23,42,.08)}.snipBox{position:fixed;border:2px dashed #1d4ed8;background:rgba(29,78,216,.12)}
+#snipBar{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:9001;background:#0b1f4b;color:#fff;padding:8px 12px;border-radius:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;max-width:94vw;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.cmpIt{position:absolute;cursor:move;outline:1px dashed #94a3b8;touch-action:none}.cmpIt img{width:100%;height:100%;display:block;pointer-events:none}.cmpIt:hover{outline:2px solid #1d4ed8}
+.cmpH{position:absolute;right:-6px;bottom:-8px;cursor:nwse-resize;font-size:14px;color:#1d4ed8;background:#fff;border-radius:4px;line-height:1}
+.cmpTools{position:absolute;top:-22px;right:0;display:none;gap:2px}.cmpIt:hover .cmpTools{display:flex}.cmpTools button{border:1px solid #cbd5e1;background:#fff;border-radius:4px;font-size:11px;padding:1px 5px;cursor:pointer}
+@media print{#snipOv,#snipBar{display:none}}
+.syncrow{margin-top:5px}.syncrow .sync{font-size:12px}
 #toTop{position:fixed;right:18px;bottom:22px;z-index:60;width:46px;height:46px;border-radius:50%;border:0;background:var(--band);color:#fff;font-size:22px;cursor:pointer;
   box-shadow:0 6px 16px rgba(0,0,0,.28);opacity:0;transform:translateY(16px) scale(.8);pointer-events:none;transition:opacity .25s,transform .25s}
 #toTop.show{opacity:.92;transform:none;pointer-events:auto}#toTop:hover{opacity:1;transform:translateY(-3px)}
 @media print{#toTop{display:none}}
+.heroS{position:relative;border-radius:16px;overflow:hidden;margin:0 0 14px;box-shadow:0 8px 24px -12px rgba(0,0,0,.4)}
+.heroSl{display:none;padding:18px 24px;flex-direction:column;justify-content:center}.heroSl.on{display:flex;animation:hfade .6s}.heroSl h2{margin:0 0 6px;font-size:24px;color:inherit}.heroSl p{margin:0;font-size:15px;color:inherit;opacity:.95}
+@keyframes hfade{from{opacity:.2}to{opacity:1}}.heroDots{position:absolute;bottom:8px;left:0;right:0;display:flex;gap:6px;justify-content:center}.heroDots i{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.5);cursor:pointer}.heroDots i.on{background:#fff}
 .hero{background:linear-gradient(120deg,var(--hc),color-mix(in srgb,var(--hc) 60%,#000));color:#fff;border-radius:16px;padding:16px 20px;margin:0 0 14px;box-shadow:0 8px 24px -12px rgba(0,0,0,.4)}
 .hero h2{margin:0 0 4px;font-size:20px;color:#fff}.hero p{margin:0;opacity:.95;line-height:1.5}
 .ewbar{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:70;background:#be185d;color:#fff;padding:9px 14px;border-radius:12px;box-shadow:0 8px 20px rgba(0,0,0,.3);font-size:14px;display:flex;gap:10px;align-items:center}
 .ewbar .btn{background:#fff;color:#be185d;border:0}
 body.ewon :is(h1,h2,h3,h4,th,label,caption,summary,nav a,.pill,.btn,.kpi>span,.stile b,.scap):hover{outline:2px dashed #be185d;outline-offset:2px;cursor:text}
 #annBar{position:sticky;top:calc(var(--bandH,62px) + 44px);z-index:28}
+@media (max-width:820px){#annBar{position:static}}
 .ann{display:flex;align-items:center;gap:10px;background:var(--ac);color:#fff;padding:7px max(3vw,14px);font-weight:600;font-size:14.5px;border-bottom:1px solid rgba(255,255,255,.25)}
 .ann-ic{font-size:17px}.ann-tx{flex:1;min-width:0;overflow:hidden}
 .ann{color:var(--tc,#fff)}.ann-x,.ann-ok{color:var(--tc,#fff)}
@@ -855,8 +866,7 @@ const NAV = [
   ["dash","Dashboard",()=>true],
   ["entry","Entry",()=>isSA()||role()==="hq"||role()==="clerk"],
   ["students","Students",()=>true],
-  ["waiting","Applicants",()=>role()!=="viewer"],
-  ["transfers","Transfers",()=>role()!=="viewer"],
+  ["waiting","Admissions & Transfers",()=>role()!=="viewer"],
   ["daycare","Day Care",()=>true],
   ["fees","Fees",()=>true],
   ["log","Log",()=>true],
@@ -901,9 +911,8 @@ function boot(){ setTimeout(actLogin,1200); setTimeout(()=>{ if(S.user&&role()!=
   document.body.classList.toggle("nopr", !canPR());
   app.innerHTML = `
   <div class="band" id="band"><div class="bandtop"><div class="brandrow">${ST().logo?`<img src="${h(ST().logo)}" alt="" class="logo">`:""}<div><h1>${h(ST().appTitle||(ST().org||"APEIs Peshawar Garrison")+" — Strength Portal")}</h1>
-    <small>${ST().appSub?h(ST().appSub)+" · ":""}Session ${h(session())} · ${DEMO?"Demo mode (this browser only)":"Live (Firebase)"}</small></div></div>
-    <div class="who"><span class="sync" id="syncDot"></span>${DEMO?`<span class="chip demo">DEMO</span>`:""}
-    <span class="zoomc" title="Text size of tables (this computer only)"><button class="btn s" data-act="tz" data-d="-1" aria-label="Smaller">A−</button><button class="btn s" data-act="tz" data-d="0" id="tzV">${Math.round(tzNow()*100)}%</button><button class="btn s" data-act="tz" data-d="1" aria-label="Larger">A+</button></span>
+    <small>${ST().appSub?h(ST().appSub)+" · ":""}Session ${h(session())} · ${DEMO?"Demo mode (this browser only)":"Live (Firebase)"}</small><div class="syncrow"><span class="sync" id="syncDot"></span></div></div></div>
+    <div class="who">${DEMO?`<span class="chip demo">DEMO</span>`:""}
     <button class="btn s" id="undoBtn" data-act="undoDlg" title="Undo your last change" hidden>↶ Undo</button>
     <button class="btn s" data-act="reload" title="Fetch the latest figures again">⟳ Refresh</button>
     <button class="btn s" data-act="guide" title="Read the user guide for your account">📘 Guide</button>
@@ -911,7 +920,10 @@ function boot(){ setTimeout(actLogin,1200); setTimeout(()=>{ if(S.user&&role()!=
     <div class="umenu"><button class="btn s ubtn" data-act="menuToggle" aria-haspopup="true" aria-expanded="false" title="Your account">☰ <span>${whoLabel()}</span></button>
       <div class="umenu-list" id="umenu" hidden role="menu">
         <div class="umenu-who">${h(me().name||"")}<small>${h(ROLES[role()]||"")}${mySchool()?" · "+h(mySchool()):""}</small></div>
+        <div class="zoomc" style="display:flex;gap:4px;align-items:center;padding:6px 10px" title="Text size of tables (this computer only)"><span style="flex:1;font-size:13px">🔍 Table text</span><button class="btn s" data-act="tz" data-d="-1" aria-label="Smaller">A−</button><button class="btn s" data-act="tz" data-d="0" id="tzV">${Math.round(tzNow()*100)}%</button><button class="btn s" data-act="tz" data-d="1" aria-label="Larger">A+</button></div>
         <button data-act="themeDlg" role="menuitem">🎨 Theme & text size</button>
+        <button data-act="myHero" role="menuitem">🖼 My front banner</button>
+        <button data-act="freeform" role="menuitem">✂ Freeform print (snip & arrange)</button>
         ${DEMO?`<button data-act="switchUser" role="menuitem">⇄ Switch role</button>`:`<button data-act="pwDlg" role="menuitem">🔑 Change password</button>`}
         <button data-act="signOut" role="menuitem" class="danger">⏻ Sign out</button></div></div></div></div>
     ${canSeeStudents()?`<div class="gsearch combo"><input id="gq" placeholder="🔍 Search students in ${ownOnly()?"your school":"all schools"} — name, Adm No, class (e.g. 9a), father CNIC, phone…  (press /)" autocomplete="off" aria-label="Search students"><div class="combo-list" id="gqList" hidden></div></div>`:""}</div>
@@ -923,7 +935,7 @@ function boot(){ setTimeout(actLogin,1200); setTimeout(()=>{ if(S.user&&role()!=
 function navHtml(){
   const inc=S.transfers.filter(t=>t.status==="pending" && (isSA()||role()==="hq"||t.to===mySchool())).length;
   const back=S.navStack.length>1||HIDDEN.some(x=>x[0]===S.view);
-  return NAV.filter(n=>n[2]()).map(([k,l])=>`<a href="#${k}" class="${S.view===k?"on":""}">${l}${k==="transfers"&&inc?`<span class="badge">${inc}</span>`:""}${k==="approvals"&&canDecide()&&apprPending().length?`<span class="badge">${apprPending().length}</span>`:""}</a>`).join("")+
+  return NAV.filter(n=>n[2]()).map(([k,l])=>`<a href="#${k}" class="${S.view===k||(k==="waiting"&&S.view==="transfers")?"on":""}">${l}${k==="waiting"&&inc?`<span class="badge" title="Transfers waiting to be accepted">${inc}</span>`:""}${k==="approvals"&&canDecide()&&apprPending().length?`<span class="badge">${apprPending().length}</span>`:""}</a>`).join("")+
     (back?`<button class="navback" data-act="back" title="Back to where you came from (Alt+←)">← Back</button>`:"");
 }
 function renderView(){
@@ -1048,9 +1060,9 @@ function kpiHtml(codes, w, rows, kind){
   const K=(go,lab,val,sub,cls,g)=>`<div class="kpi click ${g||""}" role="button" tabindex="0" ${go}><span>${lab}</span><b class="${cls||""}">${val}</b><i>${sub}</i></div>`;
   const nOn=idxAll().filter(r=>r.status==="On roll").length;
   return `<div class="kpis">
-    ${K(`data-act="drill" data-m="str"`,h(L("str")),nf(t.str),`${h(L("g"))} ${nf(t.g)} · ${h(L("b"))} ${nf(t.b)}`,"","kg1")}
+    ${K(`data-act="drill" data-m="str"`,h(L("str")),nf(t.str),`${h(L("g"))} <b>${nf(t.g)}</b><br>${h(L("b"))} <b>${nf(t.b)}</b>`,"","kg1")}
     ${K(`data-act="drill" data-m="auth"`,h(L("auth")),nf(t.auth),`${nf(t.n)} sections`,"","kg1")}
-    ${K(`data-act="drill" data-m="sd"`,h(L("sd")),sgt(t.sd),`${((t.str/(t.auth||1))*100).toFixed(1)}% of auth filled`,t.sd>0?"pos":t.sd<0?"neg":"","kg1")}
+    ${K(`data-act="drill" data-m="sd"`,h(L("sd")),sgt(t.sd),`${((t.str/(t.auth||1))*100).toFixed(1)}% filled<br>${(Math.max(0,t.auth-t.str)/(t.auth||1)*100).toFixed(1)}% vacant (${nf(Math.max(0,t.auth-t.str))} seats)`,t.sd>0?"pos":t.sd<0?"neg":"","kg1")}
     ${K(`data-act="drill" data-m="net"`,`${h(L("kMove"))} ${h(periodLabel(kind,w))}`,sgt(m.net),`${m.in} in · ${m.out} out`,m.net>0?"pos":m.net<0?"neg":"","kg2")}
     ${K(`data-act="go" data-id="transfers"`,h(L("kTransit")),pend,"awaiting receiving school","","kg2")}
     ${K(`data-act="go" data-id="waiting" data-p="tab=tfr"`,h(L("kTreq")),tr,"pending, by seniority","","kg2")}
@@ -1238,8 +1250,11 @@ async function saveEntry(){
 }
 
 /* ---------- Transfers ---------- */
+function admTabs(cur){ const inc=S.transfers.filter(t=>t.status==="pending"&&(isSA()||role()==="hq"||t.to===mySchool())).length;
+  return `<div class="subtabs">${[["new","📝 New admissions — waiting list","waiting"],["tfr","📋 Transfer requests — seniority list","waiting"],["moves",`🔁 Transfers between APEIs — in transit${inc?` <span class="badge">${inc}</span>`:""}`,"transfers"]].map(([k,l,v])=>`<button class="pill ${cur===k?"on":""}" ${v==="transfers"?`data-act="go" data-id="transfers"`:`data-act="go" data-id="waiting" data-p="tab=${k}"`}>${l}</button>`).join("")}</div>`; }
+const HIDDEN_T = HIDDEN.push(["transfers",()=>role()!=="viewer"]);
 VIEWS.transfers = {
-  shell:()=>`<div class="panel"><h2>Incoming — waiting for acceptance</h2><div class="scroll" id="tIn"></div></div><div class="panel"><h2>Outgoing — sent by your school</h2><div class="scroll" id="tOut"></div>
+  shell:()=>`${admTabs("moves")}<div class="panel"><h2>Incoming — waiting for acceptance</h2><div class="scroll" id="tIn"></div></div><div class="panel"><h2>Outgoing — sent by your school</h2><div class="scroll" id="tOut"></div>
    <p class="hint">Transfers between the schools of this portal are two-step: the sender records <b>${h(AL("APEI_OUT"))}</b> (−1 there), the receiver accepts here and picks the section (+1 there). Transfers to or from an APEI outside the portal are a single entry on the Entry tab.</p></div>`,
   regions:{
     tIn(){ const all=isSA()||role()==="hq"; const Lr=S.transfers.filter(t=>["pending","accept_wait"].includes(t.status) && (all || t.to===mySchool()));
@@ -1264,7 +1279,7 @@ function canWait(f, w){ if(isSA()) return true; const r=role();
 const waitTab = () => S.params.tab==="tfr" ? "tfr" : "new";
 function waitRows(){ const code=waitSchool(), f=S.waitStatus||"active"; return S.waiting.filter(w=>(code==="ALL"||w.school===code) && (!S.params.cl||w.cl===S.params.cl) && (f==="all"||(f==="active"?waitCounted(w.status):w.status===f))).sort((a,b)=>(a.date||"").localeCompare(b.date||"")); }
 VIEWS.waiting = {
-  shell(){ const tabs=`<div class="subtabs">${[["new","New admission — waiting list"],["tfr","Inter-APEI transfer requests"]].map(([k,l])=>`<button class="pill ${waitTab()===k?"on":""}" data-act="setP" data-p="tab=${k}">${l}</button>`).join("")}</div>`;
+  shell(){ const tabs=admTabs(waitTab());
     if(waitTab()==="tfr"){ const p=S.params;
       return tabs+`<div class="panel"><div class="ph"><h2>Transfer requests — seniority list</h2><div class="pills">${expBar("tfr")}</div></div>
         ${role()==="viewer"||role()==="principal"?"":tfrFormHtml()}<div id="tImp"></div>
@@ -1516,6 +1531,7 @@ const canEditStu = r => r && (canEditDirect() || (role()==="clerk" && r.school==
 VIEWS.student = {
   shell:()=>`<div id="spBody"><div class="panel">Loading the record…</div></div>`,
   regions:{ spBody(){ return stuPageHtml(); } },
+  post(id){ if(id==="spBody"&&S.sp) S.sp.snap=stuFormSnap(); },
   after(){ loadStuPage(); }
 };
 async function loadStuPage(){ const p=S.params; S.sp={id:p.id||"",editing:false};
@@ -1543,7 +1559,7 @@ function stuPageHtml(){ const sp=S.sp; if(!sp) return ""; if(sp.err) return `<di
   const ph=sp.photo, phBox=sp.isNew?"":`<div style="text-align:center">${ph?`<img src="${ph}" alt="Photo" style="width:96px;height:120px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">`:`<div style="width:96px;height:120px;border:1px dashed var(--line);border-radius:8px;display:grid;place-items:center;color:var(--mute);font-size:12px">No photo</div>`}
       ${may?`<label class="btn s" style="margin-top:4px">${ph?"Change":"Add"} photo<input type="file" accept="image/*" capture="user" data-chg="photoOne" hidden></label>`:""}</div>`;
   return `${sp.isNew?"":stuNavBar(r)}<div class="panel ${ed?"editing":""}"><div class="sp-head" style="align-items:flex-start">${phBox}<div style="flex:1"><h2>${sp.isNew?"Add a student to the data bank":h(r.name)}</h2>
-      <div class="sub">${h(code)} — ${h(sc?.name||"")} · ${h(r.cl)}-${h(r.sec)} · ${r.status==="On roll"?"On roll":`<span class="tag t-out">${h(r.status)}</span>`}${r.admNo?` · Adm ${h(r.admNo)}`:""}${r.cat?` · ${h(catLabel(r.cat))}`:""}${fee?` · Monthly fee Rs ${nf(fee)}`:""}</div></div>
+      <div class="sub">${h(code)} — ${h(sc?.name||"")} · ${h(r.cl)}-${h(r.sec)} · ${r.status==="On roll"?"On roll":`<span class="tag t-out">${h(r.status)}</span>`}${r.admNo?` · Adm ${h(r.admNo)}`:""}${r.cat?` · ${h(catLabel(r.cat))}`:""}${fee?` · Monthly fee Rs ${nf(fee)}`:""}</div>${sp.isNew?"":stayLine(r)}</div>
       <div class="pills"><button class="btn" data-act="back">← Back</button>${editBtn}${!sp.isNew?expBar("stuOne")+formBar("one"):""}${!sp.isNew&&r.status==="On roll"&&(canEnter(code)||canDecide())?`<button class="btn" data-act="classReq" title="Move the student to another class (parent's request etc.)">⇅ Change of class</button>`:""}${!sp.isNew&&canDecide()?`<button class="btn r" data-act="stuDel" data-id="${h(r.id)}" title="Moves the record to Trash; it can be restored">🗑 Move to Trash</button>`:""}</div></div>
       ${!sp.isNew?docsStrip(r,may):""}${!sp.isNew?verBox(r,may):""}${r.cv&&!sp.isNew?`<div class="note" style="border-color:#d97706">⚠ <b>Category to re-verify.</b> This school's categories came in against the old list. Check the category${may?` — correct it with ✎ Edit, or if it is already right press <button class="btn s g" data-act="cvOk" data-id="${h(r.id)}">✓ Category is correct</button>`:""}.</div>`:""}
     ${sp.isNew?`<div class="note" style="margin-top:10px">Use this for students already on roll. A <b>new admission</b> should be entered on the Entry tab — that adds the student to strength and creates the record by itself.</div>`:""}
@@ -2271,6 +2287,8 @@ function entryPanel(){ const st=todayStatus(), done=st.filter(x=>x.state==="ok")
    <p class="hint" style="margin:0 0 8px">${done} of ${st.length} schools confirmed today. ✓ = the clerk pressed “Today's entries are complete” (or Nil) on the Entry tab; ● = entries saved but the clerk has not pressed it yet. Click any number to open those entries in the Log.</p>
    <div class="scroll"><table class="sttab"><tr><th>Period</th>${sch.map(s=>`<th class="n">${h(s.code)}</th>`).join("")}<th class="n">${h(L("total"))}</th></tr>
     <tr><td><b>Today</b></td>${st.map(x=>`<td class="n"><span class="stchip ${x.state}" data-act="go" data-id="log" data-p="${h(link(x.code,W[0]))}" title="${h(x.name)} — ${h(stLabel(x))}"><i>${stIcon(x)}</i>${x.n}${x.state==="ok"?` <span style="font-weight:500">${x.mk.nil?"Nil":fmtT(toMs(x.mk.at))}</span>`:""}</span></td>`).join("")}<td class="n"><b class="dn" data-act="go" data-id="log" data-p="${h(link("",W[0]))}">${st.reduce((a,x)=>a+x.n,0)}</b></td></tr>
+    ${(()=>{ const P=S.recentTx.filter(t=>t.status==="pending"||(t.status==="ok"&&t.rev===false)); if(!P.length) return ""; const c=code=>P.filter(t=>t.school===code).length;
+      return `<tr style="background:#fffbeb"><td>⏳ <b>Waiting for approval</b><br><span class="mute" style="font-size:12px">not yet in the figures above</span></td>${sch.map(s=>`<td class="n">${c(s.code)?`<span class="dn" data-act="go" data-id="log" data-p="${h(qs({tab:"rev",school:s.code}))}" style="color:#b45309;font-weight:700">${c(s.code)}</span>`:`<span class="mute">0</span>`}</td>`).join("")}<td class="n"><b class="dn" data-act="go" data-id="log" data-p="tab=rev" style="color:#b45309">${P.length}</b></td></tr>`; })()}
     ${W.slice(1).map(w=>{ const v=sch.map(s=>cnt(s.code,w)); const tot=v.some(x=>x===null)?null:v.reduce((a,x)=>a+x,0);
       return `<tr><td>${w[1]}${w[0]==="yday"?` <span class="mute" style="font-size:12px">(✓ = confirmed)</span>`:""}</td>${sch.map((s,i)=>{ const mk=w[0]==="yday"?(S.daily[isoDay(w[2])]||{})[s.code]:null;
         return `<td class="n">${v[i]===null?`<span class="mute">${S.cnt?"—":"…"}</span>`:`<span class="dn" data-act="go" data-id="log" data-p="${h(link(s.code,w))}">${nf(v[i])}</span>`}${mk?` <span class="pos" title="Confirmed ${h(fmtDT(toMs(mk.at)))}">✓</span>`:""}</td>`; }).join("")}
@@ -2321,7 +2339,7 @@ async function admForms(list, f, name){ if(!canSD()){ toast(SD_MSG,true); return
   const html=list.map(admFormHtml).join("");
   if(f==="doc"){ if(!canWD()){ toast(WD_MSG,true); return; } wordFile(name,{title:"",sub:"",orientation:"portrait",models:[],html}); toast(`${list.length} admission form${list.length>1?"s":""} saved as Word.`); }
   else printHtml(`<div style="background:#fff">${html}</div>`,{paper:"A4",orientation:"portrait",allow:false}); }
-function formBar(scope){ if(!canSD()) return ""; const b=[]; if(canPR()) b.push(`<button class="btn s" data-act="admForms" data-id="${scope}" data-f="pdf" title="One A4 page per student">Admission forms — Print / PDF</button>`); if(canWD()) b.push(`<button class="btn s" data-act="admForms" data-id="${scope}" data-f="doc">Word</button>`); return b.join(""); }
+function formBar(scope){ if(!canSD()) return ""; const b=[]; if(canPR()) b.push(`<button class="btn s" data-act="admForms" data-id="${scope}" data-f="pdf" title="One A4 page per student">Admission forms — Print / PDF</button>`); if(canWD()) b.push(`<button class="btn s" data-act="admForms" data-id="${scope}" data-f="doc">Admission forms — Word</button>`); return b.join(""); }
 
 /* ---------- waiting list: school-wise and class-wise summary, every figure opens the applicants ---------- */
 function waitDrillHtml(){ const p=S.params, codes=scopeCodes(p); let T={t:0,n:0,w:0};
@@ -2977,6 +2995,7 @@ async function dupTrash(groups){ let n=0; const names=[]; toast("Working… plea
   if(!plan.length){ toast("Nothing to move — the records may already be in Trash. Press ⟳ Refresh.",true); return; }
   const CH=300; let err="";
   try{ for(let i=0;i<plan.length;i+=CH){ const ops=opsNew(); ops.noChk=true; for(const [r,keep] of plan.slice(i,i+CH)){ const o=stuToTrash(r,"duplicate of "+(keep.admNo||keep.name)); ops.set.push(...o.set); (ops.del||=[]).push(...(o.del||[])); n++; if(names.length<20) names.push(r.name); }
+      const ids=new Set(plan.slice(i,i+CH).map(([r])=>r.id)); for(const a of apprPending().filter(a=>ids.has(a.stuId))) ops.upd.push({col:"approvals",id:a.id,data:{status:"rejected",decidedBy:me().uid,decidedByName:me().name||"",decidedAt:TS,decidedMs:Date.now(),decNote:"record moved to Trash (duplicate)"}});
       await DB.apply(ops,true); toast(`Moving to Trash… ${nf(Math.min(i+CH,plan.length))} of ${nf(plan.length)}`); await new Promise(r=>setTimeout(r,30)); } }
   catch(e){ err=e.message||String(e); }
   for(const c of schoolList()) if(S.stu[c.code]) await ensureStu(c.code,true); S.trash=null; if(n) audit("Duplicates moved to Trash",`${n}: ${names.join(", ")}${n>20?"…":""}`);
@@ -3149,7 +3168,7 @@ async function apprApply(ops, a){ const day=isoDay(Date.now()), by=me().name||""
     const tx={school:a.school,action:"SEC",cl:a.cl,sec:a.sec,toCl:a.toCl,toSec:a.toSec,gender:rec.gender,cat:rec.cat||"",name:rec.name,father:rec.father||"",admNo:rec.admNo||"",studentId:rec.id,remarks:`Class change${a.reason?": "+a.reason:""} (requested by ${a.byName})`,eff:a.date||""}; const e=effFromDate(tx.eff); if(e) tx.effMs=e; buildTxOps(ops,tx); return; }
   if(a.type==="tfr"){ const t=S.transfers.find(x=>x.id===a.tfrId); if(!t) throw new Error("transfer not found"); tfrAcceptOps(ops,t,a.toCl,a.toSec,a.newAdm||"",a.date||""); return; } }
 function tfrAcceptOps(ops,t,cl,sec,adm,date){ const sid=newId();
-  ops.set.push({col:"students",id:sid,data:{...(t.stu||{name:t.name,father:t.father||"",dob:t.dob||"",gender:t.gender,cat:t.cat||""}),school:t.to,admNo:adm||t.stu?.admNo||t.admNo||"",cl,sec,status:"On roll",admDate:date||isoDay(Date.now()),prevSchool:t.from,leftDate:"",leftReason:"",createdAt:TS,updatedAt:TS,by:me().name||""}});
+  ops.set.push({col:"students",id:sid,data:{...(t.stu||{name:t.name,father:t.father||"",dob:t.dob||"",gender:t.gender,cat:t.cat||""}),school:t.to,admNo:adm||t.stu?.admNo||t.admNo||"",cl,sec,status:"On roll",admDate:date||isoDay(Date.now()),firstAdm:t.stu?.firstAdm||t.stu?.admDate||"",prevSchool:t.from,leftDate:"",leftReason:"",createdAt:TS,updatedAt:TS,by:me().name||""}});
   const tx={school:t.to,action:"APEI_IN",cl,sec,gender:t.gender,cat:t.cat,name:t.name,father:t.father||"",dob:t.dob||"",admNo:adm,remarks:t.remarks||"",fromSchool:t.from,tfrId:t.id,studentId:sid,eff:date||""}; const e=effFromDate(tx.eff); if(e) tx.effMs=e;
   const inId=txToOps(ops,tx); ops.upd.push({col:"transfers",id:t.id,data:{status:"accepted",inTx:inId,toCl:cl,toSec:sec,accBy:me().name||"",accAt:TS}}); }
 
@@ -3306,7 +3325,7 @@ Object.assign(EXTRA_ACT,{ undoDlg: () => undoDlg(), undoGo: () => undoGo() });
 document.addEventListener("keydown",e=>{ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"&&!e.target.closest("input,textarea,select,[contenteditable]")&&UNDO.length&&undoAllowed()){ e.preventDefault(); undoDlg(); } });
 
 /* ---------- portal name, front-page banner ---------- */
-function heroHtml(){ const st=ST(); if(!st.heroOn||!(st.heroTitle||st.heroText)) return ""; const c=st.heroColor||"#0b1f4b";
+function heroHtml(){ const hs=heroSlidesHtml(); if(hs!==null) return hs; const st=ST(); if(!st.heroOn||!(st.heroTitle||st.heroText)) return ""; const c=st.heroColor||"#0b1f4b";
   return `<div class="hero" style="--hc:${h(c)}">${st.heroTitle?`<h2>${h(st.heroTitle)}</h2>`:""}${st.heroText?`<p>${h(st.heroText).replace(/\n/g,"<br>")}</p>`:""}</div>`; }
 Object.assign(EXTRA_FORMS,{ brand: async () => { await saveSettings({appTitle:$("#bTitle").value.trim(),appSub:$("#bSub").value.trim(),tabTitle:$("#bTab").value.trim(),heroOn:$("#bHeroOn").value==="1",heroColor:$("#bHeroC").value,heroTitle:$("#bHeroT").value.trim(),heroText:$("#bHeroX").value.trim()},"Saved — the top bar updates now."); boot(); } });
 
@@ -3891,7 +3910,7 @@ const SETUP = {
        <form data-form="permDefaults"><table><tr><th>Role</th>${PERMS.map(p=>`<th>${p[1]}</th>`).join("")}</tr>${DL_ROLES.map(r=>`<tr><td>${h(ROLES[r])}</td>${PERMS.map(p=>p[0]).map(k=>`<td><input type="checkbox" name="${r}_${k}" ${permDef(r,k)?"checked":""} style="width:20px;height:20px"></td>`).join("")}</tr>`).join("")}</table><div class="row"><button class="btn p">Save role defaults</button></div></form>
        <p class="hint">A change takes effect the next time that person opens or refreshes the portal. Note: anything a person can see on screen could still be copied by hand or photographed — these switches stop downloads and printing from the portal, not viewing.</p></div>
        <p class="hint">Edit a name and press Tab or click elsewhere to save; it shows at the top of that person's screen and on their new log entries (older entries keep the name they were saved with). To remove someone, untick Active — their past entries stay in the log.</p></div>`; },
-  general(){ const st=ST(); return annSetupHtml()+`<div class="panel"><h2>Name of the portal & front page</h2><form data-form="brand" class="grid">
+  general(){ const st=ST(); return annSetupHtml()+`<div class="panel"><h2>🖼 Front banner (Dashboard) — slides</h2><p class="hint" style="margin-top:0">Add one or more slides with a picture or colours; several slides change by themselves. Choose “Set for everyone” to stop people using their own banner. (When slides exist they replace the simple banner below.)</p>${heroEditorHtml(false)}</div>`+`<div class="panel"><h2>Name of the portal & front page</h2><form data-form="brand" class="grid">
       <div class="f" style="grid-column:span 2"><label for="bTitle">Title in the top bar</label><input id="bTitle" value="${h(st.appTitle||"")}" placeholder="${h((st.org||"APEIs Peshawar Garrison")+" — Strength Portal")}"></div>
       <div class="f" style="grid-column:span 2"><label for="bSub">Sub-title (before “Session …”)</label><input id="bSub" value="${h(st.appSub||"")}" placeholder="e.g. Regional Directorate APEIs Peshawar"></div>
       <div class="f"><label for="bTab">Name in the browser tab / phone app</label><input id="bTab" value="${h(st.tabTitle||"")}" placeholder="APEIs Strength Portal"></div>
@@ -4163,7 +4182,9 @@ Object.assign(EXTRA_ACT,{
 /* ---------- 📘 user guide for each kind of account (PDFs kept next to the portal in the "guides" folder) ---------- */
 const GUIDES={superadmin:["guide-superadmin.pdf","Super Admin — master guide"],hq:["guide-dq-office.pdf","DQ Office guide"],clerk:["guide-clerk.pdf","School clerks' guide"],viewer:["guide-view-only.pdf","View-only guide"]};
 const guideFor = r => GUIDES[r] || GUIDES.viewer;
-Object.assign(EXTRA_ACT,{ guide: el => { const r=el?.dataset?.r || role(), [f,l]=guideFor(r), url="guides/"+f, link=(ST().guideLinks||{})[r==="principal"?"viewer":r];
+Object.assign(EXTRA_ACT,{ guide: async el => { const r=el?.dataset?.r || role(), [f,l]=guideFor(r), url="guides/"+f, link=(ST().guideLinks||{})[r==="principal"?"viewer":r];
+  if(!link && location.protocol.startsWith("http")){ let ok=true; try{ const x=await fetch(url,{method:"HEAD",cache:"no-store"}); ok=x.ok; }catch(e){ ok=false; }
+    if(!ok){ const full=new URL(url,location.href).href; modal(`<h3>📘 ${h(l)} — file not found</h3><p>The portal looked for the guide here:</p><p><code style="word-break:break-all">${h(full)}</code></p>${isSA()?`<p><b>To fix:</b> on GitHub, open the repository <b>apei-strength</b> (the same place as <code>index.html</code>) → <b>Add file → Upload files</b> → drag the 4 PDF files in, and in the box above the file list type the folder <code>guides/</code>… or simply create a folder named exactly <b>guides</b> (small letters) and upload into it. The file names must be exactly:<br><code>guide-superadmin.pdf · guide-dq-office.pdf · guide-clerk.pdf · guide-view-only.pdf</code>. GitHub Pages needs 1–2 minutes to publish them.</p>`:`<p>Please tell the Super Admin.</p>`}<div class="row"><button class="btn" data-act="closeModal">Close</button></div>`); return; } }
   modal(`<div class="ph"><h3 style="margin:0">📘 ${h(l)}</h3><div class="pills">${isSA()?Object.entries(GUIDES).map(([k,[,n]])=>`<button class="pill ${k===(GUIDES[r]?r:"viewer")?"on":""}" data-act="guide" data-r="${k}">${h(n.split(" —")[0].replace(" guide",""))}</button>`).join(""):""}
      <a class="btn s p" href="${h(link||url)}" download="${h(f)}" target="_blank" rel="noopener">⬇ Download PDF</a><button class="btn s" data-act="closeModal">Close</button></div></div>
    <iframe src="${h(link||url)}" title="${h(l)}" style="width:100%;height:72vh;border:1px solid var(--line);border-radius:8px;margin-top:8px;background:#fff"></iframe>
@@ -4347,8 +4368,8 @@ function stuNavBar(r){ const L=navList(), i=L.findIndex(x=>x.id===r.id); if(i<0)
     <span style="flex:1;min-width:240px"><b>${nf(i+1)}</b> of ${nf(L.length)} · <b>${h(r.school)}</b> ${nf(pos(inS))}/${nf(inS.length)} · class <b>${h(r.cl)}</b> ${nf(pos(inC))}/${nf(inC.length)} · section <b>${h(r.sec)}</b> ${nf(pos(inSec))}/${nf(inSec.length)} <span class="mute mini">(on roll; seniority by the order chosen)</span></span>
     <select class="in" style="width:auto" data-chg="navOrd" title="Order for Previous / Next">${NAV_ORD.map(([k,l])=>`<option value="${k}" ${navOrd()===k?"selected":""}>${h(l)}</option>`).join("")}</select>
     <button class="btn s" data-act="stuStep" data-id="1" ${i<L.length-1?"":"disabled"} title="Next (→ key)">Next ▶</button></div>`; }
-function stuDirty(){ const sp=S.sp; if(!sp?.editing||sp.isNew) return false; const r=sp.rec; for(const f of activeFields()){ const el=document.getElementById("sf_"+f.key); if(!el) continue; let v=el.value.trim(), o=String(r[f.key]??"");
-    if(f.type==="date"){ const p=parseDob(v); if(p!==null) v=p||""; } if(["fatherCnic","motherCnic","guardianCnic"].includes(f.key)&&digits(v).length===13) v=fmtCnic(v); if(PHONE_KEYS.has(f.key)) { v=fmtPhones(v); o=fmtPhones(o); } if(v!==o.trim()) return true; } return false; }
+function stuFormSnap(){ const f=document.querySelector('form[data-form="stuSave"]'); if(!f) return ""; return [...f.querySelectorAll("input,select,textarea")].filter(x=>x.id||x.name).map(x=>(x.id||x.name)+"="+(x.type==="checkbox"?x.checked:x.value)).join("\u0001"); }
+function stuDirty(){ const sp=S.sp; if(!sp?.editing||sp.isNew) return false; const now=stuFormSnap(); return !!now && sp.snap!==undefined && now!==sp.snap; }
 async function stuStep(dir){ const r=S.sp?.rec; if(!r||S.view!=="student") return; const L=navList(), i=L.findIndex(x=>x.id===r.id), nx=L[i+dir]; if(!nx) return;
   const go=()=>{ S.sp=null; go2("student",{id:nx.id}); };
   if(!stuDirty()) return go();
@@ -4405,6 +4426,166 @@ function upPanel(){ const sch=schoolList(), from=isoDay(Date.now()-29*864e5); if
 Object.assign(EXTRA_ACT,{ upShow: () => { S.upAll=true; fillRegion("dStatus",true); } });
 (()=>{ const o=VIEWS.dash?.regions?.dStatus; if(o) VIEWS.dash.regions.dStatus=(...a)=>o(...a)+upPanel(); })();
 
+/* Approvals: what the number is made of (kind × school), each figure filters the list */
+function apprSummary(){ if(!canDecide()) return ""; const P=apprPending(); if(!P.length) return ""; const sch=schoolList().map(s=>s.code), kinds=Object.keys(APPR_T).filter(k=>P.some(a=>a.type===k));
+  const c=(k,sc)=>P.filter(a=>a.type===k&&(!sc||a.school===sc)).length;
+  return `<div class="panel" style="margin:0 0 10px;padding:10px"><b>${nf(P.length)} waiting</b> — by kind and school (click a figure to show only those):<table style="margin-top:6px"><tr><th>Kind</th>${sch.map(s=>`<th class="n">${h(s)}</th>`).join("")}<th class="n">${h(L("total"))}</th></tr>
+   ${kinds.map(k=>`<tr><td><span class="tag ${APPR_T[k][1]}">${h(APPR_T[k][0])}</span></td>${sch.map(s=>`<td class="n">${c(k,s)?`<span class="dn" data-act="setP" data-p="${h(qs({apT:k,apSch:s}))}">${nf(c(k,s))}</span>`:`<span class="mute">0</span>`}</td>`).join("")}<td class="n"><b class="dn" data-act="setP" data-p="${h(qs({apT:k,apSch:""}))}">${nf(c(k))}</b></td></tr>`).join("")}</table>
+   ${(()=>{ const st=P.filter(a=>a.stuId&&a.type!=="tfr"&&!idxFind(a.stuId)); return st.length?`<p class="note" style="margin:6px 0 0">⚠ <b>${nf(st.length)}</b> of these are for records that are <b>no longer in the data bank</b> (moved to Trash, e.g. duplicate copies). <button class="btn s" data-act="apprStale">Close these ${nf(st.length)} requests</button></p>`:""; })()}
+   ${P.some(a=>a.type==="verify")?`<p class="hint" style="margin:6px 0 0">“Verify record” requests are records a clerk has checked and sent to you. They are also listed in <span class="dn" data-act="go" data-id="students" data-p="tab=unv&vlW=w">Students → Unverified → Waiting for the DQ Office</span>, where <b>Tick all → ✓ Verify ticked</b> clears hundreds at once.</p>`:""}</div>`; }
+(()=>{ const o=VIEWS.approvals.regions.apBody; VIEWS.approvals.regions.apBody=(...a)=>{ const x=o(...a); return S.apprs===null?x:apprSummary()+x; }; })();
+
+/* ---------- 🖼 front banner (hero) with slides: picture, colours, position; loops when several ---------- */
+const HERO_DEF={title:"",text:"",img:"",bg:"#0b1f4b",bg2:"#1d4ed8",tcol:"#ffffff",align:"left",height:"m",dim:"40",fit:"cover"};
+const heroMine = () => { try{ return JSON.parse(localStorage.getItem("apeis_hero_"+me().uid)||"null"); }catch(e){ return null; } };
+function heroCfg(){ const g=ST().hero; if(g?.lock||!heroMine()) return g?.on?{...g,src:"all"}:null; const m=heroMine(); return m.on?{...m,src:"mine"}:null; }
+S.heroImgs ||= {};
+async function heroImgLoad(ids){ const miss=ids.filter(id=>id&&!(id in S.heroImgs)); if(!miss.length) return; for(const id of miss){ S.heroImgs[id]=""; try{ S.heroImgs[id]=(await DB.getDoc("heroImg",id))?.img||""; }catch(e){} } if(S.view==="dash") renderView(); }
+function slideImg(x,c){ if(!x.img) return ""; if(x.img.startsWith("data:")) return x.img; if(c.src==="all"){ if(!(x.img in S.heroImgs)) heroImgLoad([x.img]); return S.heroImgs[x.img]||""; } return ""; }
+function heroSlidesHtml(){ const c=heroCfg(); if(!c||!(c.slides||[]).length) return null; const H={s:"110px",m:"170px",l:"260px",xl:"360px"};
+  return `<div class="heroS" data-int="${Math.max(3,Number(c.int)||7)}">${c.slides.map((x0,i)=>{ const x={...HERO_DEF,...x0}, im=slideImg(x,c);
+    return `<div class="heroSl ${i?"":"on"}" style="min-height:${H[x.height]||H.m};text-align:${h(x.align)};color:${h(x.tcol)};background:${im?`linear-gradient(rgba(0,0,0,${Number(x.dim)/100}),rgba(0,0,0,${Number(x.dim)/100})),url('${im}') center/${x.fit==="contain"?"contain no-repeat":"cover"}`:`linear-gradient(120deg,${h(x.bg)},${h(x.bg2)})`}">${x.title?`<h2>${h(x.title)}</h2>`:""}${x.text?`<p>${h(x.text).replace(/\n/g,"<br>")}</p>`:""}</div>`; }).join("")}${c.slides.length>1?`<div class="heroDots">${c.slides.map((_,i)=>`<i data-act="heroGo" data-id="${i}" class="${i?"":"on"}"></i>`).join("")}</div>`:""}</div>`; }
+function heroGo(i){ const b=document.querySelector(".heroS"); if(!b) return; const L2=[...b.querySelectorAll(".heroSl")], D=[...b.querySelectorAll(".heroDots i")]; if(!L2.length) return; i=((i%L2.length)+L2.length)%L2.length; L2.forEach((x,j)=>x.classList.toggle("on",j===i)); D.forEach((x,j)=>x.classList.toggle("on",j===i)); b.dataset.cur=i; }
+setInterval(()=>{ const b=document.querySelector(".heroS"); if(!b||b.matches(":hover")) return; const n=b.querySelectorAll(".heroSl").length; if(n<2) return; b._t=(b._t||0)+1; if(b._t>=Number(b.dataset.int||7)){ b._t=0; heroGo(Number(b.dataset.cur||0)+1); } },1000);
+function heroEditorHtml(mine){ const c=mine?(heroMine()||{on:true,slides:[]}):(ST().hero||{on:true,slides:[]}), sl=(S.heroEd ||= {})[mine?"m":"g"] ||= JSON.parse(JSON.stringify(c.slides||[])), lock=!!ST().hero?.lock;
+  if(mine&&lock) return `<p class="note">The Super Admin has set the front banner for everyone, so it cannot be changed here.</p>`;
+  return `<div id="heroEd" data-mine="${mine?1:""}"><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))"><div class="f"><label>Banner</label><select id="heOn"><option value="1" ${c.on!==false?"selected":""}>Shown</option><option value="" ${c.on===false?"selected":""}>Hidden</option></select></div>
+     <div class="f"><label>Next slide every (seconds)</label><input id="heInt" type="number" min="3" value="${h(c.int||7)}"></div>
+     ${mine?"":`<div class="f"><label>Who sees it</label><select id="heLock"><option value="">Default — each person may set their own</option><option value="1" ${lock?"selected":""}>Set for everyone (people cannot change it)</option></select></div>`}</div>
+   ${sl.map((x0,i)=>{ const x={...HERO_DEF,...x0}; return `<fieldset style="border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:8px 0" data-sl="${i}"><legend><b>Slide ${i+1}</b> <button type="button" class="btn s" data-act="heMove" data-id="${i}" data-d="-1" ${i?"":"disabled"}>▲</button><button type="button" class="btn s" data-act="heMove" data-id="${i}" data-d="1" ${i<sl.length-1?"":"disabled"}>▼</button> <button type="button" class="btn s r" data-act="heDel" data-id="${i}">Remove</button></legend>
+     <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))"><div class="f" style="grid-column:1/-1"><label>Heading</label><input data-k="title" value="${h(x.title)}"></div><div class="f" style="grid-column:1/-1"><label>Text</label><textarea data-k="text" rows="2">${h(x.text)}</textarea></div>
+      <div class="f"><label>Colour 1</label><input type="color" data-k="bg" value="${h(x.bg)}" style="height:38px;padding:2px"></div><div class="f"><label>Colour 2 (blend)</label><input type="color" data-k="bg2" value="${h(x.bg2)}" style="height:38px;padding:2px"></div><div class="f"><label>Text colour</label><input type="color" data-k="tcol" value="${h(x.tcol)}" style="height:38px;padding:2px"></div>
+      <div class="f"><label>Text position</label><select data-k="align">${[["left","Left"],["center","Middle"],["right","Right"]].map(([k,l])=>`<option value="${k}" ${x.align===k?"selected":""}>${l}</option>`).join("")}</select></div>
+      <div class="f"><label>Height</label><select data-k="height">${[["s","Small"],["m","Medium"],["l","Large"],["xl","Extra large"]].map(([k,l])=>`<option value="${k}" ${x.height===k?"selected":""}>${l}</option>`).join("")}</select></div>
+      <div class="f"><label>Picture</label><label class="btn s">${x.img?"Change picture":"Add picture"}<input type="file" accept="image/*" data-chg="heImg" data-id="${i}" hidden></label>${x.img?` <button type="button" class="btn s" data-act="heNoImg" data-id="${i}">No picture</button>`:""}</div>
+      <div class="f"><label>Picture fills</label><select data-k="fit"><option value="cover" ${x.fit!=="contain"?"selected":""}>Whole banner (crop)</option><option value="contain" ${x.fit==="contain"?"selected":""}>Whole picture (no crop)</option></select></div>
+      <div class="f"><label>Darken picture (for readable text)</label><input type="range" min="0" max="80" data-k="dim" value="${h(x.dim)}"></div></div></fieldset>`; }).join("")}
+   <div class="row" style="justify-content:flex-start"><button type="button" class="btn" data-act="heAdd">＋ Add a slide</button><button type="button" class="btn p" data-act="heSave">Save banner</button>${mine&&heroMine()?`<button type="button" class="btn" data-act="heReset">Use the standard banner</button>`:""}</div></div>`; }
+function heRead(){ const box=$("#heroEd"); if(!box) return null; const k=box.dataset.mine?"m":"g", sl=S.heroEd[k]; for(const f of box.querySelectorAll("[data-sl]")){ const i=+f.dataset.sl; for(const el of f.querySelectorAll("[data-k]")) sl[i][el.dataset.k]=el.value; } return {k,sl,mine:!!box.dataset.mine}; }
+function heRefresh(){ const box=$("#heroEd"); if(box) box.outerHTML=heroEditorHtml(!!box.dataset.mine); }
+Object.assign(EXTRA_ACT,{
+  heroGo: el => heroGo(Number(el.dataset.id)),
+  heAdd: () => { const r=heRead(); r.sl.push({...HERO_DEF}); heRefresh(); },
+  heDel: el => { const r=heRead(); r.sl.splice(+el.dataset.id,1); heRefresh(); },
+  heMove: el => { const r=heRead(), i=+el.dataset.id, j=i+Number(el.dataset.d); [r.sl[i],r.sl[j]]=[r.sl[j],r.sl[i]]; heRefresh(); },
+  heNoImg: el => { const r=heRead(); r.sl[+el.dataset.id].img=""; heRefresh(); },
+  heReset: () => { try{ localStorage.removeItem("apeis_hero_"+me().uid); }catch(e){} S.heroEd={}; closeModal(); toast("Standard banner restored."); renderView(); },
+  heSave: async () => { const r=heRead(); const cfg={on:$("#heOn").value==="1",int:Number($("#heInt").value)||7,slides:r.sl};
+    if(r.mine){ try{ localStorage.setItem("apeis_hero_"+me().uid,JSON.stringify(cfg)); }catch(e){ toast("Too large for this browser — use smaller pictures.",true); return; } closeModal(); toast("Your banner is saved (this computer)."); S.heroEd={}; renderView(); return; }
+    cfg.lock=$("#heLock").value==="1"; await saveSettings({hero:cfg},"Banner saved."); S.heroEd={}; fillRegion("stBody",true); },
+  myHero: () => { S.heroEd={}; modal(`<h3>🖼 My front banner</h3><p class="hint" style="margin-top:0">Your own banner on the Dashboard (this computer). If the Super Admin sets one for everyone, his is shown instead.</p>${heroEditorHtml(true)}<div class="row"><button class="btn" data-act="closeModal">Close</button></div>`,"wide"); },
+});
+document.addEventListener("change",async e=>{ const el=e.target; if(!el.matches?.('[data-chg="heImg"]')) return; const f=el.files[0]; el.value=""; if(!f) return; const r=heRead(); const img=await shrinkImage(f,1600,0.72);
+  if(r.mine){ r.sl[+el.dataset.id].img=img; heRefresh(); return; }
+  const id=newId(); try{ await DB.apply({set:[{col:"heroImg",id,data:{img,by:me().uid,at:TS}}],upd:[],inc:[],noIdx:true,noUndo:true},true); }catch(x){ toast("Picture not saved — "+x.message,true); return; } S.heroImgs[id]=img; r.sl[+el.dataset.id].img=id; heRefresh(); });
+
+/* how long the student has been in this school, and in APEIs altogether */
+function spanTxt(from){ const t=Date.parse(from+"T12:00"); if(!from||isNaN(t)) return ""; const a=new Date(t), b=new Date(); let m=(b.getFullYear()-a.getFullYear())*12+(b.getMonth()-a.getMonth()); if(b.getDate()<a.getDate()) m--; if(m<0) return "";
+  const y=Math.floor(m/12), mm=m%12; return [y?`${y} yr${y>1?"s":""}`:"", mm?`${mm} month${mm>1?"s":""}`:"", !y&&!mm?"less than a month":""].filter(Boolean).join(" "); }
+function stayLine(r){ const a=r.admDate, f=r.firstAdm&&r.firstAdm<(a||"9")?r.firstAdm:a; if(!a&&!f) return `<div class="mini mute" style="margin-top:4px">Duration: add the Date of Admission to see how long the student has been here.</div>`;
+  return `<div style="margin-top:4px;font-size:13px">🕒 In ${h(r.school)}: <b>${h(spanTxt(a)||"–")}</b> <span class="mute">(since ${h(isoToDmy(a)||"–")})</span>${f&&f!==a?` · In APEIs altogether: <b>${h(spanTxt(f))}</b> <span class="mute">(since ${h(isoToDmy(f))}${r.prevSchool?", first at "+h(r.prevSchool):""})</span>`:""}</div>`; }
+
+/* ---------- ❤ fill health records for a whole section at once ---------- */
+const HF_KEYS=["eyes","height","weight","blood","medDate","vacc","allergies","disability","medication","hearing","dental"];
+function hfHtml(){ const p=S.params, code=mySchool()||p.hfSch||schoolList()[0]?.code, sc=S.schools[code]; if(!sc) return ""; const R=stuOf(code); if(!R){ ensureStu(code).then(()=>fillRegion("hlBody",true)); return `<p class="mute">Loading ${h(code)}…</p>`; }
+  const cs=p.hfCs||(sc.classes[0]?.cl+"|"+sc.classes[0]?.secs[0]?.s), [cl,sec]=cs.split("|"), L2=sortStu(R.filter(r=>r.status==="On roll"&&r.cl===cl&&r.sec===sec)), F=activeFields().filter(f=>HF_KEYS.includes(f.key)), may=L2.some(r=>canEditStu(r));
+  const filled=L2.filter(r=>r.height&&r.weight&&r.eyes).length;
+  return `<div class="ph"><h2>✎ Fill health records — ${h(code)} ${h(cl)}-${h(sec)}</h2><div class="pills">${mySchool()?"":`<select class="in" style="width:auto" data-chg="setPsel" data-k="hfSch">${schoolList().map(s=>`<option ${s.code===code?"selected":""}>${h(s.code)}</option>`).join("")}</select>`}
+     <select class="in" style="width:auto" data-chg="setPsel" data-k="hfCs">${sc.classes.flatMap(c=>c.secs.map(x=>`<option value="${h(c.cl+"|"+x.s)}" ${cs===c.cl+"|"+x.s?"selected":""}>${h(c.cl)} - ${h(x.s)}</option>`)).join("")}</select><button class="btn s" data-act="setP" data-p="hFill=">← Health summary</button></div></div>
+   <p class="hint" style="margin-top:0">${filled} of ${L2.length} students have eyesight, height and weight. Type straight into the table (Tab moves to the next box); BMI is worked out by itself. Press <b>Save this section</b> — every change is kept in the edit log.</p>
+   <datalist id="hfEyes"><option>Normal</option><option>Weak — needs check</option><option>Wears spectacles</option></datalist><datalist id="hfVacc"><option>Complete</option><option>Incomplete</option><option>Not known</option></datalist><datalist id="hfBg"><option>A+</option><option>A−</option><option>B+</option><option>B−</option><option>AB+</option><option>AB−</option><option>O+</option><option>O−</option></datalist>
+   <form data-form="hfSave" data-k="${h(code)}"><div class="scroll"><table><tr><th>#</th><th>Adm No</th><th>Name</th><th>G/B</th>${F.map(f=>`<th>${h(f.label)}</th>`).join("")}<th>BMI</th></tr>
+   ${L2.map((r,i)=>`<tr><td class="mute">${i+1}</td><td>${h(r.admNo||"")}</td><td><span class="dn" data-act="openStu" data-id="${h(r.id)}">${h(r.name)}</span></td><td>${gTxt(r.gender)}</td>${F.map(f=>`<td><input class="in" style="min-width:${["height","weight","blood"].includes(f.key)?"70":"120"}px;min-height:28px;padding:2px 6px" ${f.type==="date"?`type="date" value="${h(r[f.key]||"")}"`:`value="${h(r[f.key]||"")}"`} ${f.key==="eyes"?'list="hfEyes"':f.key==="vacc"?'list="hfVacc"':f.key==="blood"?'list="hfBg"':""} data-hf="${h(r.id)}" data-f="${h(f.key)}" ${canEditStu(r)?"":"disabled"}></td>`).join("")}<td class="mini">${bmiOf(r)??"–"}</td></tr>`).join("")||`<tr><td colspan="${F.length+5}" class="mute">No students on roll in this section.</td></tr>`}</table></div>
+   ${may&&L2.length?`<div class="row" style="justify-content:flex-start"><button class="btn p">Save this section</button></div>`:""}</form>`; }
+Object.assign(EXTRA_FORMS,{ hfSave: async f => { const code=f.dataset.k, B=stuOf(code)||[], by={}; for(const el of f.querySelectorAll("[data-hf]")) (by[el.dataset.hf] ||= {})[el.dataset.f]=el.value.trim();
+  const ops=opsNew(); let n=0; for(const [id,v] of Object.entries(by)){ const r=B.find(x=>x.id===id); if(!r||!canEditStu(r)) continue; const d={}, ch=[];
+    for(const [k,val] of Object.entries(v)) if(String(r[k]??"")!==val){ d[k]=val; ch.push({k,l:activeFields().find(x=>x.key===k)?.label||k,from:String(r[k]??""),to:val}); }
+    if(!ch.length) continue; n++; ops.upd.push({col:"students",id,data:{...d,updatedAt:TS,updatedBy:me().name||""}}); ops.set.push({col:"edits",id:newId(),data:{stuId:id,school:code,stuName:r.name,admNo:r.admNo||"",changes:ch,at:TS,day:isoDay(Date.now()),by:me().uid,byName:me().name||"",role:role()}}); }
+  if(!n){ toast("Nothing was changed."); return; } await DB.apply(ops); await ensureStu(code,true); toast(`Health details saved for ${n} student${n>1?"s":""}.`); fillRegion("hlBody",true); } });
+setTimeout(()=>{ const o=VIEWS.students.regions.hlBody; VIEWS.students.regions.hlBody=(...a)=>{ if(S.params.hFill) return hfHtml(); const x=o(...a); return (canEnter(mySchool()||"")||canDecide()?`<div class="row" style="justify-content:flex-end;margin:0 0 6px"><button class="btn p" data-act="setP" data-p="hFill=1">✎ Fill health records — section by section</button></div>`:"")+x; }; },0);
+
+/* ---------- ✂ Freeform print: snip any part of the screen, arrange the pieces on pages, add header / footer, print ---------- */
+const H2C_URL="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js";
+async function loadH2C(){ if(window.htmlToImage) return window.htmlToImage; await new Promise((res,rej)=>{ const s=document.createElement("script"); s.src=H2C_URL; s.onload=res; s.onerror=()=>rej(new Error("The snipping tool could not load — check the internet connection")); document.head.appendChild(s); }); return window.htmlToImage; }
+const CMP = () => S.cmp ||= {pages:[[]], cur:0, head:ST().org||"", foot:"", land:false, pno:true};
+function snipStart(){ closeModal(); document.getElementById("snipBar")?.remove(); const bar=document.createElement("div"); bar.id="snipBar";
+  bar.innerHTML=`<b>✂ Snip mode</b> — hold the left mouse button and drag a box over any part of the page. Scroll or change tabs between snips. <span id="snipN">${CMP().pages.flat().length} piece(s) on the pages</span> <button class="btn s p" data-act="cmpOpen">📄 Open the pages</button><button class="btn s" data-act="snipStop">✕ Stop snipping</button>`;
+  document.body.appendChild(bar); const ov=document.createElement("div"); ov.id="snipOv"; document.body.appendChild(ov); let st=null, box=null;
+  ov.onpointerdown=e=>{ if(e.button!==0) return; st={x:e.clientX,y:e.clientY}; box=document.createElement("div"); box.className="snipBox"; ov.appendChild(box); ov.setPointerCapture(e.pointerId); };
+  ov.onpointermove=e=>{ if(!st) return; const x=Math.min(st.x,e.clientX), y=Math.min(st.y,e.clientY); Object.assign(box.style,{left:x+"px",top:y+"px",width:Math.abs(e.clientX-st.x)+"px",height:Math.abs(e.clientY-st.y)+"px"}); };
+  ov.onpointerup=async e=>{ if(!st) return; const r={x:Math.min(st.x,e.clientX),y:Math.min(st.y,e.clientY),w:Math.abs(e.clientX-st.x),h:Math.abs(e.clientY-st.y)}; st=null; box.remove(); if(r.w<12||r.h<12) return;
+    ov.style.display="none"; bar.style.display="none"; try{ const H=await loadH2C(), pr=2, sx=window.scrollX, sy=window.scrollY;
+      const full=await H.toCanvas(document.body,{width:innerWidth,height:innerHeight,pixelRatio:pr,backgroundColor:"#ffffff",cacheBust:true,skipFonts:true,style:{transform:`translate(${-sx}px,${-sy}px)`,transformOrigin:"0 0"},filter:n=>!(n.id==="snipOv"||n.id==="snipBar"||n.id==="toast"||n.classList?.contains?.("toast"))});
+      const c=document.createElement("canvas"); c.width=r.w*pr; c.height=r.h*pr; c.getContext("2d").drawImage(full,r.x*pr,r.y*pr,r.w*pr,r.h*pr,0,0,r.w*pr,r.h*pr);
+      const C=CMP(), pg=C.pages[C.cur], W=C.land?277:194, wmm=Math.min(W-4, r.w*0.2646), hmm=wmm*r.h/r.w, y=pg.reduce((a,it)=>Math.max(a,it.y+it.h+3),C.head?12:2);
+      pg.push({img:c.toDataURL("image/png"),x:2,y:Math.min(y,(C.land?190:281)-hmm-2),w:wmm,h:hmm}); toast("Added to the page ✓"); }catch(x){ toast(x.message,true); }
+    ov.style.display=""; bar.style.display=""; const n=document.getElementById("snipN"); if(n) n.textContent=`${CMP().pages.flat().length} piece(s) on the pages`; }; }
+function snipStop(){ document.getElementById("snipOv")?.remove(); document.getElementById("snipBar")?.remove(); }
+function cmpHtml(){ const C=CMP(), W=C.land?277:194, Hh=C.land?190:281, sc=C.land?2.6:3.2, pg=C.pages[C.cur];
+  return `<div class="ph"><h3 style="margin:0">📄 Freeform print — arrange your pieces</h3><div class="pills"><button class="btn s" data-act="snipGo">✂ Snip more</button><button class="btn s p" data-act="cmpPrint">🖨 Print / PDF</button><button class="btn s" data-act="cmpClear">Clear all</button><button class="btn s" data-act="closeModal">Close</button></div></div>
+   <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));margin:6px 0"><div class="f"><label>Header</label><input id="cmpHead" value="${h(C.head)}"></div><div class="f"><label>Footer</label><input id="cmpFoot" value="${h(C.foot)}" placeholder="e.g. Regional Director, APEIs Peshawar"></div>
+     <div class="f"><label>Page</label><select id="cmpLand"><option value="">Portrait (A4)</option><option value="1" ${C.land?"selected":""}>Landscape (A4)</option></select></div><div class="f"><label>Page numbers</label><select id="cmpPno"><option value="1">Yes</option><option value="" ${C.pno?"":"selected"}>No</option></select></div></div>
+   <div class="pills" style="margin-bottom:6px">${C.pages.map((_,i)=>`<button class="pill ${i===C.cur?"on":""}" data-act="cmpPg" data-id="${i}">Page ${i+1} (${C.pages[i].length})</button>`).join("")}<button class="btn s" data-act="cmpAddPg">＋ Add page</button>${C.pages.length>1?`<button class="btn s r" data-act="cmpDelPg">Remove this page</button>`:""}<span class="mute mini" style="align-self:center">Drag a piece to move it · drag its corner ◢ to resize · ▲▼ order · ⇄ move to another page · ✕ remove</span></div>
+   <div style="overflow:auto;background:#cbd5e1;padding:14px;border-radius:8px;max-height:62vh"><div id="cmpPage" style="position:relative;width:${W*sc}px;height:${Hh*sc}px;background:#fff;margin:0 auto;box-shadow:0 4px 18px rgba(0,0,0,.25)" data-sc="${sc}">
+     ${C.head?`<div style="position:absolute;top:0;left:0;right:0;text-align:center;font-weight:700;font-size:13px;padding:4px;border-bottom:1px solid #ccc">${h(C.head)}</div>`:""}
+     ${pg.map((it,i)=>`<div class="cmpIt" data-i="${i}" style="left:${it.x*sc}px;top:${it.y*sc}px;width:${it.w*sc}px;height:${it.h*sc}px"><img src="${it.img}" alt="" draggable="false"><span class="cmpH" data-i="${i}">◢</span><span class="cmpTools"><button data-act="cmpZ" data-id="${i}" data-d="-1" title="Send back">▼</button><button data-act="cmpZ" data-id="${i}" data-d="1" title="Bring forward">▲</button><button data-act="cmpMv" data-id="${i}" title="Move to the next page">⇄</button><button data-act="cmpDel" data-id="${i}" title="Remove">✕</button></span></div>`).join("")}
+     ${C.foot||C.pno?`<div style="position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:space-between;font-size:11px;padding:4px 8px;border-top:1px solid #ccc"><span>${h(C.foot)}</span><span>${C.pno?`Page ${C.cur+1} of ${C.pages.length}`:""}</span></div>`:""}</div></div>`; }
+function cmpOpen(){ snipStop(); modal(`<div id="cmpBox">${cmpHtml()}</div>`,"wide"); cmpWire(); }
+function cmpRedraw(){ const b=document.getElementById("cmpBox"); if(!b) return cmpOpen(); b.innerHTML=cmpHtml(); cmpWire(); }
+function cmpRead(){ const C=CMP(); const v=id=>document.getElementById(id); if(v("cmpHead")){ C.head=v("cmpHead").value; C.foot=v("cmpFoot").value; C.land=v("cmpLand").value==="1"; C.pno=v("cmpPno").value==="1"; } }
+function cmpWire(){ const P=document.getElementById("cmpPage"); if(!P) return; const sc=Number(P.dataset.sc), C=CMP(), pg=C.pages[C.cur];
+  for(const id of ["cmpHead","cmpFoot","cmpLand","cmpPno"]) document.getElementById(id)?.addEventListener("change",()=>{ cmpRead(); cmpRedraw(); });
+  P.querySelectorAll(".cmpIt").forEach(el=>{ const it=pg[+el.dataset.i]; let mode=null, s0=null;
+    el.onpointerdown=e=>{ if(e.target.closest("button")) return; mode=e.target.classList.contains("cmpH")?"size":"move"; s0={x:e.clientX,y:e.clientY,ix:it.x,iy:it.y,iw:it.w,ih:it.h}; el.setPointerCapture(e.pointerId); e.preventDefault(); };
+    el.onpointermove=e=>{ if(!mode) return; const dx=(e.clientX-s0.x)/sc, dy=(e.clientY-s0.y)/sc;
+      if(mode==="move"){ it.x=Math.max(0,s0.ix+dx); it.y=Math.max(0,s0.iy+dy); el.style.left=it.x*sc+"px"; el.style.top=it.y*sc+"px"; }
+      else { it.w=Math.max(10,s0.iw+dx); it.h=it.w*s0.ih/s0.iw; el.style.width=it.w*sc+"px"; el.style.height=it.h*sc+"px"; } };
+    el.onpointerup=()=>{ mode=null; }; }); }
+function cmpPrint(){ cmpRead(); const C=CMP(); if(!C.pages.flat().length){ toast("Snip something first.",true); return; } const W=C.land?277:194, Hh=C.land?190:281;
+  const html=C.pages.map((pg,pi)=>`<div style="position:relative;width:${W}mm;height:${Hh-1}mm;overflow:hidden;${pi<C.pages.length-1?"page-break-after:always;break-after:page;":""}">
+    ${C.head?`<div style="position:absolute;top:0;left:0;right:0;text-align:center;font:700 12pt Arial;padding:1mm;border-bottom:.3mm solid #999">${h(C.head)}</div>`:""}
+    ${pg.map(it=>`<img src="${it.img}" style="position:absolute;left:${it.x}mm;top:${it.y}mm;width:${it.w}mm;height:${it.h}mm">`).join("")}
+    ${C.foot||C.pno?`<div style="position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:space-between;font:9pt Arial;padding:1mm 2mm;border-top:.3mm solid #999"><span>${h(C.foot)}</span><span>${C.pno?`Page ${pi+1} of ${C.pages.length}`:""}</span></div>`:""}</div>`).join("");
+  closeModal(); printHtml(html,{paper:"A4",orientation:C.land?"landscape":"portrait",fit:false}); }
+Object.assign(EXTRA_ACT,{
+  snipGo: () => snipStart(), snipStop: () => snipStop(), cmpOpen: () => cmpOpen(), cmpPrint: () => cmpPrint(),
+  cmpPg: el => { cmpRead(); CMP().cur=+el.dataset.id; cmpRedraw(); },
+  cmpAddPg: () => { cmpRead(); const C=CMP(); C.pages.push([]); C.cur=C.pages.length-1; cmpRedraw(); },
+  cmpDelPg: () => { cmpRead(); const C=CMP(); C.pages.splice(C.cur,1); C.cur=Math.max(0,C.cur-1); cmpRedraw(); },
+  cmpDel: el => { cmpRead(); CMP().pages[CMP().cur].splice(+el.dataset.id,1); cmpRedraw(); },
+  cmpZ: el => { cmpRead(); const pg=CMP().pages[CMP().cur], i=+el.dataset.id, j=i+Number(el.dataset.d); if(j<0||j>=pg.length) return; [pg[i],pg[j]]=[pg[j],pg[i]]; cmpRedraw(); },
+  cmpMv: el => { cmpRead(); const C=CMP(), it=C.pages[C.cur].splice(+el.dataset.id,1)[0]; if(C.cur===C.pages.length-1) C.pages.push([]); C.pages[C.cur+1].push({...it,y:2}); cmpRedraw(); },
+  cmpClear: () => ask("Clear every piece?","All pages are emptied.","Clear",()=>{ S.cmp=null; cmpRedraw(); }),
+  freeform: () => { if(CMP().pages.flat().length) cmpOpen(); else snipStart(); },
+});
+
+Object.assign(EXTRA_ACT,{ apprStale: () => { const st=apprPending().filter(a=>a.stuId&&a.type!=="tfr"&&!idxFind(a.stuId)); if(!st.length) return;
+  ask(`Close ${nf(st.length)} requests?`,"Their students are no longer in the data bank, so there is nothing to approve. They are marked “closed — record no longer in the data bank”.","Close them",async()=>{ const ops=opsNew(); ops.noIdx=true; ops.noUndo=true; for(const a of st) ops.upd.push({col:"approvals",id:a.id,data:{status:"rejected",decidedBy:me().uid,decidedByName:me().name||"",decidedAt:TS,decidedMs:Date.now(),decNote:"closed — record no longer in the data bank"}});
+    await DB.apply(ops,true); audit("Stale requests closed",`${st.length} approvals for records no longer in the data bank`); toast(`${nf(st.length)} closed.`); apprLoad(); }); } });
+
+/* ---------- Data check: completeness by field and by class/section, every figure opens the students ---------- */
+function cmpRows(){ const out=[]; for(const s of schoolList()){ if(mySchool()&&s.code!==mySchool()) continue; for(const r of (stuOf(s.code)||[])) if(r.status==="On roll"){ const miss=fullFields(r).filter(k=>!MED_KEYS.has(k)&&!String(r[k]??"").trim()); out.push({r,miss,req:reqFields().filter(f=>!String(r[f.key]??"").trim()).map(f=>f.key)}); } } return out; }
+function cmpPanel(){ const p=S.params, R=cmpRows(); if(!R.length) return ""; const sch=[...new Set(R.map(x=>x.r.school))], lab=k=>activeFields().find(f=>f.key===k)?.label||k, view=p.cmV||"field";
+  const per={}; for(const c of sch){ const L=R.filter(x=>x.r.school===c); per[c]={n:L.length,full:L.filter(x=>!x.miss.length).length,req:L.filter(x=>x.req.length).length,cells:L.reduce((a,x)=>a+x.miss.length,0)}; }
+  const T={n:R.length,full:R.filter(x=>!x.miss.length).length,req:R.filter(x=>x.req.length).length};
+  const pc=(a,b)=>b?(a/b*100).toFixed(1)+"%":"–", cellBtn=(n,q,cls)=>n?`<span class="dn ${cls||""}" data-act="setP" data-p="${h(qs(q))}">${nf(n)}</span>`:`<span class="mute">0</span>`;
+  let body="";
+  if(view==="field"){ const keys=[...new Set(R.flatMap(x=>x.miss))].sort((a,b)=>R.filter(x=>x.miss.includes(b)).length-R.filter(x=>x.miss.includes(a)).length);
+    body=`<table><tr><th>Field (✱ = required)</th>${sch.map(c=>`<th class="n">${h(c)}</th>`).join("")}<th class="n">Total missing</th><th class="n">Filled %</th></tr>
+      ${keys.map(k=>{ const isReq=reqFields().some(f=>f.key===k), tot=R.filter(x=>x.miss.includes(k)).length; return `<tr><td>${h(lab(k))}${isReq?' <b class="neg">✱</b>':""}</td>${sch.map(c=>{ const n=R.filter(x=>x.r.school===c&&x.miss.includes(k)).length; return `<td class="n">${cellBtn(n,{cmF:k,cmS:c,cmC:""},isReq?"neg":"")}</td>`; }).join("")}<td class="n"><b>${cellBtn(tot,{cmF:k,cmS:"",cmC:""})}</b></td><td class="n">${pc(R.length-tot,R.length)}</td></tr>`; }).join("")||`<tr><td colspan="${sch.length+3}" class="pos">✓ Every field is filled for every student.</td></tr>`}</table>`; }
+  else { body=sch.map(c=>{ const sc=S.schools[c], L=R.filter(x=>x.r.school===c); return `<h4 style="margin:10px 0 4px">${h(c)} — ${h(sc?.name||"")}</h4><table><tr><th>Class – Sec</th><th class="n">Students</th><th class="n">Complete</th><th class="n">Required missing</th><th class="n">Some detail missing</th><th class="n">Complete %</th></tr>
+      ${sc.classes.flatMap(cl=>cl.secs.map(x=>{ const S2=L.filter(y=>y.r.cl===cl.cl&&y.r.sec===x.s); if(!S2.length) return ""; const inc=S2.filter(y=>y.miss.length).length, rq=S2.filter(y=>y.req.length).length; return `<tr class="${inc?"":"mute"}"><td>${h(cl.cl)} - ${h(x.s)}</td><td class="n">${S2.length}</td><td class="n">${S2.length-inc}</td><td class="n">${cellBtn(rq,{cmF:"__req",cmS:c,cmC:cl.cl+"|"+x.s},"neg")}</td><td class="n">${cellBtn(inc,{cmF:"__any",cmS:c,cmC:cl.cl+"|"+x.s})}</td><td class="n">${pc(S2.length-inc,S2.length)}</td></tr>`; })).join("")}</table>`; }).join(""); }
+  let list=""; if(p.cmF){ const [cc,ss]=(p.cmC||"").split("|"); const L=R.filter(x=>(!p.cmS||x.r.school===p.cmS)&&(!p.cmC||(x.r.cl===cc&&x.r.sec===ss))&&(p.cmF==="__any"?x.miss.length:p.cmF==="__req"?x.req.length:x.miss.includes(p.cmF))).sort((a,b)=>a.r.school.localeCompare(b.r.school)||clsIdx(a.r)[0]-clsIdx(b.r)[0]||clsIdx(a.r)[1]-clsIdx(b.r)[1]||admCmp(a.r,b.r));
+    list=`<div class="panel" style="border:2px solid #f59e0b;margin-top:10px"><div class="ph"><h3 style="margin:0">${nf(L.length)} students — ${h(p.cmF==="__any"?"some detail missing":p.cmF==="__req"?"a required field missing":"missing "+lab(p.cmF))}${p.cmS?" · "+h(p.cmS):""}${p.cmC?" · "+h(cc+"-"+ss):""}</h3><button class="btn s" data-act="setP" data-p="cmF=&cmS=&cmC=">✕ Close list</button></div>
+      <div class="scroll" style="max-height:60vh"><table><tr><th>#</th><th>School</th><th>Class – Sec</th><th>Adm No</th><th>Name</th><th>What is missing</th></tr>${L.slice(0,2000).map((x,i)=>`<tr class="click" data-act="openStu" data-id="${h(x.r.id)}"><td class="mute">${i+1}</td><td>${h(x.r.school)}</td><td>${h(x.r.cl)}-${h(x.r.sec)}</td><td>${h(x.r.admNo||"")}</td><td><b>${h(x.r.name)}</b></td><td style="white-space:normal" class="mini">${x.miss.map(k=>x.req.includes(k)?`<b class="neg">${h(lab(k))}</b>`:h(lab(k))).join(", ")}</td></tr>`).join("")}</table></div>
+      <p class="hint">Click a student to open the record; ← → then goes through the students one by one. Required fields are shown in red.</p></div>`; }
+  return `<div class="panel" style="border:2px solid var(--band)"><div class="ph"><h2 style="margin:0">📋 Completeness of the records</h2><div class="pills"><button class="pill ${view==="field"?"on":""}" data-act="setP" data-p="cmV=field">By field</button><button class="pill ${view==="sec"?"on":""}" data-act="setP" data-p="cmV=sec">By class &amp; section</button></div></div>
+    <table style="margin:6px 0 10px"><tr><th>School</th><th class="n">Students</th><th class="n">Fully complete</th><th class="n">Complete %</th><th class="n">Required field missing</th><th class="n">Some detail missing</th><th class="n">Empty boxes in all</th></tr>
+     ${sch.map(c=>{ const x=per[c]; return `<tr><td><b>${h(c)}</b></td><td class="n">${nf(x.n)}</td><td class="n">${nf(x.full)}</td><td class="n"><b>${pc(x.full,x.n)}</b></td><td class="n">${cellBtn(x.req,{cmF:"__req",cmS:c,cmC:""},"neg")}</td><td class="n">${cellBtn(x.n-x.full,{cmF:"__any",cmS:c,cmC:""})}</td><td class="n">${nf(x.cells)}</td></tr>`; }).join("")}
+     ${sch.length>1?`<tr class="tot"><td>${h(L("gtotal"))}</td><td class="n">${nf(T.n)}</td><td class="n">${nf(T.full)}</td><td class="n">${pc(T.full,T.n)}</td><td class="n">${nf(T.req)}</td><td class="n">${nf(T.n-T.full)}</td><td class="n">${nf(sch.reduce((a,c)=>a+per[c].cells,0))}</td></tr>`:""}</table>
+    ${body}${list}</div>`; }
+setTimeout(()=>{ const o=VIEWS.students.regions.chkBody; VIEWS.students.regions.chkBody=(...a)=>{ const x=o(...a); return /Loading the data bank/.test(x)?x:cmpPanel()+x; }; },0);
+
 /* =====================================================================
    13) STUDENT DATA BANK — one record per student, filled gradually.
    Strength figures keep coming from the counters, so a half-filled register never breaks them.
@@ -4451,7 +4632,7 @@ function stuRegHtml(){ const code=stuSchool(); if(!code) return `<div class="pan
         <p class="hint" style="margin-top:0">Strength comes from the entries; this shows how many of those students are already in the data bank. Fill it school by school with the Excel import — nothing here changes strength.</p><div class="scroll" id="sReg"></div></div>`;}
 const stuTab = () => { const t=S.params.tab||"reg"; return canSeeStudents()?t:"cat"; };
 VIEWS.students = {
-  shell(){ const T=[["reg","Register"],["cat","Category-wise strength"],["chk","Data check"],["unv",`📥 Unverified`],["verd","✅ Verified"],["sib","Siblings in APEIs"],["dup",`👥 Duplicates${canSeeStudents()&&dupGroups().length?` (${dupGroups().length})`:""}`],["health","❤ Health"],["con","Contacts"],["trash","🗑 Trash"]].filter(([k])=>k==="con"?isSA():k==="trash"?canDecide()&&canSeeStudents():k==="health"?canSeeStudents()&&canSD():k==="cat"||canSeeStudents()); const t=stuTab();
+  shell(){ const T=[["reg","Register"],["cat","Category-wise strength"],["chk","Data check"],["unv",`📥 Unverified${canSeeStudents()?` <span class="badge">${nf(idxAll().filter(r=>r.status==="On roll"&&!r.ver&&(!mySchool()||r.school===mySchool())).length)}</span>`:""}`],["verd",`✅ Verified${canSeeStudents()?` <span class="badge" style="background:#16a34a">${nf(idxAll().filter(r=>r.status==="On roll"&&r.ver&&(!mySchool()||r.school===mySchool())).length)}</span>`:""}`],["sib","Siblings in APEIs"],["dup",`👥 Duplicates${canSeeStudents()&&dupGroups().length?` (${dupGroups().length})`:""}`],["health","❤ Health"],["con","Contacts"],["trash","🗑 Trash"]].filter(([k])=>k==="con"?isSA():k==="trash"?canDecide()&&canSeeStudents():k==="health"?canSeeStudents()&&canSD():k==="cat"||canSeeStudents()); const t=stuTab();
     return `<div class="subtabs">${T.map(([k,l])=>`<button class="pill ${t===k?"on":""}" data-act="setP" data-p="tab=${k}">${l}</button>`).join("")}${canSeeStudents()?`<span class="hint" style="margin:0 0 0 auto;align-self:center">Tip: the search box at the top finds any student in all schools — press <kbd>/</kbd></span>`:""}</div>`
       + (t==="unv"||t==="verd" ? `<div class="panel" id="vlBody"></div>` : t==="dup" ? `<div class="panel" id="dupBody"></div>` : t==="health" ? `<div class="panel" id="hlBody"></div>` : t==="trash" && canDecide() ? `<div class="panel"><div class="scroll" id="trBody"></div></div>` : t==="chk" ? chkShell() : t==="con" && isSA() ? contactsHtml() : t==="cat" ? catPanelHtml() : t==="sib" ? `<div class="panel"><div class="ph"><h2>Siblings across all APEIs</h2><div class="pills"><select class="in" style="width:auto" data-chg="setPsel" data-k="sibSch"><option value="">All schools</option>${schoolList().map(s=>`<option ${S.params.sibSch===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select><label class="ck"><input type="checkbox" data-chg="setPck" data-k="sibX" ${S.params.sibX?"checked":""}> only families in 2+ campuses</label><label class="ck"><input type="checkbox" data-chg="setPck" data-k="sibAll" ${S.params.sibAll?"checked":""}> include students who left</label>${expBar("siblings")}</div></div><div class="scroll" id="sibBody"></div></div>` : stuRegHtml()); },
   regions:{
@@ -4467,8 +4648,8 @@ VIEWS.students = {
       if(!L2.length) return `<div class="empty">${R.length?"No student matches.":"No students in the data bank yet — add them one by one or import the Excel template."}</div>`;
       const F=activeFields().filter(f=>f.list&&!["cl","sec"].includes(f.key)), lim=S.stuLimit||200;
       const cell=(r,f)=>f.key==="gender"?(r.gender==="g"?"G":"B"):f.type==="date"?isoToDmy(r[f.key]):PHONE_KEYS.has(f.key)?h(fmtPhones(r[f.key]||"")):/Cnic$/.test(f.key)&&digits(r[f.key]).length===13?h(fmtCnic(r[f.key])):h(r[f.key]??""), sel=canDecide();
-      return `<p class="hint" style="margin-top:0">${L2.length} student${L2.length===1?"":"s"}${L2.length>lim?` — showing first ${lim}`:""}. Click a row to open the full record.${sel?" Tick students to move them to Trash together.":""}</p>${sel?`<div class="pills" style="margin-bottom:6px"><button class="btn s r" data-act="regTrash">🗑 Move ticked students to Trash</button><button class="btn s" data-act="regTickAll">☑ Tick all ${nf(L2.length)}</button><button class="btn s" data-act="regTickNone">☐ Untick all</button><span class="mute mini" id="regCnt" style="align-self:center"></span></div>`:""}<table><tr>${sel?`<th><input type="checkbox" data-selall="1" style="width:18px;height:18px" title="Tick all shown"></th>`:""}<th>#</th>${code==="ALL"?"<th>School</th>":""}<th>Class – Sec</th>${F.map(f=>`<th>${h(f.label)}</th>`).join("")}</tr>
-        ${L2.slice(0,lim).map((r,i)=>`<tr class="click" data-act="openStu" data-id="${h(r.id)}">${sel?`<td><input type="checkbox" data-sel="${h(r.id)}" style="width:18px;height:18px"></td>`:""}<td class="mute">${i+1}</td>${code==="ALL"?`<td>${h(r.school)}</td>`:""}<td>${h(r.cl)} - ${h(r.sec)}</td>${F.map(f=>`<td>${f.key==="status"&&r.status!=="On roll"?`<span class="tag t-out">${h(r.status)}</span>`:f.key==="cat"?h(catLabel(r.cat)):cell(r,f)}</td>`).join("")}</tr>`).join("")}</table>
+      return `<p class="hint" style="margin-top:0">${L2.length} student${L2.length===1?"":"s"}${L2.length>lim?` — showing first ${lim}`:""}. Click a row to open the full record.${sel?" Tick students to move them to Trash together.":""}</p>${sel?`<div class="pills" style="margin-bottom:6px"><button class="btn s r" data-act="regTrash">🗑 Move ticked students to Trash</button><button class="btn s" data-act="regTickAll">☑ Tick all ${nf(L2.length)}</button><button class="btn s" data-act="regTickNone">☐ Untick all</button><span class="mute mini" id="regCnt" style="align-self:center"></span></div>`:""}<table><tr>${sel?`<th><input type="checkbox" data-selall="1" style="width:18px;height:18px" title="Tick all shown"></th>`:""}<th>#</th>${code==="ALL"?"<th>School</th>":""}<th>Class – Sec</th><th title="Time in this school since the date of admission">In school</th>${F.map(f=>`<th>${h(f.label)}</th>`).join("")}</tr>
+        ${L2.slice(0,lim).map((r,i)=>`<tr class="click" data-act="openStu" data-id="${h(r.id)}">${sel?`<td><input type="checkbox" data-sel="${h(r.id)}" style="width:18px;height:18px"></td>`:""}<td class="mute">${i+1}</td>${code==="ALL"?`<td>${h(r.school)}</td>`:""}<td>${h(r.cl)} - ${h(r.sec)}</td><td class="mini" style="white-space:nowrap">${h(spanTxt(r.admDate)||"–")}</td>${F.map(f=>`<td>${f.key==="status"&&r.status!=="On roll"?`<span class="tag t-out">${h(r.status)}</span>`:f.key==="cat"?h(catLabel(r.cat)):cell(r,f)}</td>`).join("")}</tr>`).join("")}</table>
         ${L2.length>lim?`<div class="row" style="justify-content:flex-start"><button class="btn" data-act="stuMore">Show all ${L2.length}</button></div>`:""}`; },
     sReg(){ const code=stuSchool(), R=stuOf(code); if(!R) return ""; const on=R.filter(r=>r.status==="On roll");
       if(code==="ALL"){ let T=0,B=0; const rows=schoolList().map(s=>{ const st=schoolStats(s.code).str, n=on.filter(r=>r.school===s.code).length; T+=st; B+=n; const p=st?Math.round(n/st*100):0; return `<tr><td>${h(s.code)} — ${h(s.name)}</td><td class="n">${nf(st)}</td><td class="n">${nf(n)}</td><td class="n">${sg(n-st)}</td><td><div class="bar" style="margin:0;min-width:120px"><i style="width:${Math.min(100,p)}%"></i></div></td><td class="n">${p}%</td></tr>`; }).join("");
