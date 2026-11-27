@@ -202,7 +202,7 @@ nav .navback{margin:0 0 0 auto;align-self:center;flex:none}
 .kpi.click>span{display:block;padding-right:16px}
 
 .kpi.kg1{border-top:3px solid var(--brand,#1d4ed8)}.kpi.kg2{border-top:3px solid #0f766e;background:linear-gradient(#f0fdfa,#fff)}.kpi.kg3{border-top:3px solid #7c3aed;background:linear-gradient(#f5f3ff,#fff)}
-.kpi.kg4{border-top:3px solid #d97706;background:linear-gradient(#fffbeb,#fff);margin-left:10px}
+.kpi.kg4{border-top:3px solid #d97706;background:linear-gradient(#fffbeb,#fff)}
 .dark .kpi.kg2,.dark .kpi.kg3,.dark .kpi.kg4{background:none}
 .stgroups{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-bottom:12px}
 .stg{border:1px solid var(--line);border-radius:10px;padding:8px 10px;border-left:4px solid var(--c,#1d4ed8);background:var(--panel,#fff)}
@@ -291,6 +291,55 @@ body.ewon :is(h1,h2,h3,h4,th,label,caption,summary,nav a,.pill,.btn,.kpi>span,.s
 tr.tot:hover td,tr.tot td:hover,tr.tot td.dn:hover,tr.tot .dn:hover,tr.tot.click:hover td{background:color-mix(in srgb,var(--band) 85%,#fff)!important;color:#fff!important}
 tr.sub:hover td{color:inherit}
 caption.scap:hover{background:var(--band)}
+
+/* v4.35 — header: buttons on top, live status under them; KPI sub-lines stay small */
+.whocol{display:flex;flex-direction:column;align-items:flex-end;gap:5px}.whocol .syncrow{margin:0}
+.kpi i b{display:inline;font:inherit;font-weight:700;margin:0}
+.umenu-list .zoomc{display:flex!important;gap:4px}.umenu-list .zoomc button{border:1px solid var(--line);padding:3px 8px;border-radius:6px;font-size:12.5px;font-weight:700;min-width:auto;color:var(--ink);background:var(--panel)}
+/* line icons */
+svg.ic{width:1.08em;height:1.08em;vertical-align:-.17em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.btn svg.ic,.pill svg.ic{margin-right:1px}
+/* ===== Formal look — navy & gold ===== */
+:root[data-look=formal]{--gold:#c9a227;--goldsoft:light-dark(#fbf5e2,#2b2410);--bg:light-dark(#f2f4f8,#0a1222);--line:light-dark(#dde2ec,#26324a);--soft:light-dark(#f4f6fa,#162038);
+  --radius:8px;--shadow:0 1px 2px rgba(10,26,54,.05),0 2px 8px rgba(10,26,54,.04)}
+:root[data-look=formal] body{letter-spacing:.05px}
+:root[data-look=formal] .band{background:linear-gradient(180deg,var(--band),color-mix(in srgb,var(--band) 85%,#000));border-bottom:2px solid var(--gold)}
+:root[data-look=formal] .band h1{font-size:21px;letter-spacing:.2px}
+:root[data-look=formal] .band small{opacity:.75;letter-spacing:.3px}
+:root[data-look=formal] .band .btn{background:transparent;border-color:rgba(255,255,255,.22);font-weight:600}
+:root[data-look=formal] .band .btn:hover{border-color:var(--gold);background:rgba(201,162,39,.12)}
+:root[data-look=formal] .gsearch input{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.18)}
+:root[data-look=formal] nav{background:var(--band2);box-shadow:0 2px 6px rgba(10,26,54,.12)}
+:root[data-look=formal] nav a{color:#c9d3e8;font-weight:600;letter-spacing:.2px;font-size:14px}
+:root[data-look=formal] nav a:hover{color:#fff}
+:root[data-look=formal] nav a.on{background:transparent;color:#fff;border-bottom:3px solid var(--gold)!important;border-radius:0}
+:root[data-look=formal] .panel{border-radius:10px;border-color:var(--line);box-shadow:var(--shadow);padding:16px 18px}
+:root[data-look=formal] .panel>h2,:root[data-look=formal] .ph h2{font-size:16.5px;color:light-dark(var(--band),#e6ebf5);padding-left:10px;border-left:3px solid var(--gold);line-height:1.25}
+:root[data-look=formal] h3{color:light-dark(var(--band),#e6ebf5)}
+:root[data-look=formal] th{background:var(--soft);color:light-dark(#33415c,#b8c3da);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.45px;border-bottom:1.5px solid light-dark(#c9d1e0,#33415c)}
+:root[data-look=formal] td{border-bottom-color:light-dark(#edf0f5,#1f2a40)}
+:root[data-look=formal] tbody tr:hover td,:root[data-look=formal] table tr:hover>td{background:light-dark(#f8f9fc,#141e33)}
+:root[data-look=formal] .btn{font-weight:600;border-radius:7px}
+:root[data-look=formal] .btn.p{background:var(--band);border-color:var(--band)}
+:root[data-look=formal] .btn.p:hover{background:var(--band2);box-shadow:0 0 0 2px var(--goldsoft)}
+:root[data-look=formal] .pill{border-radius:7px;font-weight:600;box-shadow:none}
+:root[data-look=formal] .pill.on{background:var(--band);border-color:var(--band);color:#fff}
+:root[data-look=formal] .subtabs{border-bottom:1px solid var(--line);gap:2px;margin-bottom:14px}
+:root[data-look=formal] .subtabs .pill{background:transparent;border:0;border-bottom:3px solid transparent;border-radius:0;padding:8px 14px;color:var(--mute);box-shadow:none!important}
+:root[data-look=formal] .subtabs .pill:hover{color:var(--ink)}
+:root[data-look=formal] .subtabs .pill.on{background:transparent!important;color:light-dark(var(--band),#fff)!important;border:0!important;border-bottom:3px solid var(--gold)!important;box-shadow:none!important}
+:root[data-look=formal] .kpi{background:var(--panel)!important;border:1px solid var(--line);border-top:3px solid var(--band2)!important;box-shadow:var(--shadow)}
+:root[data-look=formal] .kpi.kg2{border-top-color:#0f766e!important}:root[data-look=formal] .kpi.kg3{border-top-color:var(--gold)!important}:root[data-look=formal] .kpi.kg4{border-top-color:#b45309!important;margin-left:0}
+:root[data-look=formal] .kpi.kg5,:root[data-look=formal] .kpi.kg6{border-top-color:#9f1239!important}
+:root[data-look=formal] .kpi>span{text-transform:uppercase;font-size:11.5px;letter-spacing:.5px;font-weight:700}
+:root[data-look=formal] .kpi b{color:light-dark(var(--band),#fff)}:root[data-look=formal] .kpi b.neg{color:var(--red)}:root[data-look=formal] .kpi b.pos{color:var(--ok)}
+:root[data-look=formal] .kpi.click:hover{border-color:var(--gold);transform:translateY(-1px)}
+:root[data-look=formal] input,:root[data-look=formal] select,:root[data-look=formal] textarea{border-radius:7px}
+:root[data-look=formal] input:focus,:root[data-look=formal] select:focus,:root[data-look=formal] textarea:focus{outline:none;border-color:var(--band2);box-shadow:0 0 0 3px light-dark(rgba(201,162,39,.28),rgba(201,162,39,.35))}
+:root[data-look=formal] .badge{background:#b3122a}
+:root[data-look=formal] .modal>div{border-radius:12px;border-top:3px solid var(--gold)}
+:root[data-look=formal] .umenu-list{border-radius:10px;box-shadow:0 10px 30px rgba(10,26,54,.18)}
+:root[data-look=formal] .note{border-left:3px solid var(--gold);border-radius:8px}
 </style>
 </head>
 <body>
@@ -864,9 +913,8 @@ function patchStuCache(ops){
    ===================================================================== */
 const NAV = [
   ["dash","Dashboard",()=>true],
-  ["entry","Entry",()=>isSA()||role()==="hq"||role()==="clerk"],
   ["students","Students",()=>true],
-  ["waiting","Admissions & Transfers",()=>role()!=="viewer"],
+  ["waiting","Entries, Admissions & Transfers",()=>role()!=="viewer"],
   ["daycare","Day Care",()=>true],
   ["fees","Fees",()=>true],
   ["log","Log",()=>true],
@@ -874,7 +922,8 @@ const NAV = [
   ["setup","Setup",()=>isSA()]
 ];
 /* pages reached by clicking (not tabs) */
-const HIDDEN = [["find",()=>canSeeStudents()],["student",()=>canSeeStudents()],["drill",()=>true]];
+const canEntry = () => isSA()||role()==="hq"||role()==="clerk";
+const HIDDEN = [["entry",canEntry],["find",()=>canSeeStudents()],["student",()=>canSeeStudents()],["drill",()=>true]];
 const allowed = v => NAV.some(n=>n[0]===v && n[2]()) || HIDDEN.some(n=>n[0]===v && n[1]());
 // one chip: "Jawad · Clerk · GAPS"; the name is skipped when it just repeats the role (e.g. "Super Admin")
 function whoLabel(){ const r=ROLES[role()]||role()||"", n=(me().name||me().email||"").trim(); const parts=[];
@@ -911,21 +960,21 @@ function boot(){ setTimeout(actLogin,1200); setTimeout(()=>{ if(S.user&&role()!=
   document.body.classList.toggle("nopr", !canPR());
   app.innerHTML = `
   <div class="band" id="band"><div class="bandtop"><div class="brandrow">${ST().logo?`<img src="${h(ST().logo)}" alt="" class="logo">`:""}<div><h1>${h(ST().appTitle||(ST().org||"APEIs Peshawar Garrison")+" — Strength Portal")}</h1>
-    <small>${ST().appSub?h(ST().appSub)+" · ":""}Session ${h(session())} · ${DEMO?"Demo mode (this browser only)":"Live (Firebase)"}</small><div class="syncrow"><span class="sync" id="syncDot"></span></div></div></div>
-    <div class="who">${DEMO?`<span class="chip demo">DEMO</span>`:""}
+    <small>${ST().appSub?h(ST().appSub)+" · ":""}Session ${h(session())} · ${DEMO?"Demo mode (this browser only)":"Live (Firebase)"}</small></div></div>
+    <div class="whocol"><div class="who">${DEMO?`<span class="chip demo">DEMO</span>`:""}
     <button class="btn s" id="undoBtn" data-act="undoDlg" title="Undo your last change" hidden>↶ Undo</button>
     <button class="btn s" data-act="reload" title="Fetch the latest figures again">⟳ Refresh</button>
-    <button class="btn s" data-act="guide" title="Read the user guide for your account">📘 Guide</button>
     ${role()!=="viewer"?`<div class="umenu"><button class="btn s bell" data-act="bell" title="Notifications">🔔<span class="badge" id="bellN" hidden></span></button><div class="umenu-list notes" id="bellList" hidden></div></div>`:""}
     <div class="umenu"><button class="btn s ubtn" data-act="menuToggle" aria-haspopup="true" aria-expanded="false" title="Your account">☰ <span>${whoLabel()}</span></button>
       <div class="umenu-list" id="umenu" hidden role="menu">
         <div class="umenu-who">${h(me().name||"")}<small>${h(ROLES[role()]||"")}${mySchool()?" · "+h(mySchool()):""}</small></div>
         <div class="zoomc" style="display:flex;gap:4px;align-items:center;padding:6px 10px" title="Text size of tables (this computer only)"><span style="flex:1;font-size:13px">🔍 Table text</span><button class="btn s" data-act="tz" data-d="-1" aria-label="Smaller">A−</button><button class="btn s" data-act="tz" data-d="0" id="tzV">${Math.round(tzNow()*100)}%</button><button class="btn s" data-act="tz" data-d="1" aria-label="Larger">A+</button></div>
+        <button data-act="guide" role="menuitem">📘 User guide</button>
         <button data-act="themeDlg" role="menuitem">🎨 Theme & text size</button>
         <button data-act="myHero" role="menuitem">🖼 My front banner</button>
         <button data-act="freeform" role="menuitem">✂ Freeform print (snip & arrange)</button>
         ${DEMO?`<button data-act="switchUser" role="menuitem">⇄ Switch role</button>`:`<button data-act="pwDlg" role="menuitem">🔑 Change password</button>`}
-        <button data-act="signOut" role="menuitem" class="danger">⏻ Sign out</button></div></div></div></div>
+        <button data-act="signOut" role="menuitem" class="danger">⏻ Sign out</button></div></div></div><div class="syncrow"><span class="sync" id="syncDot"></span></div></div></div>
     ${canSeeStudents()?`<div class="gsearch combo"><input id="gq" placeholder="🔍 Search students in ${ownOnly()?"your school":"all schools"} — name, Adm No, class (e.g. 9a), father CNIC, phone…  (press /)" autocomplete="off" aria-label="Search students"><div class="combo-list" id="gqList" hidden></div></div>`:""}</div>
   <nav id="nav"></nav><div id="annBar"></div><main id="main"></main>`; setTimeout(annPaint,0);
   document.documentElement.style.setProperty("--bandH", $("#band").offsetHeight+"px");
@@ -934,8 +983,8 @@ function boot(){ setTimeout(actLogin,1200); setTimeout(()=>{ if(S.user&&role()!=
 }
 function navHtml(){
   const inc=S.transfers.filter(t=>t.status==="pending" && (isSA()||role()==="hq"||t.to===mySchool())).length;
-  const back=S.navStack.length>1||HIDDEN.some(x=>x[0]===S.view);
-  return NAV.filter(n=>n[2]()).map(([k,l])=>`<a href="#${k}" class="${S.view===k||(k==="waiting"&&S.view==="transfers")?"on":""}">${l}${k==="waiting"&&inc?`<span class="badge" title="Transfers waiting to be accepted">${inc}</span>`:""}${k==="approvals"&&canDecide()&&apprPending().length?`<span class="badge">${apprPending().length}</span>`:""}</a>`).join("")+
+  const back=S.navStack.length>1||HIDDEN.some(x=>x[0]===S.view&&x[0]!=="entry");
+  return NAV.filter(n=>n[2]()).map(([k,l])=>`<a href="#${k==="waiting"&&canEntry()?"entry":k}" class="${S.view===k||(k==="waiting"&&(S.view==="transfers"||S.view==="entry"))?"on":""}">${l}${k==="waiting"&&inc?`<span class="badge" title="Transfers waiting to be accepted">${inc}</span>`:""}${k==="approvals"&&canDecide()&&apprPending().length?`<span class="badge">${apprPending().length}</span>`:""}</a>`).join("")+
     (back?`<button class="navback" data-act="back" title="Back to where you came from (Alt+←)">← Back</button>`:"");
 }
 function renderView(){
@@ -987,7 +1036,9 @@ addEventListener("resize",()=>topBars());
 const THEMES = { oxford:["Oxford blue","#0b1f4b","#1d3a78"], slate:["Slate","#263445","#3a4d66"], forest:["Forest green","#1e3b2f","#2f5a46"], maroon:["Maroon","#4a1d27","#6a2d3a"],
   teal:["Deep teal","#0f3c45","#1b5a66"], graphite:["Graphite","#25262b","#3b3d45"], navy:["Navy & gold","#13213c","#22355c"], plum:["Plum","#3a2142","#55345f"] };
 function uiPrefs(){ let u={}; try{ u=JSON.parse(localStorage.getItem("apeis_ui")||"{}"); }catch(e){} return {theme:"oxford",mode:"auto",size:"m",density:"normal",...(ST().ui||{}),...u}; }
-function applyTheme(){ const u=uiPrefs(), t=THEMES[u.theme]||THEMES.oxford, r=document.documentElement;
+const lookCfg = () => ({style:"formal",icons:"line",...(ST().look||{})});
+function applyTheme(){ const u=uiPrefs(), lk=lookCfg(), r=document.documentElement; let t=THEMES[u.theme]||THEMES.oxford; if(lk.style==="formal"&&u.theme==="oxford") t=["Formal","#0a1a36","#12284f"];
+  r.dataset.look=lk.style; r.dataset.icons=lk.icons; if(typeof icoScan==="function") icoScan();
   r.style.setProperty("--band",t[1]); r.style.setProperty("--band2",t[2]); r.dataset.theme=u.mode==="auto"?"":u.mode; r.dataset.size=u.size; r.dataset.density=u.density; }
 
 function loginHtml(){
@@ -1060,18 +1111,18 @@ function kpiHtml(codes, w, rows, kind){
   const K=(go,lab,val,sub,cls,g)=>`<div class="kpi click ${g||""}" role="button" tabindex="0" ${go}><span>${lab}</span><b class="${cls||""}">${val}</b><i>${sub}</i></div>`;
   const nOn=idxAll().filter(r=>r.status==="On roll").length;
   return `<div class="kpis">
-    ${K(`data-act="drill" data-m="str"`,h(L("str")),nf(t.str),`${h(L("g"))} <b>${nf(t.g)}</b><br>${h(L("b"))} <b>${nf(t.b)}</b>`,"","kg1")}
+    ${K(`data-act="drill" data-m="str"`,h(L("str")),nf(t.str),`${h(L("g"))} ${nf(t.g)}<br>${h(L("b"))} ${nf(t.b)}`,"","kg1")}
     ${K(`data-act="drill" data-m="auth"`,h(L("auth")),nf(t.auth),`${nf(t.n)} sections`,"","kg1")}
     ${K(`data-act="drill" data-m="sd"`,h(L("sd")),sgt(t.sd),`${((t.str/(t.auth||1))*100).toFixed(1)}% filled<br>${(Math.max(0,t.auth-t.str)/(t.auth||1)*100).toFixed(1)}% vacant (${nf(Math.max(0,t.auth-t.str))} seats)`,t.sd>0?"pos":t.sd<0?"neg":"","kg1")}
     ${K(`data-act="drill" data-m="net"`,`${h(L("kMove"))} ${h(periodLabel(kind,w))}`,sgt(m.net),`${m.in} in · ${m.out} out`,m.net>0?"pos":m.net<0?"neg":"","kg2")}
     ${K(`data-act="go" data-id="transfers"`,h(L("kTransit")),pend,"awaiting receiving school","","kg2")}
     ${K(`data-act="go" data-id="waiting" data-p="tab=tfr"`,h(L("kTreq")),tr,"pending, by seniority","","kg2")}
     ${K(`data-act="drill" data-m="wait"`,h(L("w")),nf(t.wait),"school & class wise","","kg2")}
+    ${K(`data-act="go" data-id="daycare"`,h(L("kDc")),nf(dc.str),`of ${nf(dc.cap)} places · ${nf(Math.max(0,dc.cap-dc.str))} vacant`,"","kg4")}
     ${K(`data-act="go" data-id="drill" data-p="m=cat"`,h(L("kCats")),nf(Object.values(catTotals(codes)).reduce((a,v)=>a+v,0)),`${cats().length} categories · click for boxes`,"","kg3")}
     ${canSeeStudents()?K(`data-act="go" data-id="students" data-p="tab=chk"`,h(L("kDb")),`${(nOn/(t.str||1)*100).toFixed(1)}%`,`${nf(nOn)} of ${nf(t.str)} students entered`,"","kg3"):""}
     ${K(`data-act="drill" data-m="status"`,h(L("kToday")),`${done}/${st.length}`,"schools confirmed",done===st.length?"pos":"neg","kg3")}
-    ${extraKpis()}
-    ${K(`data-act="go" data-id="daycare"`,h(L("kDc")),nf(dc.str),`of ${nf(dc.cap)} places · ${nf(Math.max(0,dc.cap-dc.str))} vacant`,"","kg4")}</div>`;
+    ${extraKpis()}</div>`;
 }
 function classTable(code, st, interactive){ const cx=cl=>interactive?{school:code,cl}:null;
   const cols=["n","auth","str","g","b","sd","wait"]; if(st.classes.some(c=>c.inc)) cols.splice(1,0,"inc");
@@ -1101,8 +1152,8 @@ function csMatch(code,q){ const o=csOptions(code); q=norm(q); if(!q) return o;
   return [...a,...b,...c]; }
 const entryActions = () => actions().filter(a=>a.on!==false);
 VIEWS.entry = {
-  shell(){ const code=entrySchool(); if(!code||!S.schools[code]) return `<div class="panel empty">No school assigned to your account.</div>`;
-    return `<div id="eStat"></div><div class="panel"><div class="ph"><h2>Fast entry — ${h(code)} ${h(S.schools[code].name)}</h2>
+  shell(){ const code=entrySchool(); if(!code||!S.schools[code]) return `${admTabs("entry")}<div class="panel empty">No school assigned to your account.</div>`;
+    return `${admTabs("entry")}<div id="eStat"></div><div class="panel"><div class="ph"><h2>Fast entry — ${h(code)} ${h(S.schools[code].name)}</h2>
       <div class="pills"><button class="btn" data-act="formDlg" title="Photograph a parent's handwritten form; the portal fills this entry for you to check">📷 Read admission form</button>${canDecide()?`<select class="in" style="width:auto" data-chg="entrySchool">${schoolList().map(s=>`<option value="${h(s.code)}" ${s.code===code?"selected":""}>${h(s.code)} — ${h(s.name)}</option>`).join("")}</select>`:""}</div></div>
       <form data-form="entry" class="entry" autocomplete="off"><div class="grid">
         <div class="f"><label for="fAct">Action</label><select id="fAct" data-chg="entryAct">${entryActions().map(a=>`<option value="${h(a.code)}">${h(a.label)} (${KIND_D[a.kind]>0?"+1":KIND_D[a.kind]<0?"−1":"0"})</option>`).join("")}</select></div>
@@ -1251,7 +1302,7 @@ async function saveEntry(){
 
 /* ---------- Transfers ---------- */
 function admTabs(cur){ const inc=S.transfers.filter(t=>t.status==="pending"&&(isSA()||role()==="hq"||t.to===mySchool())).length;
-  return `<div class="subtabs">${[["new","📝 New admissions — waiting list","waiting"],["tfr","📋 Transfer requests — seniority list","waiting"],["moves",`🔁 Transfers between APEIs — in transit${inc?` <span class="badge">${inc}</span>`:""}`,"transfers"]].map(([k,l,v])=>`<button class="pill ${cur===k?"on":""}" ${v==="transfers"?`data-act="go" data-id="transfers"`:`data-act="go" data-id="waiting" data-p="tab=${k}"`}>${l}</button>`).join("")}</div>`; }
+  return `<div class="subtabs">${[...(canEntry()?[["entry","📥 Daily entry — admissions & withdrawals","entry"]]:[]),["new","📝 New admissions — waiting list","waiting"],["tfr","📋 Transfer requests — seniority list","waiting"],["moves",`🔁 Transfers between APEIs — in transit${inc?` <span class="badge">${inc}</span>`:""}`,"transfers"]].map(([k,l,v])=>`<button class="pill ${cur===k?"on":""}" ${v!=="waiting"?`data-act="go" data-id="${v}"`:`data-act="go" data-id="waiting" data-p="tab=${k}"`}>${l}</button>`).join("")}</div>`; }
 const HIDDEN_T = HIDDEN.push(["transfers",()=>role()!=="viewer"]);
 VIEWS.transfers = {
   shell:()=>`${admTabs("moves")}<div class="panel"><h2>Incoming — waiting for acceptance</h2><div class="scroll" id="tIn"></div></div><div class="panel"><h2>Outgoing — sent by your school</h2><div class="scroll" id="tOut"></div>
@@ -2015,7 +2066,7 @@ async function impFee(file){ const code=S.fd.code; const rows=await readTable(fi
     r.st=st; r.m=m; r.amt=amt; if(st) r.v.name=r.v.name||st.name; }
   impSet({kind:"fee", region:"feBody", school:code, file:file.name, cols:FEE_COLS, rows, commit: async good=>{ for(const r of good){ feeAddStu(r.st,r.m); if(r.amt!==null) S.fd.rows[r.st.id].amt=r.amt; } toast(`${good.length} defaulters added — check and press Save.`); } }); }
 
-async function impGo(){ const I=S.imp; if(!I) return; const good=I.rows.filter(r=>!r.errs.length); try{ await I.commit(good); S.imp=null; uploadLog(I,good); }catch(e){ if(fsFail(e)) toast("Not imported — the database connection stopped. Press “Reload now” in the red box, then import the file again.",true); else toast("Import failed, nothing saved: "+e.message,true); return; }
+async function impGo(){ const I=S.imp; if(!I||I.busy) return; I.busy=1; const good=I.rows.filter(r=>!r.errs.length); try{ await I.commit(good); S.imp=null; uploadLog(I,good); }catch(e){ if(fsFail(e)) toast("Not imported — the database connection stopped. Press “Reload now” in the red box, then import the file again.",true); else toast("Import failed, nothing saved: "+e.message,true); I.busy=0; return; }
   if(I.kind==="dc") fillRegion("dcList",true); fillRegion(I.region,true); }
 
 /* =====================================================================
@@ -3935,7 +3986,7 @@ const SETUP = {
       <button class="btn p">Save</button></form>
       <p class="hint"><b>Auto sign-out:</b> if a PC is left signed in, it signs itself out after this many minutes with no typing or clicking (Super Admin and Senior / Viewer are never signed out automatically — only when they press Sign out).</p><p class="hint"><b>What the cutoff does:</b> strength figures are always live. The cutoff only marks where "today's movement" starts — e.g. 08:00 means the morning report counts admissions and withdrawals since 08:00 yesterday. Choose other periods (today, this week, this month, custom) in Reports.</p></div>
       <div class="panel"><div class="ph"><h2>Review of clerks' entries (dual check)</h2><button class="btn" data-act="reviewDlg">Change…</button></div><p style="margin:0">${reviewOn()?`<b class="pos">ON</b> — ${reviewMode()==="hold"?"entries wait for approval before they change strength":"entries count at once and wait in Log → Review entries"}`:`<b>OFF</b> — clerks' entries count at once`}.</p></div>
-      <div class="panel"><h2>Appearance — default for everyone</h2><p class="hint">Each person can still choose their own with the 🎨 Theme button at the top; this sets what new users see.</p>${themeForm("uiDefault")}</div>
+      ${lookHtml()}<div class="panel"><h2>Appearance — default for everyone</h2><p class="hint">Each person can still choose their own colours with ☰ → 🎨 Theme & text size; this sets what new users see.</p>${themeForm("uiDefault")}</div>
       <div class="panel"><h2>Logo</h2><p class="hint">Shown on the sign-in page, the header and printed reports. PNG or JPG; it is resized automatically.</p>
       <div class="row" style="justify-content:flex-start">${st.logo?`<img src="${h(st.logo)}" alt="" style="height:64px;border:1px solid var(--line);border-radius:6px;padding:4px;background:#fff">`:""}<label class="btn">Choose image <input type="file" accept="image/*" data-chg="logo" hidden></label>${st.logo?`<button class="btn r" data-act="logoDel">Remove</button>`:""}</div></div>`; },
   labels(){ const ov=ST().textOv||{}; return `<div class="panel" style="border:2px solid #be185d"><h2>✎ Edit words on screen</h2><p class="hint" style="margin-top:0">Switch on, then go to any page and <b>click any heading, table title, column title, label, tab or button</b> to type new wording. It is saved for everyone at once. Switch off when done.</p>
@@ -4422,8 +4473,25 @@ function upPanel(){ const sch=schoolList(), from=isoDay(Date.now()-29*864e5); if
   const last=S.upRows.slice().sort((a,b)=>b.atMs-a.atMs).slice(0,S.upAll?500:8);
   return `<h3 style="margin:14px 0 6px">Uploads (Excel) — rows saved</h3><table class="sttab"><tr><th>Period</th>${sch.map(s=>`<th class="n">${h(s.code)}</th>`).join("")}<th class="n">${h(L("total"))}</th></tr>
     ${W.map(w=>`<tr><td>${w[0]}</td>${sch.map(s=>`<td class="n">${cell(sum(s.code,w))}</td>`).join("")}<td class="n"><b>${cell(sum("",w))}</b></td></tr>`).join("")}</table>
-   ${last.length?`<table style="margin-top:8px"><tr><th>When</th><th>School</th><th>What</th><th>File</th><th class="n">Rows saved</th><th class="n">Rows rejected</th><th>By</th></tr>${last.map(u=>`<tr><td>${h(fmtDT(u.atMs))}</td><td>${h(u.school)}</td><td>${h(UP_KIND[u.kind]||u.kind)}</td><td style="white-space:normal;max-width:260px">${h(u.file)}</td><td class="n"><b>${nf(u.rows||0)}</b></td><td class="n ${u.rejected?"neg":""}">${nf(u.rejected||0)}</td><td>${h(u.byName)} <span class="mute">${h(ROLES[u.role]||"")}</span></td></tr>`).join("")}</table>${S.upRows.length>8&&!S.upAll?`<button class="btn s" data-act="upShow">Show all ${S.upRows.length} uploads (30 days)</button>`:""}`:`<p class="mute">No uploads in the last 30 days.</p>`}`; }
-Object.assign(EXTRA_ACT,{ upShow: () => { S.upAll=true; fillRegion("dStatus",true); } });
+   ${last.length?`<table style="margin-top:8px"><tr><th>When</th><th>School</th><th>What</th><th>File</th><th class="n">Rows saved</th><th class="n">Rows rejected</th><th>By</th></tr>${last.map(u=>`<tr><td>${h(fmtDT(u.atMs))}</td><td>${h(u.school)}</td><td>${h(UP_KIND[u.kind]||u.kind)}</td><td style="white-space:normal;max-width:260px">${h(u.file)}</td><td class="n"><b>${nf(u.rows||0)}</b></td><td class="n ${u.rejected?"neg":""}">${nf(u.rejected||0)}</td><td>${h(u.byName)} <span class="mute">${h(ROLES[u.role]||"")}</span></td></tr>`).join("")}</table>${S.upRows.length>8&&!S.upAll?`<button class="btn s" data-act="upShow">Show all ${S.upRows.length} uploads (30 days)</button>`:""}`:`<p class="mute">No uploads in the last 30 days.</p>`}${isSA()?`<p class="mini mute" style="margin-top:6px">Missing an upload (e.g. made before this record existed, or from an old copy of the page)? <button class="btn s" data-act="upFind">🔎 Find uploads from the data bank</button></p>`:""}`; }
+Object.assign(EXTRA_ACT,{ upShow: () => { S.upAll=true; fillRegion("dStatus",true); },
+  /* records added together by one person within the same minute (20 or more) = an Excel upload; lists those not yet in the record */
+  upFind: async () => { if(!isSA()) return; toast("Reading every school's data bank…"); await ensureStu("ALL"); await upLoad(isoDay(Date.now()-89*864e5));
+    const ms=v=>v?.toMillis?v.toMillis():typeof v==="number"?v:v?.seconds?v.seconds*1000:0, G={};
+    for(const s of schoolList()) for(const r of stuOf(s.code)||[]){ const t=ms(r.createdAt); if(!t) continue; const k=s.code+"|"+(r.by||"")+"|"+Math.floor(t/60000); (G[k]||={school:s.code,by:r.by||"",t,n:0}).n++; }
+    // join neighbouring minutes of the same person (a large file takes more than a minute to save)
+    const L=Object.values(G).sort((a,b)=>a.school.localeCompare(b.school)||a.by.localeCompare(b.by)||a.t-b.t), B=[];
+    for(const g of L){ const p=B[B.length-1]; if(p&&p.school===g.school&&p.by===g.by&&g.t-p.last<=3*60000){ p.n+=g.n; p.last=g.t; } else B.push({...g,last:g.t}); }
+    const have=S.upRows||[], found=B.filter(b=>b.n>=20 && !have.some(u=>u.school===b.school && Math.abs(u.atMs-b.t)<=10*60000));
+    S.upFound=found;
+    modal(`<div class="ph"><h3 style="margin:0">🔎 Uploads found in the data bank</h3><button class="btn s" data-act="closeModal">Close</button></div>
+      <p class="mini mute">Groups of 20 or more records added by one person at the same time (only new records — a file that only updated existing records leaves no trace). Already-recorded uploads are left out.</p>
+      ${found.length?`<table><tr><th><input type="checkbox" checked onclick="document.querySelectorAll('.upf').forEach(x=>x.checked=this.checked)"></th><th>When</th><th>School</th><th>Entered by</th><th class="n">New records</th></tr>${found.map((b,i)=>`<tr><td><input type="checkbox" class="upf" data-i="${i}" checked></td><td>${h(fmtDT(b.t))}</td><td>${h(b.school)}</td><td>${h(b.by||"—")}</td><td class="n"><b>${nf(b.n)}</b></td></tr>`).join("")}</table>
+      <div style="margin-top:10px;text-align:right"><button class="btn p" data-act="upFindSave">Add ticked to the uploads record</button></div>`:`<p>Nothing missing — every group of records in the data bank is already in the uploads record.</p>`}`, "wide"); },
+  upFindSave: async () => { const F=S.upFound||[], pick=[...document.querySelectorAll(".upf:checked")].map(x=>F[+x.dataset.i]).filter(Boolean); if(!pick.length) return toast("Tick at least one.",true);
+    const ops=opsNew(); ops.noIdx=true; ops.noUndo=true; ops.noChk=true;
+    for(const b of pick) ops.set.push({col:"uploads",id:newId(),data:{kind:"students",school:b.school,file:"(found later in the data bank — file name not known)",rows:b.n,rejected:0,by:me().uid,byName:(b.by||"?")+" (found later)",role:"",atMs:b.t,day:isoDay(b.t),at:TS,rebuilt:true}});
+    await DB.apply(ops,true); closeModal(); S.upRows=null; toast(`${pick.length} upload${pick.length>1?"s":""} added to the record.`); fillRegion("dStatus",true); } });
 (()=>{ const o=VIEWS.dash?.regions?.dStatus; if(o) VIEWS.dash.regions.dStatus=(...a)=>o(...a)+upPanel(); })();
 
 /* Approvals: what the number is made of (kind × school), each figure filters the list */
@@ -4585,6 +4653,55 @@ function cmpPanel(){ const p=S.params, R=cmpRows(); if(!R.length) return ""; con
      ${sch.length>1?`<tr class="tot"><td>${h(L("gtotal"))}</td><td class="n">${nf(T.n)}</td><td class="n">${nf(T.full)}</td><td class="n">${pc(T.full,T.n)}</td><td class="n">${nf(T.req)}</td><td class="n">${nf(T.n-T.full)}</td><td class="n">${nf(sch.reduce((a,c)=>a+per[c].cells,0))}</td></tr>`:""}</table>
     ${body}${list}</div>`; }
 setTimeout(()=>{ const o=VIEWS.students.regions.chkBody; VIEWS.students.regions.chkBody=(...a)=>{ const x=o(...a); return /Loading the data bank/.test(x)?x:cmpPanel()+x; }; },0);
+
+/* ---------- v4.35 — overall look (formal navy & gold, or the earlier look) and line icons; Setup → Appearance ---------- */
+function lookHtml(){ const lk=lookCfg(), B=(k,v,l,d)=>`<button class="pill ${lk[k]===v?"on":""}" data-act="lookSet" data-k="${k}" data-v="${v}" title="${h(d)}">${l}</button>`;
+  return `<div class="panel"><h2>Overall look — for everyone</h2><p class="hint">Changes only colours, fonts, spacing, cards, tables and icons — nothing else. You can switch back at any time.</p>
+   <div class="f"><label>Style</label><div class="pills">${B("style","formal","Formal — navy & gold","Deep navy header, gold accents, white cards, ruled tables")}${B("style","classic","Earlier look","The look the portal had before v4.35")}</div></div>
+   <div class="f" style="margin-top:8px"><label>Icons</label><div class="pills">${B("icons","line","Line icons (one colour)","Clean outline icons that take the colour of the text")}${B("icons","emoji","Colour emoji","The earlier colourful icons")}</div></div></div>`; }
+Object.assign(EXTRA_ACT,{ lookSet: async (el) => { if(!isSA()) return; await saveSettings({look:{...lookCfg(),[el.dataset.k]:el.dataset.v}},"Look saved for everyone."); applyTheme(); refresh(); } });
+
+const ICO = {
+ book:"M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5zM4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5", bell:"M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0", menu:"M4 6h16M4 12h16M4 18h16",
+ print:"M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z", trash:"M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2",
+ hour:"M5 22h14M5 2h14M17 22v-4.2a2 2 0 0 0-.6-1.4L12 12l-4.4 4.4a2 2 0 0 0-.6 1.4V22M7 2v4.2a2 2 0 0 0 .6 1.4L12 12l4.4-4.4A2 2 0 0 0 17 6.2V2", clip:"M9 2h6v4H9zM16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2",
+ eye:"M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z", okc:"M22 11.1V12a10 10 0 1 1-5.9-9.1M22 4 12 14l-3-3", mega:"M3 11v3a1 1 0 0 0 1 1h3l5 4V6L7 10H4a1 1 0 0 0-1 1zM16 8a5 5 0 0 1 0 8M19 5a9 9 0 0 1 0 14",
+ hist:"M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2", img:"M3 3h18v18H3zM9 8a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM21 15l-5-5L5 21", cut:"M6 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12",
+ cam:"M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3zM12 10a3 3 0 1 0 0 6 3 3 0 0 0 0-6z", gear:"M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1",
+ lock:"M5 11h14v11H5zM7 11V7a5 5 0 0 1 10 0v4", unlock:"M5 11h14v11H5zM7 11V7a5 5 0 0 1 9.9-1", heart:"M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z",
+ pal:"M12 2a10 10 0 0 0 0 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4A4.6 4.6 0 0 0 22 10.8C22 5.9 17.5 2 12 2zM7.5 10.5h.01M10.5 7h.01M15 7.5h.01", edit:"M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z",
+ rep:"M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3", card:"M2 5h20v14H2zM2 10h20", xc:"M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM15 9l-6 6M9 9l6 6",
+ users:"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8", wrench:"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z",
+ file:"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h5", folder:"M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9l-.8-1.2A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z",
+ search:"M11 3a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM21 21l-4.3-4.3", key:"M7.5 11a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zM10.7 12.3 21 2M15.5 7.5l3 3L22 7l-3-3", trophy:"M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.7V17c0 .6-.5 1-1 1.2C7.9 18.8 7 20.2 7 22M14 14.7V17c0 .6.5 1 1 1.2 1.1.5 2 2 2 3.8M18 2H6v7a6 6 0 0 0 12 0z",
+ scale:"M12 3v18M5 21h14M3 7h18M6 7l-3 7a3 3 0 0 0 6 0zM18 7l-3 7a3 3 0 0 0 6 0z", inbox:"M22 12h-6l-2 3h-4l-2-3H2M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z",
+ down:"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3", chart:"M3 3v18h18M8 17v-5M13 17V8M18 17v-8", pclip:"M21.4 11.1l-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5",
+ phone:"M7 2h10v20H7zM12 18h.01", power:"M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0", clock:"M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 6v6l4 2", smile:"M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01",
+ school:"M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6M12 10h.01", tag:"M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8zM7 7h.01", calc:"M4 2h16v20H4zM8 6h8M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01",
+ cap:"M22 10 12 5 2 10l10 5zM6 12v5c3 2 9 2 12 0v-5", bot:"M5 8h14v12H5zM12 4v4M9 13h.01M15 13h.01M2 14h3M19 14h3", hash:"M4 9h16M4 15h16M10 3 8 21M16 3l-2 18", money:"M2 6h20v12H2zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
+ type:"M4 7V4h16v3M9 20h6M12 4v16", msg:"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z", shield:"M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z", warn:"M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01",
+ refresh:"M21 12a9 9 0 1 1-2.6-6.4L21 8M21 3v5h-5", undo:"M3 7v6h6M21 17a9 9 0 0 0-15-6.7L3 13", swap:"M16 3l4 4-4 4M20 7H4M8 21l-4-4 4-4M4 17h16", qr:"M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3",
+ star:"M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8-6.2-3.2-6.2 3.2L7 14.2l-5-4.9 6.9-1z", sync:"M21 12a9 9 0 1 1-2.6-6.4L21 8M21 3v5h-5" };
+const ICO_MAP = {"📘":"book","🔔":"bell","☰":"menu","🖨":"print","🗑":"trash","⏳":"hour","📋":"clip","👁":"eye","✅":"okc","📢":"mega","⏪":"hist","🖼":"img","✂":"cut","📷":"cam","⚙":"gear","🔒":"lock","🔓":"unlock","❤":"heart","🎨":"pal","📝":"edit","✎":"edit",
+ "🔁":"rep","💳":"card","❌":"xc","👥":"users","👪":"users","🔧":"wrench","📄":"file","🧾":"file","🗂":"folder","🔍":"search","🔎":"search","🔑":"key","🏆":"trophy","⚖":"scale","📥":"inbox","⬇":"down","📊":"chart","📎":"pclip","📱":"phone","⏻":"power","⏰":"clock","🕒":"clock",
+ "🧸":"smile","🏫":"school","🏷":"tag","🧮":"calc","🎓":"cap","🤖":"bot","🔢":"hash","💰":"money","🔤":"type","💬":"msg","🛡":"shield","⚠":"warn","⟳":"refresh","↶":"undo","⇄":"swap","📣":"mega","📌":"pclip","📂":"folder","📁":"folder","📅":"clock","🗓":"clock","👤":"users","🖥":"phone","📞":"phone","✉":"msg","📧":"msg","🧹":"trash","💾":"down","📤":"inbox","🔗":"pclip","📈":"chart","📉":"chart","🆕":"star","⭐":"star","★":"star","🔄":"sync","♻":"sync","🧑‍🏫":"users","🩺":"heart","🏥":"heart","🍼":"smile","👶":"smile","📸":"cam","🖊":"edit","✏":"edit"};
+const ICO_RE = new RegExp("("+Object.keys(ICO_MAP).sort((a,b)=>b.length-a.length).map(k=>k.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("|")+")\\uFE0F?","gu");
+const ICO_SKIP = new Set(["SCRIPT","STYLE","OPTION","OPTGROUP","TEXTAREA","TITLE","SELECT","svg","NOSCRIPT"]);
+function icoSprite(){ if(document.getElementById("icoSprite")) return; const d=document.createElement("div"); d.id="icoSprite"; d.style.display="none";
+  d.innerHTML=`<svg xmlns="http://www.w3.org/2000/svg">${Object.entries(ICO).map(([k,p])=>`<symbol id="i-${k}" viewBox="0 0 24 24"><path d="${p}"/></symbol>`).join("")}</svg>`; document.body.prepend(d); }
+function icoNode(t){ const s=t.nodeValue; ICO_RE.lastIndex=0; if(!ICO_RE.test(s)) return; ICO_RE.lastIndex=0; const f=document.createDocumentFragment(); let i=0, m;
+  while((m=ICO_RE.exec(s))){ if(m.index>i) f.append(s.slice(i,m.index)); const sp=document.createElementNS("http://www.w3.org/2000/svg","svg"); sp.setAttribute("class","ic"); sp.setAttribute("aria-hidden","true"); sp.dataset.e=m[0];
+    const u=document.createElementNS("http://www.w3.org/2000/svg","use"); u.setAttribute("href","#i-"+ICO_MAP[m[1]]); sp.append(u); f.append(sp); i=m.index+m[0].length; }
+  if(i<s.length) f.append(s.slice(i)); t.replaceWith(f); }
+function icoWalk(root){ if(!root||ICO_SKIP.has(root.nodeName)) return; if(root.nodeType===3){ const p=root.parentNode; if(p&&!ICO_SKIP.has(p.nodeName)&&!p.closest?.("svg,select,textarea,[contenteditable]")) icoNode(root); return; }
+  if(root.nodeType!==1&&root.nodeType!==11) return; if(root.closest?.("[contenteditable],svg,select")) return; const tx=root.textContent; ICO_RE.lastIndex=0; if(!tx||!ICO_RE.test(tx)) return;
+  const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode:n=>{ const p=n.parentNode; return !p||ICO_SKIP.has(p.nodeName)||p.closest("svg,select,textarea,[contenteditable]")?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT; }}), L=[]; let n; while((n=w.nextNode())) L.push(n); L.forEach(icoNode); }
+let icoObs=null;
+function icoScan(){ const on=document.documentElement.dataset.icons==="line";
+  if(!on){ if(icoObs){ icoObs.disconnect(); icoObs=null; document.querySelectorAll("svg.ic[data-e]").forEach(s=>s.replaceWith(s.dataset.e)); } return; }
+  if(!document.body) return; icoSprite(); icoWalk(document.body);
+  if(!icoObs){ icoObs=new MutationObserver(ms=>{ for(const m of ms){ if(m.type==="characterData") icoWalk(m.target); else for(const n of m.addedNodes) icoWalk(n); } }); icoObs.observe(document.body,{childList:true,subtree:true,characterData:true}); } }
+setTimeout(icoScan,0);
 
 /* =====================================================================
    13) STUDENT DATA BANK — one record per student, filled gradually.
