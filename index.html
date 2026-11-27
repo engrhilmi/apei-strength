@@ -522,7 +522,8 @@ const actDef = code => actions().find(a=>a.code===code) || {code, label:code, ki
 const AL = code => actDef(code).label;
 const AD = code => KIND_D[actDef(code).kind] ?? 0;
 const stages = () => ST().stages?.length ? ST().stages : DEFAULT_STAGES;
-const waitSts = () => ST().waitStatuses?.length ? ST().waitStatuses : DEFAULT_WAIT_ST;
+const OFFER_ST = "Offered — awaiting joining";   // passed the test, seat offered, parents still deciding: not in strength, not in the waiting list
+const waitSts = () => { const L=ST().waitStatuses?.length ? ST().waitStatuses : DEFAULT_WAIT_ST; if(L.some(s=>s.name===OFFER_ST)) return L; const i=L.findIndex(s=>s.name==="Granted"); const R=[...L]; R.splice(i<0?R.length:i+1,0,{name:OFFER_ST,count:false}); return R; };
 const waitCounted = st => !!waitSts().find(x=>x.name===st && x.count);
 const catGroups = () => ST().catGroups?.length ? ST().catGroups : defaultCatGroups(cats());
 const catGroupOf = c => (catGroups().find(g=>g.cats.includes(c))||{name:"Others"}).name;
@@ -551,7 +552,7 @@ function defaultSettings(){
 const secCap = (sc, sec) => Number(sec.cap ?? sc.cap ?? 35);
 function cur(code, cl, sec){
   const P=S.proj&&!S.asOf?projDelta(code):null, pg=P?.d[K(cl,sec,"g")]||0, pb=P?.d[K(cl,sec,"b")]||0;
-  if(bankMode()){ const F=bankFig(code); if(F) return { g:(F.d[K(cl,sec,"g")]||0)+pg, b:(F.d[K(cl,sec,"b")]||0)+pb }; }
+  if(bankMode(code)){ const F=bankFig(code); if(F) return { g:(F.d[K(cl,sec,"g")]||0)+pg, b:(F.d[K(cl,sec,"b")]||0)+pb }; }
   const d=(STR()[code]||{}).d||{}; const x=SCH()[code]?.classes.find(c=>c.cl===cl)?.secs.find(z=>z.s===sec) || {g:0,b:0};
   return { g:(x.g||0)+(d[K(cl,sec,"g")]||0)+pg, b:(x.b||0)+(d[K(cl,sec,"b")]||0)+pb };
 }
@@ -560,7 +561,7 @@ function waitCount(code, cl){ if(S.asOf) return Number(((S.asOf.strength[code]||
   return manualWait(code,cl) + S.waiting.filter(w=>w.school===code && w.cl===cl && waitCounted(w.status)).length; }
 /* category counts per class = typed/imported category figures (c.cat) + every movement since, by category */
 function catCounts(code, c){ const r0=catCounts0(code,c); const P=S.proj&&!S.asOf?projDelta(code):null; if(!P) return r0; const p=c.cl+"|"; for(const [k,v] of Object.entries(P.c)) if(k.startsWith(p)&&v){ const ck=canonCat(k.slice(p.length)); r0[ck]=(r0[ck]||0)+v; if(!r0[ck]) delete r0[ck]; } return r0; }
-function catCounts0(code, c){ if(bankMode()){ const F=bankFig(code); if(F){ const p=c.cl+"|", r={}; for(const [k,v] of Object.entries(F.c)) if(k.startsWith(p)&&v){ const ck=canonCat(k.slice(p.length)); r[ck]=(r[ck]||0)+v; } return r; } }
+function catCounts0(code, c){ if(bankMode(code)){ const F=bankFig(code); if(F){ const p=c.cl+"|", r={}; for(const [k,v] of Object.entries(F.c)) if(k.startsWith(p)&&v){ const ck=canonCat(k.slice(p.length)); r[ck]=(r[ck]||0)+v; } return r; } }
   const dc=(STR()[code]||{}).c||{}, o=c.cat||{}, p=c.cl+"|", r={};
   const keys=new Set([...Object.keys(o), ...Object.keys(dc).filter(k=>k.startsWith(p)).map(k=>k.slice(p.length))]);
   for(const k of keys){ const v=(Number(o[k])||0)+(dc[p+k]||0); if(v){ const ck=canonCat(k); r[ck]=(r[ck]||0)+v; if(!r[ck]) delete r[ck]; } } return r; }
@@ -691,13 +692,15 @@ const idxArr = r => IDX_F.map(k=>r[k]===DEL||r[k]==null?"":String(r[k]).replace(
 const idxObj = (id, school, a) => { if(typeof a==="string") a=a.split(IDX_SEP); const o={id,school}; IDX_F.forEach((k,i)=>o[k]=(a&&a[i])||""); if(o.contact) o.contact=fmtPhones(o.contact); if(o.contact2) o.contact2=fmtPhones(o.contact2); return o; };
 function idxFind(id){ for(const [sc,m] of Object.entries(S.idx||{})) if(m[id]) return idxObj(id,sc,m[id]); return null; }
 /* strength source: "sheet" (category sheet + entries, the default) or "bank" (students on roll in the data bank) */
-const bankMode = () => ST().strSrc==="bank" && !S.asOf;
+/* each school can count from its own source: settings.strSrcBy = {JM:"bank", GC:"sheet", …}; schools not listed follow strSrc */
+const srcOf = code => (ST().strSrcBy||{})[code] || (ST().strSrc==="bank"?"bank":"sheet");
+const bankMode = code => !S.asOf && (code ? srcOf(code)==="bank" : schoolList(true).some(s=>srcOf(s.code)==="bank"));
 let bankMemo={src:null,f:{}};
 function bankCalc(code){ const f={d:{},c:{}}; for(const [id,a] of Object.entries((S.idx||{})[code]||{})){ const r=idxObj(id,code,a); if(r.status!=="On roll") continue; const k=K(r.cl,r.sec,r.gender==="g"?"g":"b"); f.d[k]=(f.d[k]||0)+1; if(r.cat){ const kc=r.cl+"|"+r.cat; f.c[kc]=(f.c[kc]||0)+1; } } return f; }
 function bankFig(code){ if(S.idx && canSeeStudents() && (!ownOnly()||code===me().school)){ if(bankMemo.src!==S.idx) bankMemo={src:S.idx,f:{}}; return bankMemo.f[code] ||= bankCalc(code); } return (S.bankStr||{})[code] || null; }
 /* staff keep the shared counts up to date so viewers (who cannot read the data bank) see the same strength */
 let bankPubT=0; function bankPublish(){ if(!bankMode()||!S.idx||!S.user||S.user.pending) return; clearTimeout(bankPubT); bankPubT=setTimeout(()=>{ const ops=opsNew(); ops.noIdx=true; ops.noUndo=true;
-  for(const s of schoolList()){ if(!(isSA()||role()==="hq"||(role()==="clerk"&&me().school===s.code))) continue; const f=bankCalc(s.code), o=(S.bankStr||{})[s.code];
+  for(const s of schoolList()){ if(!bankMode(s.code)) continue; if(!(isSA()||role()==="hq"||(role()==="clerk"&&me().school===s.code))) continue; const f=bankCalc(s.code), o=(S.bankStr||{})[s.code];
     if(!o || JSON.stringify(o.d)!==JSON.stringify(f.d) || JSON.stringify(o.c)!==JSON.stringify(f.c)) ops.set.push({col:"bankStr",id:s.code,data:{d:f.d,c:f.c,atMs:Date.now()}}); }
   if(ops.set.length) DB.apply(ops,true).catch(()=>{}); },6000); }
 /* the Super Admin's own actions are shown to nobody else */
@@ -721,7 +724,7 @@ function txToOps(ops, tx){
 function voidToOps(ops, tx, reason){
   const pre = tx.atMs && typeof schBase==="function" && tx.atMs < schBase(tx.school);
   ops.upd.push({ col:"transactions", id:tx.id, data:{ status:"void", voidBy:me().name||me().uid, voidAt:TS, voidReason:reason||"", ...(pre?{voidNoEffect:true}:{}) } });
-  if(bankMode() && tx.studentId){ const k=actDef(tx.action).kind; if(k==="in"||k==="apei_in") ops.upd.push({col:"students",id:tx.studentId,data:{status:"Left",leftReason:"admission entry voided",updatedAt:TS}}); else if(k==="out"||k==="apei_out") ops.upd.push({col:"students",id:tx.studentId,data:{status:"On roll",leftDate:"",leftReason:"",updatedAt:TS}}); }
+  if(bankMode(tx.school) && tx.studentId){ const k=actDef(tx.action).kind; if(k==="in"||k==="apei_in") ops.upd.push({col:"students",id:tx.studentId,data:{status:"Left",leftReason:"admission entry voided",updatedAt:TS}}); else if(k==="out"||k==="apei_out") ops.upd.push({col:"students",id:tx.studentId,data:{status:"On roll",leftDate:"",leftReason:"",updatedAt:TS}}); }
   if(pre) return;   // the base figures (category sheet) already include this entry — voiding only marks it
   for (const [school,cl,sec,n] of effects(tx)){ ops.inc.push({ school, key:K(cl,sec,tx.gender), n:-n }); if(tx.cat) ops.inc.push({ school, key:cl+"|"+tx.cat, n:-n, f:"c" }); }
 }
@@ -1155,11 +1158,12 @@ function kpiHtml(codes, w, rows, kind){
   return `<div class="kpis">
     ${K(`data-act="drill" data-m="str"`,h(L("str")),nf(t.str),`${h(L("g"))} ${nf(t.g)}<br>${h(L("b"))} ${nf(t.b)}`,"","kg1")}
     ${K(`data-act="drill" data-m="auth"`,h(L("auth")),nf(t.auth),`${nf(t.n)} sections`,"","kg1")}
-    ${K(`data-act="drill" data-m="sd"`,h(L("sd")),sgt(t.sd),`${((t.str/(t.auth||1))*100).toFixed(1)}% filled · ${(Math.max(0,t.auth-t.str)/(t.auth||1)*100).toFixed(1)}% vacant`,t.sd>0?"pos":t.sd<0?"neg":"","kg1")}
+    ${K(`data-act="drill" data-m="sd"`,h(L("sd")),sgt(t.sd),`${((t.str/(t.auth||1))*100).toFixed(1)}% filled · ${(Math.max(0,t.auth-t.str)/(t.auth||1)*100).toFixed(1)}% vacant${offers(codes).length?`<br>if offered join: <b>${sgt(t.sd+offers(codes).length)}</b>`:""}`,t.sd>0?"pos":t.sd<0?"neg":"","kg1")}
     ${K(`data-act="drill" data-m="net"`,`${h(L("kMove"))} ${h(periodLabel(kind,w))}`,sgt(m.net),`${m.in} in · ${m.out} out`,m.net>0?"pos":m.net<0?"neg":"","kg2")}
     ${K(`data-act="go" data-id="transfers"`,h(L("kTransit")),pend,"awaiting receiving school","","kg2")}
     ${K(`data-act="go" data-id="waiting" data-p="tab=tfr"`,h(L("kTreq")),tr,"pending, by seniority","","kg2")}
     ${K(`data-act="drill" data-m="wait"`,h(L("w")),nf(t.wait),"school & class wise","","kg2")}
+    ${offerKpi(codes,t,K)}
     ${K(`data-act="go" data-id="daycare"`,h(L("kDc")),nf(dc.str),`of ${nf(dc.cap)} places · ${nf(Math.max(0,dc.cap-dc.str))} vacant`,"","kg4")}
     ${K(`data-act="go" data-id="drill" data-p="m=cat"`,h(L("kCats")),nf(Object.values(catTotals(codes)).reduce((a,v)=>a+v,0)),`${cats().length} categories`,"","kg3")}
     ${canSeeStudents()?K(`data-act="go" data-id="students" data-p="tab=chk"`,h(L("kDb")),`${(nOn/(t.str||1)*100).toFixed(1)}%`,`${nf(nOn)} of ${nf(t.str)} students entered`,"","kg3"):""}
@@ -1299,7 +1303,7 @@ function effFromDate(v){ if(!v || v===isoDay(Date.now())) return null; const t=D
 function buildTxOps(ops, tx){   // shared by fast entry and Excel import
   const k=actDef(tx.action).kind;
   const st = tx.studentId ? (stuOf(tx.school)||[]).find(r=>r.id===tx.studentId) : findStuByAdm(tx.school, tx.admNo);
-  if(bankMode() && !st && ["out","apei_out","sec"].includes(k)){ if(!stuOf(tx.school)) ensureStu(tx.school); throw new Error(`Strength is counted from the data bank: no student with Adm No “${tx.admNo||""}” in ${tx.school}'s data bank${stuOf(tx.school)?"":" (still loading — try again in a moment)"}. Add or find the student in Students → Register first.`); }
+  if(bankMode(tx.school) && !st && ["out","apei_out","sec"].includes(k)){ if(!stuOf(tx.school)) ensureStu(tx.school); throw new Error(`Strength is counted from the data bank: no student with Adm No “${tx.admNo||""}” in ${tx.school}'s data bank${stuOf(tx.school)?"":" (still loading — try again in a moment)"}. Add or find the student in Students → Register first.`); }
   stuOpsForTx(ops, tx, st);
   if(k==="apei_out" && tx.toSchool && tx.toSchool!=="__other"){
     const tid=newId(); tx.tfrId=tid; const outId=txToOps(ops,tx);
@@ -1370,7 +1374,7 @@ function canWait(f, w){ if(isSA()) return true; const r=role();
   if(r==="hq") return ["dqRemarks","marks","status"].includes(f);
   return false; }
 const waitTab = () => S.params.tab==="tfr" ? "tfr" : "new";
-function waitRows(){ const code=waitSchool(), f=S.waitStatus||"active"; return S.waiting.filter(w=>(code==="ALL"||w.school===code) && (!S.params.cl||w.cl===S.params.cl) && (f==="all"||(f==="active"?waitCounted(w.status):w.status===f))).sort((a,b)=>(a.date||"").localeCompare(b.date||"")); }
+function waitRows(){ const code=waitSchool(), f=S.waitStatus||"active"; return S.waiting.filter(w=>(code==="ALL"||w.school===code) && (!S.params.cl||w.cl===S.params.cl) && (f==="all"||(f==="active"?(waitCounted(w.status)||w.status===OFFER_ST):w.status===f))).sort((a,b)=>(a.date||"").localeCompare(b.date||"")); }
 VIEWS.waiting = {
   shell(){ const tabs=admTabs(waitTab());
     if(waitTab()==="tfr"){ const p=S.params;
@@ -1383,7 +1387,7 @@ VIEWS.waiting = {
     const code=waitSchool(), pickSch=code==="ALL"&&canDecide(), addSchool=code!=="ALL"?code:pickSch?(S.wAddSch||schoolList()[0].code):null, canAdd=addSchool&&(canEnter(addSchool)||canDecide()), X=extraFields("waitFields");
     return tabs+`<div class="note">Optional. The class-wise waiting count is typed on the Entry tab. Use this page when you want applicants by name (test, marks, DQ remarks); every applicant with a counted status is added to that class's waiting count.</div>
      <div class="panel"><div class="ph"><h2>Applicants by name</h2><div class="pills">${(isSA()||role()==="hq")?`<select class="in" style="width:auto" data-chg="waitSchool"><option value="ALL">All schools</option>${schoolList().map(s=>`<option value="${h(s.code)}" ${s.code===code?"selected":""}>${h(s.code)}</option>`).join("")}</select>`:""}
-      <select class="in" style="width:auto" data-chg="waitStatus"><option value="active">Counted statuses</option><option value="all" ${S.waitStatus==="all"?"selected":""}>All statuses</option>${waitSts().map(s=>`<option ${S.waitStatus===s.name?"selected":""}>${h(s.name)}</option>`).join("")}</select></div></div>
+      <select class="in" style="width:auto" data-chg="waitStatus"><option value="active">Counted + offered</option><option value="all" ${S.waitStatus==="all"?"selected":""}>All statuses</option>${waitSts().map(s=>`<option ${S.waitStatus===s.name?"selected":""}>${h(s.name)}</option>`).join("")}</select></div></div>
      ${canAdd?pasteBox("new")+`<form data-form="wait" class="entry" autocomplete="off" style="margin-bottom:12px"><div class="grid">
        ${pickSch?`<div class="f"><label for="wSch">School *</label><select id="wSch" data-chg="wAddSch">${schoolList().map(s=>`<option value="${h(s.code)}" ${s.code===addSchool?"selected":""}>${h(s.code)} — ${h(s.name)}</option>`).join("")}</select></div>`:""}
        <div class="f"><label for="wDate">Appl date</label><input id="wDate" type="date" value="${isoDay(Date.now())}" max="${isoDay(Date.now())}" ${isSA()?"":"disabled title=\"Today's date is put in automatically; only the Super Admin can change it\""}></div>
@@ -4305,14 +4309,21 @@ Object.assign(EXTRA_ACT,{ dcAp: el => { if(!canDecide()) return; const id=el.dat
   if(ok) go(""); else ask("Reject this day care request?","Write the reason the clerk will see.","Reject",go,true); } });
 /* Setup → Opening strength: where live strength comes from */
 function sheetStr(code){ const sc=S.schools[code], d=(S.strength[code]||{}).d||{}; let n=0; for(const c of sc?.classes||[]) for(const x of c.secs) n+=(x.g||0)+(x.b||0)+(d[K(c.cl,x.s,"g")]||0)+(d[K(c.cl,x.s,"b")]||0); return n; }
-function strSrcHtml(){ const bank=ST().strSrc==="bank", R=schoolList().map(s=>{ const F=bankFig(s.code); return {code:s.code,sh:sheetStr(s.code),bk:F?sumV(F.d):null}; });
-  const T=R.reduce((a,r)=>({sh:a.sh+r.sh,bk:a.bk+(r.bk||0)}),{sh:0,bk:0});
-  return `<div class="panel" style="border:2px solid ${bank?"#16a34a":"var(--band)"}"><h2>Where live strength comes from</h2>
-   <div class="pills" style="margin-bottom:8px"><button class="pill ${bank?"":"on"}" data-act="strSrc" data-id="sheet">📄 Category-wise sheet + entries</button><button class="pill ${bank?"on":""}" data-act="strSrc" data-id="bank">🗂 Data bank (students on roll)</button></div>
-   <p class="hint" style="margin-top:0">${bank?`<b>Now: data bank.</b> Every section's girls, boys and categories are counted from the students on roll in the data bank. A student added in the Register, imported from Excel, or admitted through the Entry tab counts at once; a withdrawal or transfer-out marks the student Left and stops counting. Withdrawals and section changes in the Entry tab need the student's Adm No to be in the data bank.`:`<b>Now: category-wise sheet.</b> Strength = the figures loaded from the sheet (Opening strength below) + every admission, withdrawal and transfer entered since. Students in the data bank do not change it.`} You can switch back and forth at any time — nothing is lost; the sheet figures and all entries stay saved.</p>
-   <table><tr><th>School</th><th class="n">Sheet + entries</th><th class="n">Data bank (on roll)</th><th class="n">Difference</th></tr>${R.map(r=>`<tr><td><b>${h(r.code)}</b></td><td class="n">${nf(r.sh)}</td><td class="n">${r.bk==null?"–":nf(r.bk)}</td><td class="n ${r.bk!=null&&r.bk!==r.sh?"neg":""}">${r.bk==null?"":sg(r.bk-r.sh)}</td></tr>`).join("")}<tr class="tot"><td>${h(L("gtotal"))}</td><td class="n">${nf(T.sh)}</td><td class="n">${nf(T.bk)}</td><td class="n">${sg(T.bk-T.sh)}</td></tr></table></div>`; }
-Object.assign(EXTRA_ACT,{ strSrc: el => { const to=el.dataset.id; if((ST().strSrc||"sheet")===to) return;
-  ask(to==="bank"?"Count strength from the data bank?":"Go back to the category-wise sheet?", to==="bank"?"Dashboard, reports and Sur/Dft will show the students on roll in the data bank. Schools whose data bank is not complete will show lower figures until their clerks finish entering.":"Strength goes back to the sheet figures plus the entries made since.", "Switch", async()=>{ await saveSettings({strSrc:to},"Strength source changed."); audit("Strength source changed", to==="bank"?"Data bank":"Category-wise sheet + entries"); if(to==="bank") bankPublish(); S.asOfCache={}; renderView(); }); } });
+function strSrcHtml(){ const R=schoolList().map(s=>{ const F=bankFig(s.code); return {code:s.code,name:s.name,src:srcOf(s.code),sh:sheetStr(s.code),bk:F?sumV(F.d):null}; });
+  const T=R.reduce((a,r)=>({sh:a.sh+r.sh,bk:a.bk+(r.bk||0),live:a.live+(r.src==="bank"?(r.bk||0):r.sh)}),{sh:0,bk:0,live:0}), nb=R.filter(r=>r.src==="bank").length;
+  return `<div class="panel" style="border:2px solid ${nb?"#16a34a":"var(--band)"}"><div class="ph"><h2>Where live strength comes from — school by school</h2><div class="pills"><button class="btn s" data-act="strSrcAll" data-id="sheet">📄 All schools: sheet</button><button class="btn s" data-act="strSrcAll" data-id="bank">🗂 All schools: data bank</button></div></div>
+   <p class="hint" style="margin-top:0">For each school choose what its live strength counts: <b>📄 Sheet + entries</b> = the figures loaded from the category-wise sheet (Opening strength below) plus every admission, withdrawal and transfer since; <b>🗂 Data bank</b> = the students on roll entered in that school's data bank (Register, Excel, Entry tab). Pick the data bank for a school once its records are complete. You can switch any school back at any time — nothing is lost.</p>
+   <div class="scroll"><table><tr><th>School</th><th>Counts from</th><th class="n">Sheet + entries</th><th class="n">Data bank (on roll)</th><th class="n">Difference</th><th class="n">Live strength now</th></tr>
+   ${R.map(r=>`<tr><td><b>${h(r.code)}</b> <span class="mute">${h(r.name)}</span></td><td><div class="pills"><button class="pill ${r.src==="sheet"?"on":""}" data-act="strSrcOne" data-sc="${h(r.code)}" data-id="sheet">📄 Sheet</button><button class="pill ${r.src==="bank"?"on":""}" data-act="strSrcOne" data-sc="${h(r.code)}" data-id="bank">🗂 Data bank</button></div></td>
+     <td class="n ${r.src==="sheet"?"":"mute"}">${nf(r.sh)}</td><td class="n ${r.src==="bank"?"":"mute"}">${r.bk==null?"–":nf(r.bk)}</td><td class="n ${r.bk!=null&&r.bk!==r.sh?"neg":""}">${r.bk==null?"":sg(r.bk-r.sh)}</td><td class="n"><b>${nf(r.src==="bank"?(r.bk||0):r.sh)}</b></td></tr>`).join("")}
+   <tr class="tot"><td>${h(L("gtotal"))}</td><td>${nb} of ${R.length} from the data bank</td><td class="n">${nf(T.sh)}</td><td class="n">${nf(T.bk)}</td><td class="n">${sg(T.bk-T.sh)}</td><td class="n">${nf(T.live)}</td></tr></table></div></div>`; }
+async function strSrcSave(map, what){ const all=Object.fromEntries(schoolList(true).map(s=>[s.code,srcOf(s.code)])); Object.assign(all,map);
+  await saveSettings({strSrcBy:all},"Strength source changed."); audit("Strength source changed",what); if(Object.values(map).includes("bank")) bankPublish(); S.asOfCache={}; projMemo.src=null; renderView(); }
+Object.assign(EXTRA_ACT,{
+  strSrcOne: el => { const sc=el.dataset.sc, to=el.dataset.id; if(srcOf(sc)===to) return; const F=bankFig(sc), bk=F?sumV(F.d):0, sh=sheetStr(sc);
+    ask(`${sc}: count from the ${to==="bank"?"data bank":"sheet"}?`, to==="bank"?`${sc}'s live strength becomes the <b>${nf(bk)}</b> students on roll in its data bank (now ${nf(sh)} from the sheet + entries, difference ${sg(bk-sh)}). Dashboard, reports and Sur/Dft change at once for everyone.`:`${sc}'s live strength goes back to the sheet figures plus the entries made since: <b>${nf(sh)}</b>.`,"Switch",()=>strSrcSave({[sc]:to},`${sc}: ${to==="bank"?"data bank":"category-wise sheet + entries"}`)); },
+  strSrcAll: el => { const to=el.dataset.id; ask(`All schools: count from the ${to==="bank"?"data bank":"sheet"}?`, to==="bank"?"Schools whose data bank is not complete will show lower figures until their clerks finish.":"Every school goes back to the sheet figures plus the entries made since.","Switch all",()=>strSrcSave(Object.fromEntries(schoolList(true).map(s=>[s.code,to])),`All schools: ${to==="bank"?"data bank":"category-wise sheet + entries"}`)); },
+  strSrc: el => EXTRA_ACT.strSrcAll(el) });
 
 /* ---------- fee defaulters report: template the Super Admin can change ---------- */
 const FEE_TCOLS=[["ser","Ser"],["inst","Instns"],["str","Student Str"],["m1","1x Month"],["m2","2x Months"],["m3","3x Months"],["m4","4x Months"],["m5","5x Months"],["tot","Total"],["amt","Amount"],["pct","%age"],["rem","Remarks"]];
@@ -4359,9 +4370,9 @@ let projMemo={k:null,v:{}};
 function projItems(code){ const out=[], I=id=>idxFind(id);
   for(const t of S.recentTx||[]) if(t.status==="pending"&&(!code||t.school===code||t.toSchool===code)) out.push({kind:"tx",t});
   for(const a of (S.apprs||[]).filter(a=>a.status==="pending"&&(!code||a.school===code))){
-    if(a.type==="class"||a.type==="tfr"||(a.type==="field"&&bankMode())) out.push({kind:a.type,a,r:a.stuId?I(a.stuId):null}); }
+    if(a.type==="class"||a.type==="tfr"||(a.type==="field"&&bankMode(a.school))) out.push({kind:a.type,a,r:a.stuId?I(a.stuId):null}); }
   return out; }
-function projDelta(code){ if(projMemo.src!==S.recentTx||projMemo.a!==S.apprs||projMemo.i!==S.idx||projMemo.m!==ST().strSrc) projMemo={src:S.recentTx,a:S.apprs,i:S.idx,m:ST().strSrc,v:{}};
+function projDelta(code){ if(projMemo.src!==S.recentTx||projMemo.a!==S.apprs||projMemo.i!==S.idx||projMemo.m!==JSON.stringify([ST().strSrc,ST().strSrcBy])) projMemo={src:S.recentTx,a:S.apprs,i:S.idx,m:JSON.stringify([ST().strSrc,ST().strSrcBy]),v:{}};
   if(projMemo.v[code]) return projMemo.v[code]; const D={d:{},c:{},n:0}; const add=(cl,sec,g,cat,n)=>{ const k=K(cl,sec,g==="g"?"g":"b"); D.d[k]=(D.d[k]||0)+n; if(cat){ const kc=cl+"|"+cat; D.c[kc]=(D.c[kc]||0)+n; } };
   for(const x of projItems(code)){ D.n++;
     if(x.kind==="tx"){ for(const [sc,cl,sec,n] of effects(x.t)) if(sc===code) add(cl,sec,x.t.gender,x.t.cat,n); }
@@ -4581,7 +4592,7 @@ function uploadLog(I, good){ try{ const bad=I.rows.length-good.length, schools={
   DB.apply(ops,true).then(()=>{ S.upRows=null; }).catch(()=>{}); }catch(e){} }
 async function upLoad(fromDay){ try{ const R=ownOnly()?(await DB.queryW("uploads",[["school","==",me().school]])).filter(u=>u.day>=fromDay):await DB.query("uploads","day",">=",fromDay); S.upRows=hideSA(R); }catch(e){ S.upRows=[]; } fillRegion("dStatus",true); }
 function upPanel(){ const sch=schoolList(), from="2000-01-01"; if(!S.upRows){ if(!S.upLoading){ S.upLoading=1; upLoad(from).finally(()=>{ S.upLoading=0; }); } return `<p class="mute">Loading uploads…</p>`; }
-  const now=Date.now(), t0=new Date(); t0.setHours(0,0,0,0); const W=[["Today",t0.getTime()],["Yesterday",t0.getTime()-864e5,t0.getTime()-1],["Past 7 days",now-7*864e5],["Past 30 days",now-30*864e5],["All time",0]];
+  const now=Date.now(), t0=new Date(); t0.setHours(0,0,0,0); const W=[["Today",t0.getTime()],["Yesterday",t0.getTime()-864e5,t0.getTime()-1],["Past 7 days",now-7*864e5],["Past 30 days",now-30*864e5],["This session",baseStartMs()],["All time",0]];
   const sum=(code,w)=>{ const L=S.upRows.filter(u=>(!code||u.school===code)&&u.atMs>=w[1]&&u.atMs<=(w[2]||now)); return {n:L.length,rows:L.reduce((a,u)=>a+(u.rows||0),0)}; };
   const cell=x=>x.n?`<span class="dn" data-act="upShow">${nf(x.rows)}</span><br><span class="mini mute">${x.n} file${x.n>1?"s":""}</span>`:`<span class="mute">0</span>`;
   const last=S.upRows.slice().sort((a,b)=>b.atMs-a.atMs).slice(0,S.upAll?500:8);
@@ -4918,7 +4929,7 @@ const aiBreak = R => { const o={}; for(const r of R){ const k=r.school; (o[k] ||
 async function aiTool(name, a={}){
   if(name==="get_overview"){ const idx=idxAll(), pend=apprPending(), ts=todayStatus(), dc=dcTotals();
     let comp=null; try{ const C=cmpRows(); if(C.length) comp=Object.fromEntries(schoolList().map(s=>{ const L=C.filter(x=>x.r.school===s.code); return [s.code,{records:L.length,complete:L.filter(x=>!x.miss.length).length,missingRequired:L.filter(x=>x.req.length).length}]; })); }catch(e){}
-    return {date:isoDay(Date.now()),session:session(),strengthSource:bankMode()?"data bank":"master sheet + entries",schools:schoolList().map(s=>{ const t=schoolStats(s.code), B=idx.filter(r=>r.school===s.code&&r.status==="On roll");
+    return {date:isoDay(Date.now()),session:session(),strengthSource:Object.fromEntries(schoolList().map(s=>[s.code,srcOf(s.code)==="bank"?"data bank":"master sheet + entries"])),schools:schoolList().map(s=>{ const t=schoolStats(s.code), B=idx.filter(r=>r.school===s.code&&r.status==="On roll");
       return {code:s.code,name:s.name,strength:t.str,girls:t.g,boys:t.b,authorised:t.auth,surplusDeficit:t.sd,vacant:Math.max(0,t.auth-t.str),waiting:t.wait,sections:t.n,dataBank:B.length,verified:B.filter(r=>r.ver).length,unverified:B.filter(r=>!r.ver).length,sentForVerification:B.filter(r=>!r.ver&&r.vreq).length,flagged:B.filter(r=>r.flag).length,todayEntries:ts.find(x=>x.code===s.code)?.state}; }),
       completeness:comp||"open Data check once to load", approvalsWaiting:Object.entries(pend.reduce((o,x)=>{ const k=(APPR_T[x.type]?.[0]||x.type).replace(/^\W+\s*/,"")+" | "+x.school; o[k]=(o[k]||0)+1; return o; },{})).map(([k,n])=>({kind:k.split(" | ")[0],school:k.split(" | ")[1],n})),
       transfersInTransit:S.transfers.filter(t=>t.status==="pending").length, transferRequestsPending:S.tfrapps.filter(x=>x.status==="Pending").length, dayCare:{children:dc.str,places:dc.cap}}; }
@@ -5076,10 +5087,38 @@ async function dupLoadDocs(){ try{ let R=await DB.allDocs("docLog");
       ops.set.push({col:"settings",id:"app",data:{docLogFilled:true},merge:true}); await DB.apply(ops,true); }
     S.docUp=R; }catch(e){ S.docUp=[]; } fillRegion("dStatus",true); }
 function docUpPanel(){ if(!(isSA()||role()==="hq")) return ""; if(!S.docUp){ if(!S.docUpBusy){ S.docUpBusy=1; dupLoadDocs().finally(()=>S.docUpBusy=0); } return `<p class="mute">Loading documents…</p>`; }
-  const sch=schoolList(), now=Date.now(), t0=new Date(); t0.setHours(0,0,0,0); const W=[["Today",t0.getTime()],["Yesterday",t0.getTime()-864e5,t0.getTime()-1],["Past 7 days",now-7*864e5],["Past 30 days",now-30*864e5],["All time",0]];
+  const sch=schoolList(), now=Date.now(), t0=new Date(); t0.setHours(0,0,0,0); const W=[["Today",t0.getTime()],["Yesterday",t0.getTime()-864e5,t0.getTime()-1],["Past 7 days",now-7*864e5],["Past 30 days",now-30*864e5],["This session",baseStartMs()],["All time",0]];
   const n=(c,w)=>S.docUp.filter(d=>(!c||d.school===c)&&d.atMs>=w[1]&&d.atMs<=(w[2]||now)).length;
   return `<h3 style="margin:14px 0 6px">Documents uploaded (B-Form, CNIC, certificates…) <button class="btn s" data-act="go" data-id="students" data-p="tab=docs">📎 See them all</button></h3><table class="sttab"><tr><th>Period</th>${sch.map(s=>`<th class="n">${h(s.code)}</th>`).join("")}<th class="n">${h(L("total"))}</th></tr>
    ${W.map(w=>`<tr><td>${w[0]}</td>${sch.map(s=>`<td class="n">${n(s.code,w)||`<span class="mute">0</span>`}</td>`).join("")}<td class="n"><b>${n("",w)}</b></td></tr>`).join("")}</table>`; }
+
+/* ---------- v4.38 — "Offered — awaiting joining": passed the entrance test, seat offered, parents still deciding.
+   Not in strength, not in the waiting list; shown in its own box with the strength and Sur/Dft "if they join". ---------- */
+const offers = codes => S.waiting.filter(w=>w.status===OFFER_ST&&(!codes||codes.includes(w.school)));
+const daysSince = ms => ms ? Math.floor((Date.now()-ms)/864e5) : null;
+function offerKpi(codes, t, K){ const O=offers(codes); const g=O.filter(w=>w.gender==="g").length;
+  return K(`data-act="go" data-id="offers"`,"Offered — awaiting joining",nf(O.length),O.length?`${nf(g)} girls · ${nf(O.length-g)} boys<br>if all join: Str <b>${nf(t.str+O.length)}</b> · ${h(L("sd"))} <b>${sgt(t.sd+O.length)}</b>`:"passed the test, parents to decide","","kg4"); }
+HIDDEN.push(["offers",()=>true]);
+VIEWS.offers = {
+  shell:()=>`<div class="panel"><div class="ph"><h2>🎫 ${h(OFFER_ST)}</h2><div class="pills"><button class="btn s" data-act="go" data-id="waiting" data-p="tab=new">📝 Applicants list</button></div></div>
+    <p class="hint" style="margin-top:0">Children who passed the entrance test and were offered a seat, while their parents decide. They are <b>not</b> counted in strength or in the waiting list. Mark an applicant this way in <b>Entries, Admissions & Transfers → New admissions</b> (Status column); when the child joins press <b>Admit</b>, if the parents decline set the status to <i>Cancelled</i> or <i>Not Responding</i>.</p><div id="ofBody"></div></div>`,
+  regions:{ ofBody(){ const p=S.params, sch=schoolList().filter(s=>!mySchool()||s.code===mySchool()), O=offers(sch.map(s=>s.code)), F=O.filter(w=>!p.ofS||w.school===p.ofS);
+    const row=(code)=>{ const t=schoolStats(code), o=O.filter(w=>w.school===code), g=o.filter(w=>w.gender==="g").length; return {code,t,n:o.length,g,b:o.length-g}; };
+    const R=sch.map(s=>row(s.code)), T=R.reduce((a,r)=>({str:a.str+r.t.str,auth:a.auth+r.t.auth,n:a.n+r.n,g:a.g+r.g,b:a.b+r.b}),{str:0,auth:0,n:0,g:0,b:0});
+    const cls=[...new Map(F.map(w=>[w.school+"|"+w.cl,{school:w.school,cl:w.cl}])).values()].sort((a,b)=>a.school.localeCompare(b.school));
+    const clRow=x=>{ const c=S.schools[x.school]?.classes.find(c=>c.cl===x.cl), st=c?classStats(x.school,c):{str:0,auth:0}, n=F.filter(w=>w.school===x.school&&w.cl===x.cl).length; return `<tr><td>${h(x.school)}</td><td><b>${h(x.cl)}</b></td><td class="n">${nf(st.auth)}</td><td class="n">${nf(st.str)}</td><td class="n">${sgt(st.str-st.auth)}</td><td class="n"><b>${n}</b></td><td class="n"><b>${nf(st.str+n)}</b></td><td class="n ${st.str+n-st.auth>0?"neg":""}"><b>${sgt(st.str+n-st.auth)}</b></td></tr>`; };
+    return `<h3 style="margin:4px 0 6px">If they all join — strength and ${h(L("sd"))}</h3>
+     <div class="scroll"><table class="sttab"><tr><th>School</th><th class="n">${h(L("auth"))}</th><th class="n">Strength now</th><th class="n">${h(L("sd"))} now</th><th class="n">Offered (${h(L("g"))} / ${h(L("b"))})</th><th class="n">Projected strength</th><th class="n">Projected ${h(L("sd"))}</th></tr>
+      ${R.map(r=>`<tr class="${p.ofS===r.code?"sel":""}"><td><b class="dn" data-act="setP" data-p="ofS=${h(p.ofS===r.code?"":r.code)}">${h(r.code)}</b></td><td class="n">${nf(r.t.auth)}</td><td class="n">${nf(r.t.str)}</td><td class="n">${sgt(r.t.sd)}</td><td class="n">${r.n?`<b>${r.n}</b> <span class="mute">(${r.g} / ${r.b})</span>`:`<span class="mute">0</span>`}</td><td class="n"><b>${nf(r.t.str+r.n)}</b></td><td class="n ${r.t.str+r.n-r.t.auth>0?"neg":""}"><b>${sgt(r.t.str+r.n-r.t.auth)}</b></td></tr>`).join("")}
+      <tr class="tot"><td>${h(L("gtotal"))}</td><td class="n">${nf(T.auth)}</td><td class="n">${nf(T.str)}</td><td class="n">${sgt(T.str-T.auth)}</td><td class="n">${T.n} (${T.g} / ${T.b})</td><td class="n">${nf(T.str+T.n)}</td><td class="n">${sgt(T.str+T.n-T.auth)}</td></tr></table></div>
+     ${cls.length?`<h3 style="margin:14px 0 6px">Class by class${p.ofS?" — "+h(p.ofS):""}</h3><div class="scroll"><table class="sttab"><tr><th>School</th><th>Class</th><th class="n">${h(L("auth"))}</th><th class="n">Now</th><th class="n">${h(L("sd"))} now</th><th class="n">Offered</th><th class="n">Projected</th><th class="n">Projected ${h(L("sd"))}</th></tr>${cls.map(clRow).join("")}</table></div>`:""}
+     <h3 style="margin:14px 0 6px">The children (${F.length})${p.ofS?` — ${h(p.ofS)} <button class="btn s" data-act="setP" data-p="ofS=">all schools</button>`:""}</h3>
+     ${F.length?`<div class="scroll"><table><tr><th>#</th><th>School</th><th>Class</th><th>Name</th><th>Father</th><th>${h(L("g"))}/${h(L("b"))}</th><th>Category</th><th>Contact</th><th>Test marks</th><th>Offered on</th><th class="n">Days waiting</th><th>Remarks (DQ / school)</th><th></th></tr>
+      ${F.sort((a,b)=>(a.offerAt||0)-(b.offerAt||0)).map((w,i)=>{ const d=daysSince(w.offerAt); return `<tr><td class="mute">${i+1}</td><td>${h(w.school)}</td><td>${h(w.cl)}</td><td><b>${h(w.name)}</b></td><td>${h(w.father||"")}</td><td>${w.gender==="g"?"G":w.gender==="b"?"B":""}</td><td>${h(catLabel(w.cat))}</td><td>${h(w.contact||"")}</td><td>${h(w.marks||"")}</td><td>${h(w.offerAt?fmtD(w.offerAt):"–")}</td><td class="n ${d!=null&&d>14?"neg":""}">${d==null?"–":d}</td><td style="white-space:normal;max-width:260px">${h([w.dqRemarks,w.remarks].filter(Boolean).join(" · "))}</td>
+        <td style="white-space:nowrap">${canEnter(w.school)?`<button class="btn s p" data-act="admitDlg" data-id="${h(w.id)}">Admit</button> <button class="btn s" data-act="wEdit" data-id="${h(w.id)}" title="All details">✎</button> <button class="btn s r" data-act="offerNo" data-id="${h(w.id)}" title="Parents declined">Not joining</button>`:""}</td></tr>`; }).join("")}</table></div><p class="hint">Red = waiting more than 14 days — worth a phone call. ✎ shows and corrects everything the parents gave.</p>`:`<p class="mute">No child is waiting. In the applicants list, set an applicant's Status to “${h(OFFER_ST)}”.</p>`}`; } }
+};
+Object.assign(EXTRA_ACT,{ offerNo: el => { const w=S.waiting.find(x=>x.id===el.dataset.id); if(!w) return;
+  ask(`${w.name} — not joining?`,"The status becomes “Cancelled”, with your reason. The record stays in the applicants list.","Not joining",async why=>{ await DB.apply({set:[],inc:[],upd:[{col:"waiting",id:w.id,data:{status:"Cancelled",cancelReason:why||"Parents declined the offer",updatedAt:TS,updatedBy:me().name||""}}]}); toast("Marked as not joining."); },true); } });
 
 /* =====================================================================
    13) STUDENT DATA BANK — one record per student, filled gradually.
@@ -5610,7 +5649,7 @@ document.addEventListener("change", async e => {
   if(el.dataset.chg && CHG[el.dataset.chg]) return CHG[el.dataset.chg](el);
   if(el.dataset.rp){ if(!(el.tagName==="TEXTAREA"||el.type==="text")) setRp(el); return; }
   try{
-    if(el.dataset.wf){ const w=S.waiting.find(x=>x.id===el.dataset.id); if(!w||!canWait(el.dataset.wf,w)) return; await DB.apply({set:[],inc:[],upd:[{col:"waiting",id:w.id,data:{[el.dataset.wf]:el.value,updatedAt:TS,updatedBy:me().name||""}}]}); toast("Saved."); return; }
+    if(el.dataset.wf){ const w=S.waiting.find(x=>x.id===el.dataset.id); if(!w||!canWait(el.dataset.wf,w)) return; const ex=el.dataset.wf==="status"&&el.value===OFFER_ST&&w.status!==OFFER_ST?{offerAt:Date.now(),offerBy:me().name||""}:{}; await DB.apply({set:[],inc:[],upd:[{col:"waiting",id:w.id,data:{[el.dataset.wf]:el.value,...ex,updatedAt:TS,updatedBy:me().name||""}}]}); toast(el.value===OFFER_ST?"Marked Offered — awaiting joining. Shown in the Dashboard box; not counted in strength or the waiting list.":"Saved."); return; }
     if(el.dataset.uu && isSA()){ const v=el.value, k=el.dataset.uu; let val;
       if(k==="voidMin") val = v==="" ? DEL : Math.max(0,Math.round(Number(v)||0));
       else if(v==="custom"){ const m=Math.round(Number(prompt(k==="undoBtn"?"Switch the Undo button on for how many minutes?":"Allow undoing record changes for how many minutes?","45"))||0); if(m<=0){ fillRegion("stBody",true); return; } val=Date.now()+m*60e3; }
