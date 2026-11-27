@@ -284,6 +284,9 @@ main caption.scap{text-align:left;padding-left:12px}
  .sttab{display:block;overflow-x:auto;max-width:100%}
  main .panel>table{display:block;overflow-x:auto;max-width:100%}
 }
+.kpi.kedit{cursor:grab;outline:2px dashed #c9a227;outline-offset:-2px;position:relative;padding-bottom:40px}.kpi.kedit:hover{transform:none}.kpi.kedit::after{display:none}
+.kpi.khid{opacity:.4}.kpi.kdrag{opacity:.5}.kpi.kover{outline:3px solid #0f766e}
+.kctl{position:absolute;left:6px;right:6px;bottom:6px;display:flex;gap:4px;justify-content:space-between}.kctl button{border:1px solid var(--line);background:var(--panel);border-radius:6px;font-size:12px;font-weight:700;padding:2px 8px;cursor:pointer}
 @media print{#toTop,#toBot,#updBar,.snavMini{display:none}}
 .heroS{position:relative;border-radius:16px;overflow:hidden;margin:0 0 14px;box-shadow:0 8px 24px -12px rgba(0,0,0,.4)}
 .heroSl{display:none;padding:18px 24px;flex-direction:column;justify-content:center}.heroSl.on{display:flex;animation:hfade .6s}.heroSl h2{margin:0 0 6px;font-size:24px;color:inherit}.heroSl p{margin:0;font-size:15px;color:inherit;opacity:.95}
@@ -5119,6 +5122,40 @@ VIEWS.offers = {
 };
 Object.assign(EXTRA_ACT,{ offerNo: el => { const w=S.waiting.find(x=>x.id===el.dataset.id); if(!w) return;
   ask(`${w.name} — not joining?`,"The status becomes “Cancelled”, with your reason. The record stays in the applicants list.","Not joining",async why=>{ await DB.apply({set:[],inc:[],upd:[{col:"waiting",id:w.id,data:{status:"Cancelled",cancelReason:why||"Parents declined the offer",updatedAt:TS,updatedBy:me().name||""}}]}); toast("Marked as not joining."); },true); } });
+
+/* ---------- v4.39 — the Super Admin arranges the Dashboard boxes (order, shown / hidden) for everyone ---------- */
+const KPI_NAMES = {str:"Current strength",auth:"Authorised seats",sd:"Surplus / deficit",move:"Movement",transit:"Transfers in transit",treq:"Transfer requests",wait:"Waiting list",offer:"Offered — awaiting joining",dc:"Day care",cats:"Categories",db:"Data bank",today:"Today's entries",fee:"Fee defaulters",health:"Student health"};
+function kpiKey(el){ const a=el.dataset.act, m=el.dataset.m, id=el.dataset.id, p=el.dataset.p||"";
+  if(a==="drill") return {str:"str",auth:"auth",sd:"sd",net:"move",wait:"wait",status:"today"}[m]||m;
+  if(id==="transfers") return "transit"; if(id==="waiting"&&/tfr/.test(p)) return "treq"; if(id==="offers") return "offer"; if(id==="daycare") return "dc";
+  if(id==="drill"&&/m=cat/.test(p)) return "cats"; if(id==="drill"&&/m=fee/.test(p)) return "fee"; if(id==="fees") return "fee"; if(id==="students"&&/tab=chk/.test(p)) return "db"; if(id==="students"&&/tab=health/.test(p)) return "health"; return (a||"")+(id||m||""); }
+const kpiCfg = () => S.kpiDraft || {order:ST().kpiOrder||[], hide:ST().kpiHide||[]};
+function kpiArrange(html){ const t=document.createElement("template"); t.innerHTML=html; const box=t.content.querySelector(".kpis"); if(!box) return html;
+  const C=kpiCfg(), ed=!!S.kpiDraft, cards=[...box.children].map((el,i)=>({el,i,k:kpiKey(el)}));
+  const pos=k=>{ const j=C.order.indexOf(k); return j<0?1000:j; };
+  cards.sort((a,b)=>pos(a.k)-pos(b.k)||a.i-b.i);
+  box.innerHTML=""; for(const c of cards){ const hid=C.hide.includes(c.k); if(hid&&!ed) continue; c.el.dataset.k=c.k;
+    if(ed){ c.el.removeAttribute("data-act"); c.el.classList.add("kedit"); if(hid) c.el.classList.add("khid"); c.el.setAttribute("draggable","true");
+      c.el.insertAdjacentHTML("beforeend",`<div class="kctl"><button data-act="kpiMv" data-k="${c.k}" data-d="-1" title="Move left">◀</button><button data-act="kpiHide" data-k="${c.k}" title="${hid?"Show":"Hide"} this box">${hid?"Show":"Hide"}</button><button data-act="kpiMv" data-k="${c.k}" data-d="1" title="Move right">▶</button></div>`); }
+    box.appendChild(c.el); }
+  const bar = ed ? `<div class="note" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>Arranging the Dashboard boxes — for everyone.</b><span class="mini">Drag a box to its place (or use ◀ ▶); <i>Hide</i> removes it from everyone's Dashboard.</span><span style="flex:1"></span><button class="btn s" data-act="kpiReset">Standard order</button><button class="btn s" data-act="kpiCancel">Cancel</button><button class="btn s p" data-act="kpiSave">Save for everyone</button></div>` : "";
+  const btn = !ed && isSA() ? `<div style="text-align:right;margin:-8px 0 8px"><button class="btn s ghost" data-act="kpiEdit" title="Change the order of these boxes, or hide some, for everyone">⚙ Arrange boxes</button></div>` : "";
+  return bar+t.innerHTML+btn; }
+{ const o=VIEWS.dash.regions.dKpi; VIEWS.dash.regions.dKpi=(...a)=>kpiArrange(o(...a)); }
+function kpiKeysNow(){ return [...document.querySelectorAll("#dKpi .kpi[data-k]")].map(e=>e.dataset.k); }
+function kpiMove(k, toK, after){ const D=S.kpiDraft, L=kpiKeysNow().filter(x=>x!==k); let j=toK?L.indexOf(toK):-1; if(j<0) j=L.length; else if(after) j++; L.splice(j,0,k); D.order=L; fillRegion("dKpi",true); }
+Object.assign(EXTRA_ACT,{
+  kpiEdit: () => { S.kpiDraft={order:[...(ST().kpiOrder||[])],hide:[...(ST().kpiHide||[])]}; fillRegion("dKpi",true); },
+  kpiCancel: () => { S.kpiDraft=null; fillRegion("dKpi",true); },
+  kpiReset: () => { S.kpiDraft={order:[],hide:[]}; fillRegion("dKpi",true); },
+  kpiHide: el => { const D=S.kpiDraft, k=el.dataset.k; D.hide=D.hide.includes(k)?D.hide.filter(x=>x!==k):[...D.hide,k]; fillRegion("dKpi",true); },
+  kpiMv: el => { const L=kpiKeysNow(), k=el.dataset.k, i=L.indexOf(k), j=i+Number(el.dataset.d); if(j<0||j>=L.length) return; L.splice(i,1); L.splice(j,0,k); S.kpiDraft.order=L; fillRegion("dKpi",true); },
+  kpiSave: async () => { const D=S.kpiDraft; const order=kpiKeysNow(); await saveSettings({kpiOrder:order,kpiHide:D.hide},"Dashboard boxes saved for everyone."); audit("Dashboard boxes arranged",order.map(k=>(D.hide.includes(k)?"(hidden) ":"")+(KPI_NAMES[k]||k)).join(", ")); S.kpiDraft=null; fillRegion("dKpi",true); } });
+let kpiDragK=null;
+document.addEventListener("dragstart",e=>{ const c=e.target.closest?.("#dKpi .kpi.kedit"); if(!c) return; kpiDragK=c.dataset.k; c.classList.add("kdrag"); e.dataTransfer.effectAllowed="move"; try{ e.dataTransfer.setData("text/plain",kpiDragK); }catch(x){} });
+document.addEventListener("dragover",e=>{ const c=e.target.closest?.("#dKpi .kpi.kedit"); if(!c||!kpiDragK) return; e.preventDefault(); document.querySelectorAll("#dKpi .kover").forEach(x=>x.classList.remove("kover")); if(c.dataset.k!==kpiDragK) c.classList.add("kover"); });
+document.addEventListener("drop",e=>{ const c=e.target.closest?.("#dKpi .kpi.kedit"); if(!c||!kpiDragK) return; e.preventDefault(); const r=c.getBoundingClientRect(), after=e.clientX>r.left+r.width/2; const k=kpiDragK; kpiDragK=null; if(c.dataset.k!==k) kpiMove(k,c.dataset.k,after); });
+document.addEventListener("dragend",()=>{ kpiDragK=null; document.querySelectorAll("#dKpi .kdrag,#dKpi .kover").forEach(x=>x.classList.remove("kdrag","kover")); });
 
 /* =====================================================================
    13) STUDENT DATA BANK — one record per student, filled gradually.
