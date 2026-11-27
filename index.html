@@ -530,6 +530,11 @@ const actDef = code => actions().find(a=>a.code===code) || {code, label:code, ki
 const AL = code => actDef(code).label;
 const AD = code => KIND_D[actDef(code).kind] ?? 0;
 const stages = () => ST().stages?.length ? ST().stages : DEFAULT_STAGES;
+/* access lock: the Super Admin can shut the portal for the senior / viewers (QR), for everyone, or for single users, with a message */
+const MAINT_MSG = "The Dashboard is undergoing some maintenance. Please visit us later.";
+function lockFor(u, st){ if(!u||u.role==="superadmin") return null; st ||= {};
+  if(u.locked) return u.lockMsg||st.lockMsg||MAINT_MSG;
+  if(st.lockOn && (!st.lockUntil || st.lockUntil>Date.now()) && (st.lockScope==="all" || u.role==="viewer")) return st.lockMsg||MAINT_MSG; return null; }
 const OFFER_ST = "Offered — awaiting joining";   // passed the test, seat offered, parents still deciding: not in strength, not in the waiting list
 const waitSts = () => { const L=ST().waitStatuses?.length ? ST().waitStatuses : DEFAULT_WAIT_ST; if(L.some(s=>s.name===OFFER_ST)) return L; const i=L.findIndex(s=>s.name==="Granted"); const R=[...L]; R.splice(i<0?R.length:i+1,0,{name:OFFER_ST,count:false}); return R; };
 const waitCounted = st => !!waitSts().find(x=>x.name===st && x.count);
@@ -832,17 +837,21 @@ const Fire = {
       }
       const p = ps.data(); S.user = { ...p, uid:u.uid, email:u.email };
       if(!p.active){ S.user.inactive=true; S.ready=true; boot(); return; }
+      if(p.role!=="superadmin"){ const sd=await m.getDoc(m.doc(this.db,"settings","app")).catch(()=>null); const st=sd&&sd.exists()?sd.data():{}; const lk=lockFor(p,st);
+        if(lk){ S.settings=st; S.user.pending=true; S.user.setupDone=true; S.user.lockedOut=lk; S.ready=true; boot();
+          this.unsub.push(m.onSnapshot(m.doc(this.db,"settings","app"),d=>{ S.settings=d.data()||{}; if(!lockFor(p,S.settings)) location.reload(); else if(S.user?.lockedOut!==lockFor(p,S.settings)){ S.user.lockedOut=lockFor(p,S.settings); boot(); } },()=>{}));
+          this.unsub.push(m.onSnapshot(uref,d=>{ const q=d.data()||{}; if(!lockFor(q,S.settings)) location.reload(); },()=>{})); return; } }
       await this.listen(); S.ready=true; if(!location.hash) S.view=homeView(); boot(); ensureSnapshot();
       setTimeout(()=>migrate().catch(e=>console.warn(e)),3000);
       if(isSA() && !ST().idxV3) setTimeout(async()=>{ try{ const ok=await rebuildIdx(); if(ok) await saveSettings({idxBuilt:true,idxV2:true,idxV3:true},"Student search rebuilt for all schools."); }catch(e){ console.warn(e); } }, 4000);
     }catch(e){ S.user={ uid:u.uid, email:u.email, error:e.message }; S.ready=true; boot(); }
   },
   listen(){
-    const m=this.m, db=this.db, on=(q,f)=>this.unsub.push(m.onSnapshot(q,snap=>{ if(!snap.metadata.fromCache){ SYNC.last=Date.now(); SYNC.cache=false; } syncPaint(); f(snap); },e=>{ SYNC.err=e.message; syncPaint(); fsFail(e); toast("Sync error: "+e.message,true); }));
+    const m=this.m, db=this.db, on=(q,f)=>this.unsub.push(m.onSnapshot(q,snap=>{ if(!snap.metadata.fromCache){ SYNC.last=Date.now(); SYNC.cache=false; } syncPaint(); f(snap); },e=>{ if(e.code==="permission-denied"&&!isSA()&&!this.relock){ this.relock=setTimeout(()=>{ this.relock=0; this.onAuth(this.auth.currentUser); },800); return; } SYNC.err=e.message; syncPaint(); fsFail(e); toast("Sync error: "+e.message,true); }));
     const data = d => ({ id:d.id, ...d.data({serverTimestamps:"estimate"}) });
     const first={}; let done; const ready=new Promise(r=>done=r); const got=k=>{ first[k]=1; if(first.settings&&first.schools&&first.strength) done(); };
     const waitNow=()=>{ S.waiting=(this.waitAll||[]).filter(w=>w.session===sessOf(w.school)&&!w.deleted); };
-    on(m.doc(db,"settings","app"), d=>{ S.settings=d.data()||{}; waitNow(); got("settings"); refresh(); });
+    on(m.doc(db,"settings","app"), d=>{ S.settings=d.data()||{}; waitNow(); got("settings"); if(lockFor(S.user,S.settings)){ this.onAuth(this.auth.currentUser); return; } refresh(); });
     on(m.collection(db,"schools"), q=>{ S.schools=Object.fromEntries(q.docs.map(d=>[d.id,data(d)])); got("schools"); refresh(); });
     on(m.collection(db,"strength"), q=>{ S.strength=Object.fromEntries(q.docs.map(d=>{ const x=d.data(); return [d.id,{d:x.d||{},w:x.w||{},c:x.c||{}}]; })); got("strength"); refresh(); });
     on(m.query(m.collection(db,"transactions"), m.where("at",">=", m.Timestamp.fromMillis(Date.now()-8*864e5))),
@@ -1004,6 +1013,7 @@ function boot(){ setTimeout(actLogin,1200); setTimeout(()=>{ if(S.user&&role()!=
   const app=$("#app"); applyTheme(); document.title=ST().tabTitle||"APEIs Strength Portal";
   if(!S.ready){ app.innerHTML=`<div class="login"><div class="panel">Loading…</div></div>`; return; }
   if(!S.user){ app.innerHTML = loginHtml(); return; }
+  if(DEMO&&!S.user.pending){ const lk=lockFor(S.user,ST()); if(lk) S.user={...S.user,pending:true,setupDone:true,lockedOut:lk}; }
   if(S.user.pending || S.user.inactive || S.user.error){ app.innerHTML = gateHtml(); return; }
   const r=routeFix(parseHash()); if(allowed(r.v)){ S.view=r.v; S.params=r.p; } else if(!allowed(S.view)){ S.view=homeView(); S.params={}; }
   if(!S.navStack.length) S.navStack.push(location.hash||"#"+S.view);
@@ -1118,6 +1128,7 @@ function gateHtml(){
     <p>No system exists yet in this Firebase project. You (<b>${h(u.email)}</b>) will become the <b>Super Admin</b>; all six schools with classes, sections, opening strength and waiting counts from your Drive sheets will be created.</p>
     <form data-form="bootstrap" class="grid" style="grid-template-columns:1fr"><div class="f"><label for="bName">Your name as shown in the log</label><input id="bName" required value="Super Admin"></div>
     <button class="btn p">Create the system</button></form><p class="hint"><a href="#" data-act="signOut">Sign out</a></p></div></div>`;
+  if(u.lockedOut) return `<div class="login"><div class="panel" style="text-align:center;padding:30px 24px"><div style="font-size:46px;line-height:1">🛠</div><h2 style="font-size:21px;margin:10px 0 8px;border:0;padding:0">${h(ST().appTitle||"APEIs Strength Portal")}</h2><p style="font-size:16px;white-space:pre-line">${h(u.lockedOut)}</p><p class="hint">This page opens by itself again when the portal is back.</p><div class="row" style="justify-content:center"><button class="btn" onclick="location.reload()">Check again</button><button class="btn" data-act="signOut">Sign out</button></div></div></div>`;
   if(u.signup) return signupWaitHtml(u.signup);
   const msg = u.error ? "Could not load your profile: "+u.error : u.inactive ? "Your account has been deactivated. Contact the Super Admin." : "Your login exists but has not been given a role yet. Ask the Super Admin to add you in Setup → Users.";
   return `<div class="login"><div class="panel"><p>${h(msg)}</p><button class="btn" data-act="signOut">Sign out</button></div></div>`;
@@ -2591,6 +2602,7 @@ function notes(){ const out=[], today=isoDay(Date.now()), seen=seenSet();
   if(isSA()){ const d=(S.recentTx||[]).filter(t=>hqUids().has(t.by)&&t.atMs>Date.now()-3*864e5); if(d.length) out.push({id:"hq_"+d.map(t=>t.id).sort().join("").slice(-24), urgent:!seen.has("hq_"+d.map(t=>t.id).sort().join("").slice(-24)), html:`★ ${d.length} entr${d.length>1?"ies":"y"} made by the DQ Office itself in the last 3 days`, go:"log", gop:"by=__hq&from="+isoDay(Date.now()-2*864e5)}); }
   if(canDecide()){ const n=apprPending().length; if(n) out.push({id:"appr", urgent:true, html:`✅ ${n} request${n>1?"s":""} from schools waiting for your approval`, go:"approvals"}); }
   if(role()==="clerk") for(const a of (S.apprs||[]).filter(a=>a.status!=="pending"&&a.by===me().uid)) out.push({id:"ap_"+a.id, urgent:!seen.has("ap_"+a.id), html:`${a.status==="approved"?"✅ Approved":a.status==="returned"?"↩ Returned for correction":"❌ Not approved"}: ${h(APPR_T[a.type]?.[0]||a.type)} — ${h(a.stuName)}${a.decNote?`<br><span class="mute">${h(a.decidedByName||"")}: ${h(a.decNote)}</span>`:""}`, go:"approvals"});
+  if(isSA()&&(S.signups||[]).length){ const L=S.signups; out.unshift({id:"su_"+L.map(x=>x.id).sort().join("").slice(-24), urgent:true, html:`🆕 <b>${L.length} sign-up request${L.length>1?"s":""}</b> waiting for your approval: ${L.slice(0,4).map(x=>`${h(x.name)} (${h(x.appt||"")}${x.school&&x.school!=="ALL"?", "+h(x.school):""})`).join(", ")}${L.length>4?" …":""}`, go:"setup", gop:"st=users"}); }
   return out; }
 const seenSet = () => { try{ return new Set(JSON.parse(localStorage.getItem("apeis_seen")||"[]")); }catch(e){ return new Set(); } };
 function bellPaint(){ const b=$("#bellN"); if(!b) return; const N=notes(), n=N.filter(x=>x.urgent).length; b.textContent=n||""; b.hidden=!n; const L=$("#bellList"); if(L && !L.hidden) L.innerHTML=bellHtml(N); }
@@ -4025,7 +4037,7 @@ const SETUP_INFO = { schools:["🏫","Schools, classes, sections, seats"], openi
 const SETUP_TABS = [["schools","Schools & sections"],["opening","Opening strength"],["users","Users & permissions"],["general","General & appearance"],["cats","Categories"],["catopen","Category figures"],["actions","Actions & statuses"],
   ["stufields","Student fields"],["appfields","Applicant columns"],["labels","Labels & terms"],["stages","Consolidation"],["fees","Fees"],["wa","WhatsApp templates"],["presets","Report presets"],["live","Live QR code"],["data","Backup & data"],["ai","Form reading (AI)"],["session","New session & promotion"]];
 VIEWS.setup = {
-  shell:()=>{ const name=Object.fromEntries(SETUP_TABS); return `<div class="sthead"><div><h2 style="margin:0">⚙ Setup</h2><p class="hint" style="margin:2px 0 0">Everything in the portal can be changed here. Pick a tile — its page opens below.</p></div>${S.setupTab?`<span class="stcur">Now open: <b>${h(name[S.setupTab]||"")}</b></span>`:""}</div><div class="stiles">${SETUP_GROUPS.map(([g,c,keys])=>`<div class="sgrp" style="--c:${c}"><h4>${h(g)}</h4>${keys.filter(k=>name[k]).map(k=>`<button class="stile ${S.setupTab===k?"on":""}" data-act="setupTab" data-id="${k}"><span class="ic">${SETUP_INFO[k]?.[0]||"•"}</span><span class="tx"><b>${h(name[k])}</b><small>${h(SETUP_INFO[k]?.[1]||"")}</small></span><span class="go">›</span></button>`).join("")}</div>`).join("")}</div><div id="stBody"></div>`; },
+  shell:()=>{ if(S.params.st&&S.params.st!==S.setupTab){ S.setupTab=S.params.st; } const name=Object.fromEntries(SETUP_TABS); return `<div class="sthead"><div><h2 style="margin:0">⚙ Setup</h2><p class="hint" style="margin:2px 0 0">Everything in the portal can be changed here. Pick a tile — its page opens below.</p></div>${S.setupTab?`<span class="stcur">Now open: <b>${h(name[S.setupTab]||"")}</b></span>`:""}</div><div class="stiles">${SETUP_GROUPS.map(([g,c,keys])=>`<div class="sgrp" style="--c:${c}"><h4>${h(g)}</h4>${keys.filter(k=>name[k]).map(k=>`<button class="stile ${S.setupTab===k?"on":""}" data-act="setupTab" data-id="${k}"><span class="ic">${SETUP_INFO[k]?.[0]||"•"}</span><span class="tx"><b>${h(name[k])}</b><small>${h(SETUP_INFO[k]?.[1]||"")}</small></span><span class="go">›</span></button>`).join("")}</div>`).join("")}</div><div id="stBody"></div>`; },
   regions:{ stBody(){ return (SETUP[S.setupTab]||SETUP.schools)(); } },
   post(id){ if(S.setupTab==="session") wireRepSearch(); },
   after(){ if(S.setupTab==="wa") waPreview(); }
@@ -4072,7 +4084,7 @@ const SETUP = {
      ${sc.classes.map((c,i)=>c.secs.map((x,j)=>{ const v=cur(code,c.cl,x.s); return `<tr><td>${h(c.cl)} - ${h(x.s)}${x.est?` <span class="tag t-mid">est.</span>`:""}</td><td class="n"><input class="in num" type="number" min="1" name="c_${i}_${j}" value="${x.cap??""}" placeholder="${sc.cap}"></td><td class="n"><input class="in num" type="number" min="0" name="g_${i}_${j}" value="${x.g||0}"></td><td class="n"><input class="in num" type="number" min="0" name="b_${i}_${j}" value="${x.b||0}"></td><td class="n">${(x.g||0)+(x.b||0)}</td><td class="n">${v.g+v.b}</td></tr>`; }).join("")).join("")}
      </table></div><div class="row"><button class="btn p">Save opening strength for ${h(code)}</button></div></form></div>`; },
   users(){ const Lu=[...S.users].sort((a,b)=>(a.role+a.school+a.name).localeCompare(b.role+b.school+b.name));
-    return `${signupPanel()}${adminFnHtml()}<div class="panel"><h2>Create a login</h2><form data-form="addUser" class="grid" autocomplete="off">
+    return `${signupPanel()}${accessPanel()}${adminFnHtml()}<div class="panel"><h2>Create a login</h2><form data-form="addUser" class="grid" autocomplete="off">
       <div class="f"><label for="uName">Full name</label><input id="uName" required></div>
       <div class="f"><label for="uEmail">Email or username</label><input id="uEmail" required placeholder="jawad or jawad@gmail.com"></div>
       ${DEMO?"":`<div class="f"><label for="uPw">Temporary password (6+)</label><input id="uPw" required minlength="6"></div>`}
@@ -4186,7 +4198,7 @@ const SETUP = {
       <td><button class="btn s" data-act="pMove" data-id="${i}" data-d="-1" ${i?"":"disabled"}>▲</button><button class="btn s" data-act="pMove" data-id="${i}" data-d="1" ${i<P.length-1?"":"disabled"}>▼</button> <button class="btn s" data-act="pOpen" data-id="${h(p.id)}">Open</button> ${P.length>1?`<button class="btn s r" data-act="pDel" data-id="${i}">Delete</button>`:""}</td></tr>`).join("")}</table></div>
      <div class="row"><button class="btn r" data-act="pRestore">Add back the 5 built-in presets</button></div></div>`; },
   live(){ const url=liveUrl(); const local=location.protocol==="file:";
-    return `<div class="panel"><h2>📱 Live QR code</h2><p class="hint" style="margin-top:0">The QR always opens the <b>live</b> dashboard — figures update by themselves while it is open.</p>
+    return `<div class="panel"><h2>📱 Live QR code</h2><p class="hint" style="margin-top:0">The QR always opens the <b>live</b> dashboard — figures update by themselves while it is open.</p><p class="note">🔒 To close the QR dashboard for a while (with a message such as “under maintenance”), or to lock single users: <button class="btn s" data-act="setupTab" data-id="users">Access & maintenance</button></p>
       ${local?`<div class="note">You opened the file from your computer, so this address only works on this PC. After you upload the app to GitHub Pages, open it from there and this QR code will show the real address.</div>`:""}
       <div class="rlayout"><div><div id="qrBox" class="qrbox">${qrSvg(url)}</div><p style="word-break:break-all"><b>${h(url)}</b></p>
         <div class="row" style="justify-content:flex-start"><button class="btn p" data-act="qrPng">Download QR (PNG)</button><select class="in" id="qrAcc" style="width:auto;max-width:260px" title="Login printed on the card"><option value="">Login boxes left empty</option>${(S.users||[]).filter(u=>!u.replacedBy&&!u.pending).sort((a,b)=>(a.role+a.name).localeCompare(b.role+b.name)).map(u=>`<option value="${h(u.uid)}">${h(u.name)} — ${h(ROLES[u.role]||u.role)}${u.school&&u.school!=="ALL"?" "+h(u.school):""}</option>`).join("")}</select><button class="btn" data-act="qrPrint">Print QR card</button><button class="btn" data-act="qrCopy">Copy link</button></div></div>
@@ -5168,6 +5180,29 @@ document.addEventListener("dragstart",e=>{ const c=e.target.closest?.("#dKpi .kp
 document.addEventListener("dragover",e=>{ const c=e.target.closest?.("#dKpi .kpi.kedit"); if(!c||!kpiDragK) return; e.preventDefault(); document.querySelectorAll("#dKpi .kover").forEach(x=>x.classList.remove("kover")); if(c.dataset.k!==kpiDragK) c.classList.add("kover"); });
 document.addEventListener("drop",e=>{ const c=e.target.closest?.("#dKpi .kpi.kedit"); if(!c||!kpiDragK) return; e.preventDefault(); const r=c.getBoundingClientRect(), after=e.clientX>r.left+r.width/2; const k=kpiDragK; kpiDragK=null; if(c.dataset.k!==k) kpiMove(k,c.dataset.k,after); });
 document.addEventListener("dragend",()=>{ kpiDragK=null; document.querySelectorAll("#dKpi .kdrag,#dKpi .kover").forEach(x=>x.classList.remove("kdrag","kover")); });
+
+/* ---------- v4.40 — 🔒 Access & maintenance: shut the portal for the QR / viewers, for everyone, or for single users ---------- */
+function accessPanel(){ const st=ST(), on=!!st.lockOn&&(!st.lockUntil||st.lockUntil>Date.now()), U=(S.users||[]).filter(u=>u.role!=="superadmin"&&!u.replacedBy).sort((a,b)=>(a.role+a.school+a.name).localeCompare(b.role+b.school+b.name)), nl=U.filter(u=>u.locked).length;
+  return `<div class="panel" id="accessPanel" style="border:2px solid ${on||nl?"#b3122a":"var(--line)"}"><h2>🔒 Access & maintenance ${on?`<span class="tag t-out">LOCKED${st.lockScope==="all"?" — everyone":" — senior / viewers"}</span>`:""}${nl?` <span class="tag t-mid">${nl} user${nl>1?"s":""} locked</span>`:""}</h2>
+   <p class="hint" style="margin-top:0">Close the portal for a while — the people locked out see only your message instead of the Dashboard (including your senior's QR code). You are never locked. Their data stays safe: the database itself refuses them until you unlock.</p>
+   <form data-form="lockSave" class="grid">
+    <div class="f"><label>Who is locked out</label><select id="lkScope"><option value="viewers" ${st.lockScope!=="all"?"selected":""}>Senior / viewers (everyone who opens the QR)</option><option value="all" ${st.lockScope==="all"?"selected":""}>Everyone except me (Super Admin)</option></select></div>
+    <div class="f"><label>Open again by itself at (optional)</label><input type="datetime-local" id="lkUntil" value="${st.lockUntil?new Date(st.lockUntil-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,16):""}"></div>
+    <div class="f" style="grid-column:1/-1"><label>Message they see</label><textarea id="lkMsg" rows="2">${h(st.lockMsg||MAINT_MSG)}</textarea></div>
+    <div class="row" style="grid-column:1/-1;justify-content:flex-start">${on?`<button type="button" class="btn g" data-act="lockOff">🔓 Unlock now</button><button class="btn">Save changes</button>`:`<button class="btn r">🔒 Lock now</button>`}</div></form>
+   <details style="margin-top:10px" ${nl?"open":""}><summary><b>Lock single users</b> (${nl} locked)</summary>
+    <div class="scroll" style="margin-top:6px"><table><tr><th>Name</th><th>Role</th><th>School</th><th>Locked</th><th>Own message (optional)</th></tr>
+    ${U.map(u=>`<tr><td>${h(u.name)}</td><td>${h(ROLES[u.role]||u.role)}</td><td>${h(u.school)}</td><td><input type="checkbox" data-lku="${h(u.uid)}" ${u.locked?"checked":""} style="width:20px;height:20px"></td><td><input class="in" data-lkm="${h(u.uid)}" value="${h(u.lockMsg||"")}" placeholder="the message above"></td></tr>`).join("")}</table></div>
+    <div class="row" style="justify-content:flex-start"><button class="btn s" data-act="lockAllUsers" data-v="1">Lock all listed</button><button class="btn s" data-act="lockAllUsers" data-v="">Unlock all listed</button></div></details></div>`; }
+Object.assign(EXTRA_FORMS,{ lockSave: async () => { const u=$("#lkUntil").value, d={lockOn:true,lockScope:$("#lkScope").value,lockMsg:$("#lkMsg").value.trim()||MAINT_MSG,lockUntil:u?Date.parse(u):0};
+  await saveSettings(d,"Portal locked for "+(d.lockScope==="all"?"everyone except you.":"the senior / viewers.")); audit("Portal locked",`${d.lockScope==="all"?"Everyone except Super Admin":"Senior / viewers"}${d.lockUntil?" until "+fmtDT(d.lockUntil):""}: ${d.lockMsg}`); fillRegion("stBody",true); } });
+Object.assign(EXTRA_ACT,{
+  lockOff: async () => { await saveSettings({lockOn:false,lockUntil:0},"Portal unlocked."); audit("Portal unlocked",""); fillRegion("stBody",true); },
+  lockAllUsers: async el => { const v=!!el.dataset.v, U=(S.users||[]).filter(u=>u.role!=="superadmin"&&!u.replacedBy&&!!u.locked!==v); if(!U.length) return;
+    await DB.apply({set:[],inc:[],upd:U.map(u=>({col:"users",id:u.uid,data:{locked:v}})),noIdx:true}); audit(v?"Users locked":"Users unlocked",U.map(u=>u.name).join(", ")); toast(`${U.length} user${U.length>1?"s":""} ${v?"locked":"unlocked"}.`); fillRegion("stBody",true); } });
+document.addEventListener("change",async e=>{ const el=e.target;
+  if(el.dataset?.lku){ const u=(S.users||[]).find(x=>x.uid===el.dataset.lku); await DB.apply({set:[],inc:[],upd:[{col:"users",id:el.dataset.lku,data:{locked:el.checked}}],noIdx:true}); audit(el.checked?"User locked":"User unlocked",u?.name||""); toast(`${u?.name||"User"} ${el.checked?"locked — sees only the message":"unlocked"}.`); }
+  else if(el.dataset?.lkm){ await DB.apply({set:[],inc:[],upd:[{col:"users",id:el.dataset.lkm,data:{lockMsg:el.value.trim()}}],noIdx:true}); toast("Message saved."); } });
 
 /* =====================================================================
    13) STUDENT DATA BANK — one record per student, filled gradually.
