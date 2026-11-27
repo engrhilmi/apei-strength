@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a1a36">
+<title>APEIs Staff Portal</title>
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin><link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@600;800&family=Red+Hat+Text:wght@400;500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<style>
+:root{color-scheme:light;--bg:#f2f4f8;--panel:#fff;--ink:#0f1b33;--mute:#5b6782;--line:#dde2ec;--band:#0a1a36;--band2:#12284f;--gold:#c9a227;--soft:#f4f6fa;
+ --red:#b3122a;--redsoft:#fde8eb;--ok:#0f6b5c;--oksoft:#e3f4f0;--amber:#8a5a00;--ambersoft:#fff4dc;--shadow:0 1px 2px rgba(10,26,54,.05),0 2px 8px rgba(10,26,54,.04)}
+*{box-sizing:border-box;min-width:0}[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Red Hat Text",system-ui,sans-serif}
+h1,h2,h3{font-family:"Red Hat Display",system-ui,sans-serif;margin:0;line-height:1.15}
+button,input,select,textarea{font:inherit;color:inherit}
+.band{background:linear-gradient(180deg,var(--band),#06112a);color:#fff;padding:12px max(3vw,14px);border-bottom:2px solid var(--gold);display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between}
+.band h1{font-size:20px}.band small{display:block;opacity:.75;font-size:13px;margin-top:3px}
+.who{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+nav{background:var(--band2);display:flex;gap:2px;overflow-x:auto;padding:0 max(3vw,10px);position:sticky;top:0;z-index:20;box-shadow:0 2px 6px rgba(10,26,54,.12)}
+nav a{flex:none;color:#c9d3e8;text-decoration:none;padding:11px 14px;font-weight:600;white-space:nowrap;border-bottom:3px solid transparent;font-size:14px}
+nav a:hover{color:#fff}nav a.on{color:#fff;border-bottom-color:var(--gold)}
+nav .badge{margin-left:5px}
+main{max-width:1400px;margin:0 auto;padding:16px max(2vw,10px) 60px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:14px;box-shadow:var(--shadow)}
+.panel>h2,.ph h2{font-size:16.5px;color:var(--band);padding-left:10px;border-left:3px solid var(--gold);line-height:1.25}
+.panel>h2{margin-bottom:10px}
+.ph{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:7px 14px;font-weight:600;cursor:pointer;min-height:36px;white-space:nowrap;box-shadow:var(--shadow)}
+.btn:hover{background:var(--soft)}.btn.p{background:var(--band);border-color:var(--band);color:#fff}.btn.p:hover{background:var(--band2)}
+.btn.r{color:var(--red)}.btn.g{color:var(--ok)}.btn.s{min-height:30px;padding:4px 10px;font-size:13px}.btn:disabled{opacity:.45;cursor:not-allowed}
+.band .btn{background:transparent;color:#fff;border-color:rgba(255,255,255,.25);box-shadow:none}.band .btn:hover{border-color:var(--gold)}
+.pills{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.pill{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:6px 12px;font-weight:600;cursor:pointer;font-size:13.5px}.pill.on{background:var(--band);color:#fff;border-color:var(--band)}
+.subtabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.subtabs .pill{background:transparent;border:0;border-bottom:3px solid transparent;border-radius:0;padding:8px 14px;color:var(--mute)}.subtabs .pill.on{color:var(--band);border-bottom-color:var(--gold);background:transparent}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:6px 8px;border-bottom:1px solid #edf0f5;text-align:left;white-space:nowrap}
+th{background:var(--soft);color:#33415c;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.45px;border-bottom:1.5px solid #c9d1e0;position:sticky;top:0}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}tr.tot td{background:var(--band);color:#fff;font-weight:700}
+tr.click{cursor:pointer}tr.click:hover td{background:#f8f9fc}
+.scroll{overflow:auto;max-width:100%}
+.dn{cursor:pointer;border-bottom:1px dotted currentColor}.dn:hover{color:var(--band2)}
+.neg{color:var(--red)}.pos{color:var(--ok)}.mute{color:var(--mute)}.mini{font-size:12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--band2);border-radius:10px;padding:10px 13px;box-shadow:var(--shadow)}
+.kpi span{display:block;text-transform:uppercase;font-size:11.5px;letter-spacing:.5px;font-weight:700;color:var(--mute)}
+.kpi b{display:block;font:800 26px/1.1 "Red Hat Display",sans-serif;margin-top:3px;color:var(--band)}.kpi b.neg{color:var(--red)}.kpi b.pos{color:var(--ok)}
+.kpi i{font-style:normal;font-size:12.5px;color:var(--mute);display:block}
+.kpi.k2{border-top-color:#0f766e}.kpi.k3{border-top-color:var(--gold)}.kpi.k4{border-top-color:#9f1239}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px 12px}
+.f{display:flex;flex-direction:column;gap:3px}.f label{font-size:12.5px;font-weight:700;color:var(--mute)}
+.f.wide{grid-column:span 2}
+input,select,textarea{border:1px solid var(--line);border-radius:7px;padding:7px 9px;background:#fff;min-height:36px;width:100%}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--band2);box-shadow:0 0 0 3px rgba(201,162,39,.28)}
+input.lock{background:#f6f7fa;color:#5b6782}
+fieldset{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 12px}legend{font-weight:800;color:var(--band);padding:0 6px}
+.note{background:var(--ambersoft);border:1px solid #f1d39b;border-left:3px solid var(--gold);border-radius:8px;padding:9px 12px;margin:0 0 12px;color:#4a3a10}
+.hint{color:var(--mute);font-size:13px;margin:6px 0}
+.tag{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;font-weight:700;background:var(--soft);color:var(--band)}
+.t-ok{background:var(--oksoft);color:var(--ok)}.t-out{background:var(--redsoft);color:var(--red)}.t-mid{background:var(--ambersoft);color:var(--amber)}
+.badge{display:inline-block;min-width:18px;padding:0 6px;border-radius:99px;background:#b3122a;color:#fff;font-size:11px;font-weight:800;text-align:center;line-height:18px}
+.row{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:12px}
+.modal{position:fixed;inset:0;background:rgba(10,26,54,.45);display:flex;align-items:safe center;justify-content:center;padding:20px;z-index:100;overflow:auto}
+.modal>div{background:#fff;border-radius:12px;border-top:3px solid var(--gold);padding:18px 20px;width:min(560px,100%);box-shadow:0 20px 60px rgba(0,0,0,.3)}.modal>div.wide{width:min(1100px,100%)}
+#toast{position:fixed;right:16px;bottom:16px;z-index:200;background:var(--band);color:#fff;padding:10px 16px;border-radius:10px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:420px}#toast.err{background:#b3122a}
+.login{max-width:440px;margin:8vh auto;padding:0 12px}.login .panel{padding:22px}
+.docs{display:flex;gap:10px;flex-wrap:wrap}.docs figure{margin:0;width:120px;border:1px solid var(--line);border-radius:8px;overflow:hidden;cursor:zoom-in}.docs img{width:100%;height:90px;object-fit:cover;display:block}.docs figcaption{font-size:11px;padding:4px 6px}
+.wm{position:fixed;inset:0;pointer-events:none;z-index:9;display:none}
+@media print{.band,nav,.noprint,.btn,.pills,#toast{display:none!important}body{background:#fff}.panel{box-shadow:none;border:0;padding:0}.wm{display:block}main{padding:0}th{position:static}}
+@media(max-width:600px){.f.wide{grid-column:auto}.band h1{font-size:17px}}
+</style>
+</head>
+<body>
+<div id="app"><div class="login"><div class="panel">Loading…</div></div></div>
+<div id="modalRoot"></div>
+<script type="module">
+/* =====================================================================
+   APEIs STAFF PORTAL — teaching, admin & ancillary staff of the APEIs schools
+   Same Firebase project and the same logins as the Strength Portal.
+   ===================================================================== */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyC4o7bCsrmeZG8Hi20i3GQ0WDMXMR8Nmvc",
+  authDomain: "apeis-strength.firebaseapp.com",
+  projectId: "apeis-strength",
+  storageBucket: "apeis-strength.firebasestorage.app",
+  messagingSenderId: "689913779995",
+  appId: "1:689913779995:web:a7e587e803b6405a70a5be",
+  measurementId: "G-TB9EWXYMC9"
+};
+const FB_VER = "10.14.1", LOGIN_DOMAIN = "apeis.local", MAIN_URL = "../";
+const DEMO = !FIREBASE_CONFIG.apiKey || FIREBASE_CONFIG.apiKey.startsWith("PASTE");
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const h = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const norm = v => String(v ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const nf = n => Number(n||0).toLocaleString("en-US");
+const sg = n => n>0 ? "+"+nf(n) : n<0 ? "−"+nf(-n) : "0";
+const isoDay = ms => { const d=new Date(ms); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const fmtD = v => { if(!v) return ""; const d=typeof v==="number"?new Date(v):new Date(String(v).length===10?v+"T12:00":v); return isNaN(d)?String(v):`${String(d.getDate()).padStart(2,"0")}-${MON[d.getMonth()]}-${d.getFullYear()}`; };
+const fmtDT = ms => ms ? `${fmtD(ms)} ${String(new Date(ms).getHours()).padStart(2,"0")}:${String(new Date(ms).getMinutes()).padStart(2,"0")}` : "";
+const newId = () => Date.now().toString(36)+Math.random().toString(36).slice(2,9);
+const asEmail = v => v.includes("@") ? v.trim() : `${v.trim().toLowerCase()}@${LOGIN_DOMAIN}`;
+const toMs = v => !v ? 0 : typeof v==="number" ? v : v.toMillis ? v.toMillis() : (Date.parse(v)||0);
+const TS = {__ts:1}, DEL = {__del:1};
+const CNIC_RE = /^\d{5}-\d{7}-\d$/;
+function toast(msg, err){ let t=$("#toast"); if(!t){ t=document.createElement("div"); t.id="toast"; document.body.appendChild(t); } t.textContent=msg; t.className=err?"err":""; t.hidden=false; clearTimeout(t._t); t._t=setTimeout(()=>t.hidden=true, err?6000:3200); }
+function modal(html, cls){ $("#modalRoot").innerHTML=`<div class="modal" data-act="modalBg"><div class="${cls||""}">${html}</div></div>`; }
+const closeModal = () => { $("#modalRoot").innerHTML=""; };
+function spanTxt(from){ const t=Date.parse(from+"T12:00"); if(!from||isNaN(t)) return ""; const a=new Date(t), b=new Date(); let m=(b.getFullYear()-a.getFullYear())*12+(b.getMonth()-a.getMonth()); if(b.getDate()<a.getDate()) m--; if(m<0) return ""; const y=Math.floor(m/12), mm=m%12; return [y?`${y} yr${y>1?"s":""}`:"", mm?`${mm} mo`:"", !y&&!mm?"< 1 month":""].filter(Boolean).join(" "); }
+const ageOf = d => { const t=Date.parse(d+"T12:00"); return isNaN(t)?null:Math.floor((Date.now()-t)/31557600000); };
+
+/* ---------------- state ---------------- */
+const S = { user:null, ready:false, settings:{}, schools:{}, cfg:{}, posts:{}, counts:{}, staff:[], appr:[], view:"dash", params:{}, loaded:false };
+const ST = () => S.settings||{};
+const me = () => S.user||{};
+const role = () => me().role||"";
+const isSA = () => role()==="superadmin";
+const isHQ = () => role()==="hq";
+const allSch = () => isSA()||isHQ()||(role()==="viewer");
+const mySchool = () => ["clerk","principal"].includes(role()) ? me().school : "";
+const canSeeStaff = () => isSA()||isHQ()||["clerk","principal"].includes(role())||(role()==="viewer"&&me().stuView===true);
+const canEdit = r => isSA()||isHQ()||(role()==="clerk"&&(!r||r.school===me().school));
+const canConfirm = r => isSA()||isHQ()||(role()==="principal"&&r.school===me().school);
+const canPost = () => isSA()||isHQ();
+const schoolList = () => Object.values(S.schools).filter(s=>s.active!==false).sort((a,b)=>(a.order||99)-(b.order||99)).map(s=>({code:s.code||s.id,name:s.name}));
+const visSchools = () => schoolList().filter(s=>!mySchool()||s.code===mySchool());
+
+/* ---------------- lists (editable in Setup) ---------------- */
+const CATS = ["Teaching","Admin","Ancillary"];
+const DEF_POSTS = [
+ ["principal","Principal","Admin",19],["vp","Vice Principal","Admin",18],["sechead","Section Head / Coordinator","Teaching",17],
+ ["sst","Senior Subject Teacher (SST)","Teaching",16],["jst","Junior Subject Teacher (JST)","Teaching",14],["prt","Primary Teacher (PRT)","Teaching",14],["eys","EYS / Montessori Teacher","Teaching",12],
+ ["cs","Computer Teacher","Teaching",14],["pet","Physical Education Teacher","Teaching",14],["art","Art / Drawing Teacher","Teaching",12],["qari","Qari / Islamiat Teacher","Teaching",12],["lect","Lecturer (College)","Teaching",17],
+ ["ao","Admin Officer","Admin",16],["acct","Accountant","Admin",14],["clerk","Clerk / Office Assistant","Admin",11],["cop","Computer Operator","Admin",12],["lib","Librarian","Admin",12],["labst","Lab Assistant","Admin",9],["recp","Receptionist","Admin",9],
+ ["nq","Naib Qasid","Ancillary",1],["aya","Aya / Maid","Ancillary",1],["chow","Chowkidar / Guard","Ancillary",1],["swp","Sweeper / Cleaner","Ancillary",1],["drv","Driver","Ancillary",5],["mali","Mali (Gardener)","Ancillary",1],["elec","Electrician / Plumber","Ancillary",5]
+].map(([id,name,cat,bps])=>({id,name,cat,bps}));
+const DEF_CFG = { posts:DEF_POSTS, leaveTypes:["Casual","Medical","Earned","Maternity","Study","Without pay","Duty / official"], quals:["Matric","Intermediate","Graduate (BA/BSc)","BS (4-yr)","Masters (MA/MSc)","MPhil / MS","PhD"], prof:["None","B.Ed","M.Ed","ADE","CT / PTC","Montessori / ECE","Other"],
+  statuses:["In service","On leave","Resigned","Retired","Transferred out","Terminated","Expired"], apptTypes:["Permanent","Contract","Ad hoc","Visiting / part time","Daily wages"] };
+const cfg = () => ({...DEF_CFG, ...(S.cfg||{})});
+const posts = () => cfg().posts||DEF_POSTS;
+const postOf = id => posts().find(p=>p.id===id);
+const inService = r => (r.status||"In service")==="In service"||r.status==="On leave";
+
+/* the staff record — fields grouped as on the form. lock: once filled, a clerk's change needs approval */
+const FIELDS = [
+ ["Personal",[["name","Full name","text",1,1],["father","Father / husband name","text",0,1],["gender","Gender","sel:Female,Male",1],["dob","Date of birth","date",0,1],["cnic","CNIC","cnic",1,1],["domicile","Domicile","text"],["religion","Religion","text"],["marital","Marital status","sel:Single,Married,Widowed,Divorced"],["contact","Mobile","text",1],["contact2","Other phone","text"],["email","Email","text"],["address","Home address","wide"]]],
+ ["Service",[["empNo","Employee / staff No","text",0,1],["postId","Post","post",1],["bps","BPS / pay scale","num"],["apptType","Appointment","list:apptTypes"],["joinDate","Joined APEIs on","date",1,1],["joinSchool","Joined this school on","date"],["status","Status","list:statuses",1],["statusDate","Status date (left / retired…)","date"],["prevService","Previous service / experience","wide"]]],
+ ["Qualification",[["qual","Highest qualification","list:quals"],["qualSubj","Subjects / major","text"],["qualInst","Institution","text"],["qualYear","Year","num"],["prof","Professional qualification","list:prof"],["expYears","Teaching experience before APEIs (years)","num"]]],
+ ["Teaching",[["section","Section / wing","text"],["subjects","Subjects taught","text"],["classes","Classes taught","text"],["classTeacher","Class teacher of","text"]]],
+ ["Remarks",[["remarks","Remarks","wide"]]]
+];
+const ALLF = FIELDS.flatMap(([,L])=>L.map(([k,l,t,req,lock])=>({k,l,t,req:!!req,lock:!!lock})));
+const FL = k => ALLF.find(f=>f.k===k)?.l||k;
+
+/* ---------------- backend: demo (this browser) or Firebase ---------------- */
+const fixTs = o => { const r={}; for(const [k,v] of Object.entries(o)) if(v!==DEL) r[k]=v===TS?Date.now():v; return r; };
+const Local = {
+  KEY:"apeis_staff_demo", st:null,
+  load(){ try{ this.st=JSON.parse(localStorage.getItem(this.KEY)); }catch(e){} if(!this.st) this.seed(); },
+  save(){ try{ localStorage.setItem(this.KEY,JSON.stringify(this.st)); }catch(e){} },
+  seed(){ const sch={}; [["JM","APS - Jnr Mall Rd"],["MidWsk","APS - Mid Wsk Rd"],["GAPS","APS Babar Rd"],["GC","APS & C - Girls"],["BC","APS & C - Boys"],["APSIS","APSIS Psc"]].forEach(([c,n],i)=>sch[c]={code:c,name:n,order:i+1,active:true});
+    const users={}; [["sa","Super Admin (you)","superadmin","ALL"],["hq","DQ Office","hq","ALL"],["cm","Comdt (Senior)","viewer","ALL"],["pj","Principal JM","principal","JM"],["cj","Clerk JM","clerk","JM"],["cg","Clerk GC","clerk","GC"]].forEach(([u,n,r,s])=>users[u]={uid:u,name:n,role:r,school:s,active:true});
+    const staff={}, F=["Ayesha","Sana","Hina","Imran","Bilal","Saima","Nadia","Usman","Farah","Tariq","Rabia","Kamran","Asma","Zahid","Shazia","Naveed"], L=["Khan","Ali","Ahmed","Shah","Iqbal","Raza","Malik","Hussain"];
+    let i=0; for(const c of Object.keys(sch)) for(const p of ["principal","sst","sst","jst","prt","prt","prt","eys","clerk","nq","chow","swp"]){ const id="st"+(i++), fn=F[i%F.length], g=/a$|ah$|ma$|ia$/.test(fn)?"Female":"Male";
+      staff[id]={school:c,name:`${g==="Female"?"Mrs":"Mr"} ${fn} ${L[i%L.length]}`,father:`${L[(i+3)%L.length]} ${["Gul","Khan","Din"][i%3]}`,gender:g,dob:`19${70+i%25}-0${1+i%9}-1${i%9}`,cnic:`17301-${String(1000000+i*7919).slice(0,7)}-${i%9}`,contact:`0300-${String(5000000+i*331).slice(0,7)}`,
+        empNo:"APS-"+(1000+i),postId:p,bps:postOf(p)?.bps||"",apptType:i%5?"Permanent":"Contract",joinDate:`20${String(5+i%18).padStart(2,"0")}-0${1+i%9}-01`,status:i%23===7?"On leave":"In service",qual:i%3?"Masters (MA/MSc)":"Graduate (BA/BSc)",prof:i%2?"B.Ed":"None",subjects:p==="sst"?"English":p==="jst"?"Maths":"",createdAt:Date.now()}; }
+    const sp={}; for(const c of Object.keys(sch)) sp[c]={s:{principal:1,vp:1,sst:4,jst:3,prt:6,eys:3,clerk:2,nq:2,chow:2,swp:2,cs:1,lib:1}};
+    this.st={settings:{app:{org:"APEIs Peshawar Garrison"}},schools:sch,users,staff,staffPosts:sp,staffCfg:{},staffAppr:{},staffLeave:{},staffDocs:{},staffEdits:{},staffCount:{},printReq:{},audit:{}}; this.save(); },
+  async start(){ this.load(); S.settings=this.st.settings.app||{}; S.schools=this.st.schools; const u=sessionStorage.getItem("apeis_staff_demo_u"); if(u&&this.st.users[u]) await this.login(u); S.ready=true; boot(); },
+  async login(uid){ S.user={...this.st.users[uid]}; sessionStorage.setItem("apeis_staff_demo_u",uid); this.pull(); publishCounts(); },
+  pull(){ const st=this.st; S.cfg=st.staffCfg.app||{}; S.posts=Object.fromEntries(Object.entries(st.staffPosts).map(([k,v])=>[k,v.s||{}])); S.counts=st.staffCount;
+    S.staff=canSeeStaff()?Object.entries(st.staff).map(([id,v])=>({id,...v})).filter(r=>!mySchool()||r.school===mySchool()):[]; S.appr=Object.entries(st.staffAppr).map(([id,v])=>({id,...v})).filter(a=>a.status==="pending"&&(!mySchool()||a.school===mySchool())); S.loaded=true; },
+  async apply(ops){ const st=this.st; for(const x of ops.set||[]) (st[x.col] ||= {})[x.id]= x.merge?{...(st[x.col][x.id]||{}),...fixTs(x.data)}:fixTs(x.data);
+    for(const x of ops.upd||[]){ const d=(st[x.col] ||= {})[x.id]; if(!d) throw new Error("Record not found"); for(const [k,v] of Object.entries(x.data)){ if(v===DEL) delete d[k]; else d[k]=v===TS?Date.now():v; } }
+    for(const x of ops.del||[]) delete (st[x.col]||{})[x.id]; this.save(); this.pull(); refresh(); if(!ops.set?.some(x=>x.col==="staffCount")) publishCounts(); },
+  async queryW(col, W){ return Object.entries(this.st[col]||{}).map(([id,x])=>({id,...x})).filter(d=>W.every(([f,op,v])=>op==="=="?d[f]===v:op===">="?d[f]>=v:true)); },
+  async query(col, f, op, v){ return Object.entries(this.st[col]||{}).map(([id,x])=>({id,...x})).filter(d=>op==="=="?d[f]===v:op===">="?d[f]>=v:op==="in"?v.includes(d[f]):true); },
+  async signIn(){ toast("Demo mode: pick a person below."); }, async signOut(){ sessionStorage.removeItem("apeis_staff_demo_u"); S.user=null; boot(); }
+};
+const Fire = {
+  m:null, db:null, auth:null, unsub:[],
+  async start(){ const b=`https://www.gstatic.com/firebasejs/${FB_VER}/`; const [A,Au,F]=await Promise.all([import(b+"firebase-app.js"),import(b+"firebase-auth.js"),import(b+"firebase-firestore.js")]); this.m={...A,...Au,...F};
+    const m=this.m, app=m.initializeApp(FIREBASE_CONFIG); this.auth=m.getAuth(app); try{ this.db=m.initializeFirestore(app,{localCache:m.persistentLocalCache({tabManager:m.persistentMultipleTabManager()})}); }catch(e){ this.db=m.getFirestore(app); }
+    m.onAuthStateChanged(this.auth,u=>this.onAuth(u)); },
+  async onAuth(u){ const m=this.m; this.stop(); if(!u){ S.user=null; S.ready=true; boot(); return; }
+    try{ const ps=await m.getDoc(m.doc(this.db,"users",u.uid)); if(!ps.exists()||!ps.data().active){ S.user={uid:u.uid,email:u.email,none:true,inactive:ps.exists()}; S.ready=true; boot(); return; }
+      S.user={...ps.data(),uid:u.uid,email:u.email}; this.listen(); S.ready=true; boot(); }catch(e){ S.user={uid:u.uid,error:e.message}; S.ready=true; boot(); } },
+  listen(){ const m=this.m, db=this.db, on=(q,f)=>this.unsub.push(m.onSnapshot(q,f,e=>toast("Sync error: "+e.message,true))), data=d=>({id:d.id,...d.data({serverTimestamps:"estimate"})});
+    on(m.doc(db,"settings","app"),d=>{ S.settings=d.data()||{}; refresh(); });
+    on(m.collection(db,"schools"),q=>{ S.schools=Object.fromEntries(q.docs.map(d=>[d.id,{code:d.id,...d.data()}])); refresh(); });
+    on(m.doc(db,"staffCfg","app"),d=>{ S.cfg=d.data()||{}; refresh(); });
+    on(m.collection(db,"staffPosts"),q=>{ S.posts=Object.fromEntries(q.docs.map(d=>[d.id,d.data().s||{}])); refresh(); });
+    on(m.collection(db,"staffCount"),q=>{ S.counts=Object.fromEntries(q.docs.map(d=>[d.id,d.data()])); refresh(); });
+    if(canSeeStaff()){ const own=mySchool(); on(own?m.query(m.collection(db,"staff"),m.where("school","==",own)):m.collection(db,"staff"),q=>{ S.staff=q.docs.map(data); S.loaded=true; refresh(); publishCounts(); });
+      if(role()!=="viewer") on(own?m.query(m.collection(db,"staffAppr"),m.where("school","==",own)):m.query(m.collection(db,"staffAppr"),m.where("status","==","pending")),q=>{ S.appr=q.docs.map(data).filter(a=>a.status==="pending"); refresh(); }); }
+    else S.loaded=true; },
+  stop(){ this.unsub.forEach(f=>f()); this.unsub=[]; },
+  conv(o){ const m=this.m, r={}; for(const [k,v] of Object.entries(o)) r[k]=v===TS?m.serverTimestamp():v===DEL?m.deleteField():v; return r; },
+  async apply(ops){ const m=this.m, db=this.db; const all=[...(ops.set||[]).map(x=>["s",x]),...(ops.upd||[]).map(x=>["u",x]),...(ops.del||[]).map(x=>["d",x])];
+    for(let i=0;i<all.length;i+=400){ const b=m.writeBatch(db); for(const [t,x] of all.slice(i,i+400)){ const r=m.doc(db,x.col,x.id); if(t==="s") b.set(r,this.conv(x.data),x.merge?{merge:true}:{}); else if(t==="u") b.update(r,this.conv(x.data)); else b.delete(r); } await b.commit(); } },
+  async queryW(col,W){ const m=this.m; return (await m.getDocs(m.query(m.collection(this.db,col),...W.map(([f,op,v])=>m.where(f,op,v))))).docs.map(d=>({id:d.id,...d.data()})); },
+  async query(col,f,op,v){ const m=this.m; return (await m.getDocs(m.query(m.collection(this.db,col),m.where(f,op,v)))).docs.map(d=>({id:d.id,...d.data()})); },
+  async signIn(e,p){ await this.m.signInWithEmailAndPassword(this.auth,asEmail(e),p); }, async signOut(){ await this.m.signOut(this.auth); }
+};
+const DB = DEMO ? Local : Fire;
+async function q2(col, f, op, v){ try{ return await DB.query(col,f,op,v); }catch(e){ toast(e.message,true); return []; } }
+/* records of one staff member: a school's own users must ask "this school AND this person" (the security rules check the school) */
+async function byStaff(col, r){ try{ return mySchool()?await DB.queryW(col,[["school","==",r.school],["staffId","==",r.id]]):await DB.query(col,"staffId","==",r.id); }catch(e){ toast(e.message,true); return []; } }
+function audit(what, detail){ try{ DB.apply({set:[{col:"audit",id:newId(),data:{what:"Staff portal — "+what,detail:String(detail||"").slice(0,900),by:me().uid,byName:me().name||"",role:role(),atMs:Date.now(),day:isoDay(Date.now()),at:TS}}]}); }catch(e){} }
+
+/* in-post numbers per school, shared so that the senior (viewer) sees sanctioned vs in post without reading personal data */
+let pubT=0; function publishCounts(){ if(role()==="viewer"||role()==="principal") return; clearTimeout(pubT); pubT=setTimeout(()=>{ const ops={set:[]};
+  for(const s of schoolList()){ if(mySchool()&&s.code!==mySchool()) continue; const c=countsOf(s.code,true), o=S.counts[s.code];
+    if(!o||JSON.stringify(o.p||{})!==JSON.stringify(c.p)) ops.set.push({col:"staffCount",id:s.code,data:{p:c.p,atMs:Date.now()}}); }
+  if(ops.set.length) DB.apply(ops).catch(()=>{}); },3000); }
+function countsOf(code, fromStaff){ if(fromStaff||canSeeStaff()){ const p={}; for(const r of S.staff) if(r.school===code&&inService(r)&&r.postId) p[r.postId]=(p[r.postId]||0)+1; return {p}; } return {p:(S.counts[code]||{}).p||{}}; }
+
+/* ---------------- shell ---------------- */
+const NAV = [["dash","Dashboard",()=>true],["staff","Staff",canSeeStaff],["posts","Sanctioned posts",()=>true],["leave","Leave",canSeeStaff],["import","Import",()=>isSA()||isHQ()||role()==="clerk"],["appr","Approvals",()=>role()!=="viewer"&&canSeeStaff()],["log","Log",canSeeStaff],["setup","Setup",isSA]];
+function parseHash(){ const raw=location.hash.replace(/^#/,""); const i=raw.indexOf("?"); const v=decodeURIComponent(i<0?raw:raw.slice(0,i))||"dash"; const p={}; if(i>=0) for(const kv of raw.slice(i+1).split("&")){ if(!kv) continue; const j=kv.indexOf("="); p[decodeURIComponent(kv.slice(0,j))]=decodeURIComponent(kv.slice(j+1)); } return {v,p}; }
+const qs = o => Object.entries(o).filter(([,v])=>v!==""&&v!=null).map(([k,v])=>k+"="+encodeURIComponent(v)).join("&");
+function go(v,p){ const hs="#"+v+(p&&qs(p)?"?"+qs(p):""); if(location.hash===hs) render(); else location.hash=hs; }
+function setP(p){ go(S.view,Object.fromEntries(Object.entries({...S.params,...p}).filter(([,v])=>v!==""&&v!=null))); }
+addEventListener("hashchange",()=>render());
+function boot(){ const app=$("#app");
+  if(!S.ready){ app.innerHTML=`<div class="login"><div class="panel">Loading…</div></div>`; return; }
+  if(!S.user) { app.innerHTML=loginHtml(); return; }
+  if(S.user.none||S.user.error){ app.innerHTML=`<div class="login"><div class="panel"><h2 style="margin-bottom:8px">No access yet</h2><p>${S.user.error?h(S.user.error):S.user.inactive?"Your account is switched off.":"This login has no account in the APEIs portals yet. Ask for one on the Strength Portal (“New user? Request an account”); the Regional Director approves it, and the same login then opens this portal."}</p><div class="row"><a class="btn" href="${MAIN_URL}">Strength Portal</a><button class="btn" data-act="signOut">Sign out</button></div></div></div>`; return; }
+  app.innerHTML=`<div class="band"><div><h1>${h((ST().org||"APEIs Peshawar Garrison"))} — Staff Portal</h1><small>Teaching, admin & ancillary staff · ${DEMO?"Demo (this browser only)":"Live"}</small></div>
+    <div class="who noprint"><a class="btn s" href="${MAIN_URL}" title="Open the Strength Portal">↗ Strength Portal</a><span class="mini" style="opacity:.85">${h(me().name||"")} · ${h({superadmin:"Super Admin",hq:"DQ Office",viewer:"Viewer",principal:"Principal / Section Head",clerk:"Clerk"}[role()]||role())}${mySchool()?" · "+h(mySchool()):""}</span><button class="btn s" data-act="signOut">Sign out</button></div></div>
+    <nav id="nav"></nav><main id="main"></main><div class="wm" id="wm"></div>`;
+  render(); }
+function render(){ if(!$("#main")) return boot(); const r=parseHash(); const ok=NAV.find(n=>n[0]===r.v&&n[2]())||(r.v==="rec"&&canSeeStaff()); S.view=ok?r.v:"dash"; S.params=ok?r.p:{};
+  $("#nav").innerHTML=NAV.filter(n=>n[2]()).map(([k,l])=>`<a href="#${k}" class="${S.view===k||(k==="staff"&&S.view==="rec")?"on":""}">${l}${k==="appr"&&S.appr.length?`<span class="badge">${S.appr.length}</span>`:""}</a>`).join("");
+  const y=scrollY; $("#main").innerHTML=(V[S.view]||V.dash)(); if(S.keepY){ scrollTo(0,y); S.keepY=false; } }
+let rq=0; function refresh(){ if(rq) return; rq=requestAnimationFrame(()=>{ rq=0; if(!S.user||S.user.none) return boot(); if(!$("#main")) return boot(); if(document.activeElement&&$("#main").contains(document.activeElement)&&/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return; S.keepY=true; render(); }); }
+function loginHtml(){ if(DEMO) return `<div class="login"><div class="panel"><h2 style="margin-bottom:6px">APEIs Staff Portal</h2><p class="note">Demo mode — data stays in this browser. Pick a person.</p><div style="display:grid;gap:8px">${Object.values(Local.st.users).map(u=>`<button class="btn" style="text-align:left" data-act="demoLogin" data-id="${u.uid}"><b>${h(u.name)}</b> <span class="mute">· ${h(u.role)}${u.school!=="ALL"?" · "+h(u.school):""}</span></button>`).join("")}</div></div></div>`;
+  return `<div class="login"><div class="panel"><h2 style="margin-bottom:12px">APEIs Staff Portal</h2><form data-form="login" class="grid" style="grid-template-columns:1fr"><div class="f"><label>Email or username</label><input id="lE" required autocomplete="username"></div><div class="f"><label>Password</label><input id="lP" type="password" required autocomplete="current-password"></div><button class="btn p">Sign in</button></form>
+    <p class="hint">Same login as the Strength Portal. No account yet? <a href="${MAIN_URL}">Request one there</a>.</p></div></div>`; }
+
+/* ---------------- figures ---------------- */
+function sanc(code, pid){ return Number((S.posts[code]||{})[pid]||0); }
+function schoolFig(code){ const c=countsOf(code).p, r={}; for(const cat of CATS) r[cat]={s:0,i:0}; const ids=new Set([...Object.keys(S.posts[code]||{}),...Object.keys(c)]);
+  for(const pid of ids){ const p=postOf(pid); const cat=p?.cat||"Admin"; r[cat].s+=sanc(code,pid); r[cat].i+=c[pid]||0; } r.all={s:CATS.reduce((a,k)=>a+r[k].s,0),i:CATS.reduce((a,k)=>a+r[k].i,0)}; return r; }
+const vac = x => x.s-x.i;
+
+/* ---------------- views ---------------- */
+const V = {};
+V.dash = () => { const sch=visSchools(), F=Object.fromEntries(sch.map(s=>[s.code,schoolFig(s.code)])); const T={}; for(const k of [...CATS,"all"]) T[k]={s:sch.reduce((a,s)=>a+F[s.code][k].s,0),i:sch.reduce((a,s)=>a+F[s.code][k].i,0)};
+  const R=canSeeStaff()?S.staff.filter(r=>inService(r)):[], conf=R.filter(r=>r.conf).length, onLeave=R.filter(r=>r.status==="On leave").length;
+  const cell=(x,code,cat)=>`<td class="n">${nf(x.s)}</td><td class="n">${canSeeStaff()?`<span class="dn" data-act="go" data-v="staff" data-p="${h(qs({school:code||"",cat:cat||""}))}">${nf(x.i)}</span>`:nf(x.i)}</td><td class="n ${vac(x)>0?"neg":vac(x)<0?"pos":""}">${vac(x)>0?nf(vac(x))+" vacant":vac(x)<0?nf(-vac(x))+" extra":"—"}</td>`;
+  return `<div class="kpis"><div class="kpi"><span>Staff in post</span><b>${nf(T.all.i)}</b><i>of ${nf(T.all.s)} sanctioned</i></div><div class="kpi k4"><span>Vacant posts</span><b class="${vac(T.all)>0?"neg":""}">${nf(Math.max(0,vac(T.all)))}</b><i>${T.all.s?((T.all.i/T.all.s)*100).toFixed(1):"0"}% filled</i></div>
+    ${CATS.map((c,i)=>`<div class="kpi k${i+2>3?3:i+2}"><span>${c}</span><b>${nf(T[c].i)}</b><i>${nf(T[c].s)} sanctioned · ${vac(T[c])>0?nf(vac(T[c]))+" vacant":vac(T[c])<0?nf(-vac(T[c]))+" extra":"full"}</i></div>`).join("")}
+    ${canSeeStaff()?`<div class="kpi k3"><span>Records confirmed</span><b>${R.length?((conf/R.length)*100).toFixed(0):0}%</b><i>${nf(conf)} of ${nf(R.length)} by the principal</i></div><div class="kpi"><span>On leave now</span><b>${nf(onLeave)}</b><i>status “On leave”</i></div>`:""}</div>
+   <div class="panel"><div class="ph"><h2>Sanctioned posts against staff in post</h2>${expBtns("dash")}</div><div class="scroll"><table id="tDash"><tr><th rowspan="2">School</th>${CATS.map(c=>`<th class="n" colspan="3" style="text-align:center">${c}</th>`).join("")}<th class="n" colspan="3" style="text-align:center">Total</th></tr><tr>${[...CATS,"Total"].map(()=>`<th class="n">Sanc</th><th class="n">In post</th><th class="n">Vacant</th>`).join("")}</tr>
+     ${sch.map(s=>`<tr><td><b class="dn" data-act="go" data-v="posts" data-p="school=${h(s.code)}">${h(s.code)}</b> <span class="mute">${h(s.name)}</span></td>${CATS.map(c=>cell(F[s.code][c],s.code,c)).join("")}${cell(F[s.code].all,s.code,"")}</tr>`).join("")}
+     <tr class="tot"><td>Total</td>${[...CATS,"all"].map(c=>`<td class="n">${nf(T[c].s)}</td><td class="n">${nf(T[c].i)}</td><td class="n">${vac(T[c])>0?nf(vac(T[c])):vac(T[c])<0?"+"+nf(-vac(T[c])):"—"}</td>`).join("")}</tr></table></div>
+     <p class="hint">Click a school for its posts one by one${canSeeStaff()?", or a number for the staff behind it":""}. Staff “On leave” count as in post; resigned, retired, transferred out etc. do not.</p></div>`; };
+function postTable(code){ const c=countsOf(code).p; const ids=[...new Set([...posts().map(p=>p.id),...Object.keys(c)])].filter(pid=>sanc(code,pid)||c[pid]);
+  return ids.map(pid=>({pid,p:postOf(pid)||{name:pid,cat:"Admin",bps:""},s:sanc(code,pid),i:c[pid]||0})).sort((a,b)=>CATS.indexOf(a.p.cat)-CATS.indexOf(b.p.cat)); }
+V.posts = () => { const p=S.params, sch=visSchools(), code=p.school&&sch.some(s=>s.code===p.school)?p.school:sch[0]?.code; if(!code) return `<div class="panel">No school.</div>`; const R=postTable(code), ed=canPost()&&p.edit;
+  const tot=R.reduce((a,x)=>({s:a.s+x.s,i:a.i+x.i}),{s:0,i:0});
+  return `<div class="panel"><div class="ph"><h2>Sanctioned posts — ${h(code)}</h2><div class="pills">${sch.map(s=>`<button class="pill ${s.code===code?"on":""}" data-act="setP" data-p="${h(qs({school:s.code}))}">${h(s.code)}</button>`).join("")}${canPost()?`<button class="btn s ${ed?"p":""}" data-act="setP" data-p="${h(qs({school:code,edit:ed?"":"1"}))}">${ed?"Done":"✎ Edit sanctioned numbers"}</button>`:""}${expBtns("posts")}</div></div>
+   ${ed?`<p class="note">Type the sanctioned number for each post of ${h(code)} and press Save. Posts not listed: add them in Setup → Posts.</p><form data-form="postsSave" data-id="${h(code)}"><div class="scroll"><table><tr><th>Post</th><th>Category</th><th class="n">BPS</th><th class="n">Sanctioned</th><th class="n">In post</th></tr>
+     ${CATS.map(cat=>posts().filter(x=>x.cat===cat).map(x=>`<tr><td>${h(x.name)}</td><td>${cat}</td><td class="n">${h(x.bps||"")}</td><td class="n"><input type="number" min="0" name="${h(x.id)}" value="${sanc(code,x.id)||""}" style="width:80px;text-align:right"></td><td class="n">${nf(countsOf(code).p[x.id]||0)}</td></tr>`).join("")).join("")}</table></div><div class="row"><button class="btn p">Save sanctioned posts of ${h(code)}</button></div></form>`
+   :`<div class="scroll"><table id="tPosts"><tr><th>Post</th><th>Category</th><th class="n">BPS</th><th class="n">Sanctioned</th><th class="n">In post</th><th class="n">Vacant / extra</th></tr>
+     ${R.map(x=>`<tr><td>${h(x.p.name)}</td><td>${h(x.p.cat)}</td><td class="n">${h(x.p.bps||"")}</td><td class="n">${nf(x.s)}</td><td class="n">${canSeeStaff()?`<span class="dn" data-act="go" data-v="staff" data-p="${h(qs({school:code,post:x.pid}))}">${nf(x.i)}</span>`:nf(x.i)}</td><td class="n ${x.s-x.i>0?"neg":x.s-x.i<0?"pos":""}">${x.s-x.i>0?nf(x.s-x.i)+" vacant":x.s-x.i<0?nf(x.i-x.s)+" extra":"—"}</td></tr>`).join("")}
+     <tr class="tot"><td colspan="3">Total</td><td class="n">${nf(tot.s)}</td><td class="n">${nf(tot.i)}</td><td class="n">${tot.s-tot.i>0?nf(tot.s-tot.i)+" vacant":tot.s-tot.i<0?nf(tot.i-tot.s)+" extra":"—"}</td></tr></table></div>${R.length?"":`<p class="mute">No sanctioned posts entered for ${h(code)} yet.${canPost()?" Press ✎ Edit sanctioned numbers.":""}</p>`}`}</div>`; };
+
+function staffRows(){ const p=S.params; const q=norm(p.q||"");
+  return S.staff.filter(r=>(!p.school||r.school===p.school)&&(!p.post||r.postId===p.post)&&(!p.cat||(postOf(r.postId)?.cat||"")===p.cat)&&(p.st==="all"||(p.st?r.status===p.st:inService(r)))&&(!p.conf||(p.conf==="no"?!r.conf:!!r.conf))&&(!q||norm([r.name,r.father,r.cnic,r.empNo,r.contact,r.subjects].join(" ")).includes(q)))
+   .sort((a,b)=>(a.school||"").localeCompare(b.school||"")||CATS.indexOf(postOf(a.postId)?.cat)-CATS.indexOf(postOf(b.postId)?.cat)||(postOf(b.postId)?.bps||0)-(postOf(a.postId)?.bps||0)||(a.joinDate||"9").localeCompare(b.joinDate||"9")); }
+V.staff = () => { const p=S.params, sch=visSchools(); if(!S.loaded) return `<div class="panel">Loading…</div>`; const R=staffRows();
+  return `<div class="panel"><div class="ph"><h2>Staff (${nf(R.length)})</h2><div class="pills">${canEdit()?`<button class="btn p" data-act="recNew">＋ Add staff member</button>`:""}${expBtns("staff")}</div></div>
+   <div class="grid noprint" style="margin-bottom:10px">${mySchool()?"":`<div class="f"><label>School</label><select data-p="school"><option value="">All schools</option>${sch.map(s=>`<option ${p.school===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select></div>`}
+    <div class="f"><label>Category</label><select data-p="cat"><option value="">All</option>${CATS.map(c=>`<option ${p.cat===c?"selected":""}>${c}</option>`).join("")}</select></div>
+    <div class="f"><label>Post</label><select data-p="post"><option value="">All posts</option>${posts().map(x=>`<option value="${h(x.id)}" ${p.post===x.id?"selected":""}>${h(x.name)}</option>`).join("")}</select></div>
+    <div class="f"><label>Status</label><select data-p="st"><option value="">In service + on leave</option><option value="all" ${p.st==="all"?"selected":""}>Everyone</option>${cfg().statuses.map(x=>`<option ${p.st===x?"selected":""}>${h(x)}</option>`).join("")}</select></div>
+    <div class="f"><label>Confirmed by principal</label><select data-p="conf"><option value="">Any</option><option value="no" ${p.conf==="no"?"selected":""}>Not yet</option><option value="yes" ${p.conf==="yes"?"selected":""}>Confirmed</option></select></div>
+    <div class="f"><label>Search</label><input data-p="q" value="${h(p.q||"")}" placeholder="name, CNIC, staff No, subject…"></div></div>
+   <div class="scroll"><table id="tStaff"><tr><th>#</th>${mySchool()?"":"<th>School</th>"}<th>Name</th><th>Post</th><th class="n">BPS</th><th>Appointment</th><th>Qualification</th><th>Subjects</th><th>Joined APEIs</th><th>Service</th><th>Status</th><th>Checked</th></tr>
+    ${R.slice(0,1500).map((r,i)=>`<tr class="click" data-act="openRec" data-id="${h(r.id)}"><td class="mute">${i+1}${r.ret?` <span class="tag t-out" title="${h(r.ret)}">↩</span>`:""}</td>${mySchool()?"":`<td>${h(r.school)}</td>`}<td><b>${h(r.name)}</b></td><td>${h(postOf(r.postId)?.name||r.postId||"")}</td><td class="n">${h(r.bps||"")}</td><td>${h(r.apptType||"")}</td><td>${h(r.qual||"")}${r.prof&&r.prof!=="None"?", "+h(r.prof):""}</td><td>${h(r.subjects||"")}</td><td>${h(fmtD(r.joinDate))}</td><td>${h(spanTxt(r.joinDate))}</td>
+      <td>${r.status&&r.status!=="In service"?`<span class="tag ${r.status==="On leave"?"t-mid":"t-out"}">${h(r.status)}</span>`:`<span class="tag t-ok">In service</span>`}</td><td>${r.conf?`<span class="tag t-ok" title="${h(r.conf.by)} ${h(fmtD(r.conf.atMs))}">✓</span>`:`<span class="mute">—</span>`}</td></tr>`).join("")}</table></div>
+   ${R.length?"":`<p class="mute">No staff match.${canEdit()?" Add them one by one, or upload the school's Excel list (Import).":""}</p>`}</div>`; };
+
+/* one staff record */
+function recForm(r, may){ const lockOn=r.id&&role()==="clerk";
+  const inp=(f)=>{ const v=r[f.k]??"", locked=lockOn&&f.lock&&String(v).trim(); const nm=`name="${f.k}" ${f.req?"required":""} ${may?"":"disabled"}`;
+    let x; const [t,arg]=f.t.split(":");
+    if(t==="sel") x=`<select ${nm}><option value=""></option>${arg.split(",").map(o=>`<option ${v===o?"selected":""}>${h(o)}</option>`).join("")}</select>`;
+    else if(t==="list") x=`<select ${nm}><option value=""></option>${(cfg()[arg]||[]).map(o=>`<option ${v===o?"selected":""}>${h(o)}</option>`).join("")}</select>`;
+    else if(t==="post") x=`<select ${nm}><option value=""></option>${CATS.map(c=>`<optgroup label="${c}">${posts().filter(p=>p.cat===c).map(p=>`<option value="${h(p.id)}" ${v===p.id?"selected":""}>${h(p.name)}${p.bps?" (BPS "+h(p.bps)+")":""}</option>`).join("")}</optgroup>`).join("")}</select>`;
+    else if(t==="date") x=`<input type="date" ${nm} value="${h(v)}">`;
+    else if(t==="num") x=`<input type="number" ${nm} value="${h(v)}">`;
+    else if(t==="wide") x=`<textarea ${nm} rows="2">${h(v)}</textarea>`;
+    else x=`<input ${nm} value="${h(v)}" ${t==="cnic"?'placeholder="12345-1234567-1"':""}>`;
+    return `<div class="f ${t==="wide"?"wide":""}"><label>${h(f.l)}${f.req?" *":""}${locked?` <span title="Filled: a change goes to the DQ Office / Regional Director for approval">🔒</span>`:""}</label>${x}</div>`; };
+  return `<form data-form="recSave" data-id="${h(r.id||"")}">${FIELDS.map(([g,L])=>`<fieldset><legend>${g}</legend><div class="grid">${L.map(([k])=>inp(ALLF.find(f=>f.k===k))).join("")}</div></fieldset>`).join("")}
+   ${may?`<div class="row" style="justify-content:space-between"><span class="hint" style="margin:0">${lockOn?"🔒 = main details: once filled, a change by the school goes for approval with a reason.":""}</span><button class="btn p">${r.id?"Save changes":"Add staff member"}</button></div>`:""}</form>`; }
+V.rec = () => { const id=S.params.id; const r=id?S.staff.find(x=>x.id===id):{school:mySchool()||S.params.school||"",status:"In service"}; if(id&&!r) return `<div class="panel">${S.loaded?"Record not found.":"Loading…"}</div>`;
+  const may=canEdit(r), R=staffRows(), i=R.findIndex(x=>x.id===id);
+  return `<div class="panel noprint" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn s" data-act="go" data-v="staff" data-p="${h(qs({school:r.school}))}">← Staff list</button>${id&&i>=0?`<button class="btn s" data-act="openRec" data-id="${h(R[i-1]?.id||"")}" ${i>0?"":"disabled"}>◀ Previous</button><span class="mini">${i+1} of ${R.length}</span><button class="btn s" data-act="openRec" data-id="${h(R[i+1]?.id||"")}" ${i<R.length-1?"":"disabled"}>Next ▶</button>`:""}<span style="flex:1"></span>${id?`<button class="btn s" data-act="printRec">🖨 Print record</button>`:""}</div>
+   <div class="panel"><div class="ph"><h2>${id?h(r.name):"New staff member"}</h2>${id?`<span class="mini mute">${h(r.school)} · ${h(postOf(r.postId)?.name||"")} · in service ${h(spanTxt(r.joinDate)||"–")}</span>`:""}</div>
+    ${!id&&!mySchool()?`<div class="f" style="max-width:300px;margin-bottom:10px"><label>School *</label><select id="recSch">${visSchools().map(s=>`<option ${r.school===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select></div>`:""}
+    ${id?confBox(r):""}${id?docsBox(r,may):""}${recForm(r,may)}</div>
+   ${id?`<div class="panel"><div class="ph"><h2>Leave record</h2>${may?`<button class="btn s" data-act="leaveNew" data-id="${h(id)}">＋ Add leave</button>`:""}</div><div id="lvBox">${leaveBox(id)}</div></div><div class="panel"><h2>History of changes</h2><div id="hiBox">${histBox(id)}</div></div>`:""}`; };
+function confBox(r){ const pend=S.appr.filter(a=>a.staffId===r.id);
+  return `${pend.length?`<div class="note">⏳ ${pend.length} change${pend.length>1?"s":""} waiting for approval: ${pend.map(a=>a.changes.map(c=>h(c.l)).join(", ")).join("; ")}</div>`:""}
+   ${r.ret?`<div class="note" style="border-left-color:#b3122a;background:#fde8eb">↩ <b>Returned by the principal:</b> ${h(r.ret)} <span class="mini mute">(${h(r.retBy||"")})</span></div>`:""}
+   <div style="margin:0 0 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">${r.conf?`<span class="tag t-ok">✓ Confirmed by ${h(r.conf.by)} on ${h(fmtD(r.conf.atMs))}</span>`:`<span class="tag t-mid">Not yet confirmed by the principal</span>`}
+    ${canConfirm(r)?`${r.conf?"":`<button class="btn s g" data-act="confirm" data-id="${h(r.id)}">✓ Confirm — checked against the service record</button>`}<button class="btn s r" data-act="retRec" data-id="${h(r.id)}">↩ Return to clerk with remarks</button>`:""}</div>`; }
+
+/* documents (CNIC, degrees, appointment letter…) */
+const DOC_T = ["CNIC","Appointment letter","Degree / certificate","Experience letter","Service book page","Photo","Other"];
+function docsBox(r, may){ const D=S.docs?.[r.id]; if(!D){ (S.docs ||= {})[r.id]=null; loadDocs(r); }
+  return `<div class="panel" style="padding:10px 12px;background:var(--soft)"><div class="ph" style="margin-bottom:6px"><b>📎 Documents (${(D||[]).length})</b>${may?`<span class="pills"><select id="docT" style="width:auto">${DOC_T.map(t=>`<option>${t}</option>`).join("")}</select><label class="btn s">＋ Add document<input type="file" accept="image/*" data-chg="docAdd" data-id="${h(r.id)}" hidden></label></span>`:""}</div>
+   ${D===null||D===undefined?`<span class="mute">Loading…</span>`:D.length?`<div class="docs">${D.map((d,i)=>`<figure data-act="docView" data-id="${h(r.id)}" data-i="${i}"><img src="${d.img}" alt=""><figcaption>${h(d.type)}<br><span class="mute">${h(fmtD(d.atMs))}</span></figcaption></figure>`).join("")}</div>`:`<span class="mute">No documents yet.</span>`}</div>`; }
+async function loadDocs(r){ const D=await byStaff("staffDocs",r); S.docs[r.id]=D.sort((a,b)=>(a.atMs||0)-(b.atMs||0)); refresh(); }
+function shrink(file,max=1600,q=0.72){ return new Promise((res,rej)=>{ const img=new Image(); img.onload=()=>{ const k=Math.min(1,max/Math.max(img.width,img.height)), c=document.createElement("canvas"); c.width=Math.round(img.width*k); c.height=Math.round(img.height*k); c.getContext("2d").drawImage(img,0,0,c.width,c.height); res(c.toDataURL("image/jpeg",q)); }; img.onerror=()=>rej(new Error("Not a picture (use JPG or PNG).")); img.src=URL.createObjectURL(file); }); }
+
+/* leave */
+function leaveBox(id){ const L=S.leave?.[id]; if(L===undefined){ (S.leave ||= {})[id]=null; (async()=>{ const r=S.staff.find(x=>x.id===id); const D=r?await byStaff("staffLeave",r):[]; S.leave[id]=D.sort((a,b)=>(b.from||"").localeCompare(a.from||"")); refresh(); })(); }
+  if(!L) return `<span class="mute">Loading…</span>`; const yr=String(new Date().getFullYear()), Y=L.filter(x=>(x.from||"").startsWith(yr)), by={}; for(const x of Y) by[x.type]=(by[x.type]||0)+Number(x.days||0);
+  return `${Object.keys(by).length?`<p class="hint" style="margin-top:0">${yr}: ${Object.entries(by).map(([k,v])=>`${h(k)} <b>${v}</b> day${v==1?"":"s"}`).join(" · ")}</p>`:""}${L.length?`<table><tr><th>From</th><th>To</th><th class="n">Days</th><th>Type</th><th>Remarks</th><th>Entered by</th></tr>${L.map(x=>`<tr><td>${h(fmtD(x.from))}</td><td>${h(fmtD(x.to))}</td><td class="n">${h(x.days)}</td><td>${h(x.type)}</td><td style="white-space:normal">${h(x.remarks||"")}</td><td class="mini">${h(x.byName||"")}</td></tr>`).join("")}</table>`:`<span class="mute">No leave recorded.</span>`}`; }
+const daysBetween = (a,b) => { const x=Date.parse(a+"T12:00"), y=Date.parse(b+"T12:00"); return isNaN(x)||isNaN(y)||y<x?0:Math.round((y-x)/864e5)+1; };
+function histBox(id){ const L=S.hist?.[id]; if(L===undefined){ (S.hist ||= {})[id]=null; (async()=>{ const r=S.staff.find(x=>x.id===id); const D=r?await byStaff("staffEdits",r):[]; S.hist[id]=D.sort((a,b)=>(b.atMs||0)-(a.atMs||0)); refresh(); })(); }
+  if(!L) return `<span class="mute">Loading…</span>`; return L.length?`<table><tr><th>When</th><th>By</th><th>What</th></tr>${L.map(e=>`<tr><td class="mini">${h(fmtDT(e.atMs))}</td><td class="mini">${h(e.byName||"")}</td><td style="white-space:normal">${h(e.kind||"")}${(e.changes||[]).map(c=>`<div><b>${h(c.l)}</b>: <span class="mute">${h(c.from||"(empty)")}</span> → ${h(c.to||"(empty)")}</div>`).join("")}</td></tr>`).join("")}</table>`:`<span class="mute">No changes recorded yet.</span>`; }
+
+/* leave register (all staff) */
+V.leave = () => { const p=S.params, from=p.from||isoDay(Date.now()-30*864e5), to=p.to||isoDay(Date.now()+60*864e5);
+  if(!S.leaveAll||S.leaveKey!==from+to){ S.leaveKey=from+to; S.leaveAll=null; (async()=>{ const D=mySchool()?(await q2("staffLeave","school","==",mySchool())):await q2("staffLeave","to",">=",from); S.leaveAll=D.filter(x=>(x.to||"")>=from&&(x.from||"")<=to); refresh(); })(); }
+  const R=(S.leaveAll||[]).filter(x=>!p.school||x.school===p.school).sort((a,b)=>(b.from||"").localeCompare(a.from||"")); const nm=id=>S.staff.find(x=>x.id===id);
+  return `<div class="panel"><div class="ph"><h2>Leave register</h2><div class="pills">${expBtns("leave")}</div></div><div class="grid noprint" style="margin-bottom:10px"><div class="f"><label>From</label><input type="date" data-p="from" value="${h(from)}"></div><div class="f"><label>To</label><input type="date" data-p="to" value="${h(to)}"></div>${mySchool()?"":`<div class="f"><label>School</label><select data-p="school"><option value="">All</option>${visSchools().map(s=>`<option ${p.school===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select></div>`}</div>
+   ${S.leaveAll===null?`<p class="mute">Loading…</p>`:`<div class="scroll"><table id="tLeave"><tr><th>School</th><th>Name</th><th>Post</th><th>From</th><th>To</th><th class="n">Days</th><th>Type</th><th>Remarks</th></tr>${R.map(x=>{ const s=nm(x.staffId); return `<tr class="click" data-act="openRec" data-id="${h(x.staffId)}"><td>${h(x.school)}</td><td>${h(s?.name||x.name||"")}</td><td>${h(postOf(s?.postId)?.name||"")}</td><td>${h(fmtD(x.from))}</td><td>${h(fmtD(x.to))}</td><td class="n">${h(x.days)}</td><td>${h(x.type)}</td><td style="white-space:normal">${h(x.remarks||"")}</td></tr>`; }).join("")}</table></div>${R.length?"":`<p class="mute">No leave in these dates.</p>`}`}</div>`; };
+
+/* approvals of changes to main details */
+V.appr = () => { const A=S.appr, dec=isSA()||isHQ();
+  return `<div class="panel"><h2>${dec?"Changes to main details waiting for approval":"My requests"} (${A.length})</h2><p class="hint" style="margin-top:0">Name, father's name, CNIC, date of birth, staff No and joining date can be changed by a school only with approval, with the reason.</p>
+   ${A.length?`<div class="scroll"><table><tr><th>When</th><th>School</th><th>Staff member</th><th>Change</th><th>Reason</th><th>Asked by</th>${dec?"<th></th>":""}</tr>${A.sort((a,b)=>a.atMs-b.atMs).map(a=>`<tr><td class="mini">${h(fmtDT(a.atMs))}</td><td>${h(a.school)}</td><td><span class="dn" data-act="openRec" data-id="${h(a.staffId)}">${h(a.name)}</span></td><td style="white-space:normal">${a.changes.map(c=>`<div><b>${h(c.l)}</b>: <span class="mute">${h(c.from)}</span> → ${h(c.to)}</div>`).join("")}</td><td style="white-space:normal">${h(a.reason)}</td><td class="mini">${h(a.byName)}</td>${dec?`<td><button class="btn s g" data-act="apprOk" data-id="${h(a.id)}">✓ Approve</button> <button class="btn s r" data-act="apprNo" data-id="${h(a.id)}">✕</button></td>`:""}</tr>`).join("")}</table></div>`:`<p class="mute">Nothing waiting.</p>`}</div>`; };
+
+/* log */
+V.log = () => { const p=S.params, from=p.from||isoDay(Date.now()-14*864e5);
+  if(!S.logRows||S.logKey!==from){ S.logKey=from; S.logRows=null; (async()=>{ const D=mySchool()?(await q2("staffEdits","school","==",mySchool())).filter(e=>(e.day||"")>=from):await q2("staffEdits","day",">=",from); S.logRows=D.sort((a,b)=>(b.atMs||0)-(a.atMs||0)); refresh(); })(); }
+  const R=(S.logRows||[]).filter(e=>!p.school||e.school===p.school);
+  return `<div class="panel"><div class="ph"><h2>Log — every addition and change</h2>${expBtns("log")}</div><div class="grid noprint" style="margin-bottom:10px"><div class="f"><label>Since</label><input type="date" data-p="from" value="${h(from)}"></div>${mySchool()?"":`<div class="f"><label>School</label><select data-p="school"><option value="">All</option>${visSchools().map(s=>`<option ${p.school===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select></div>`}</div>
+   ${S.logRows===null?`<p class="mute">Loading…</p>`:`<div class="scroll"><table id="tLog"><tr><th>When</th><th>School</th><th>Staff member</th><th>What</th><th>By</th></tr>${R.map(e=>`<tr><td class="mini">${h(fmtDT(e.atMs))}</td><td>${h(e.school)}</td><td><span class="dn" data-act="openRec" data-id="${h(e.staffId)}">${h(e.name||"")}</span></td><td style="white-space:normal">${h(e.kind||"")}${(e.changes||[]).slice(0,8).map(c=>`<div class="mini"><b>${h(c.l)}</b>: ${h(c.from||"")} → ${h(c.to||"")}</div>`).join("")}</td><td class="mini">${h(e.byName||"")}</td></tr>`).join("")}</table></div>${R.length?"":`<p class="mute">Nothing in these dates.</p>`}`}</div>`; };
+
+/* import from Excel — reads any column order; columns are matched by their headings */
+const IMP_ALIAS = { name:["name","fullname","nameofemployee","employeename","staffname","teachername"], father:["father","fathername","fatherhusbandname","fhname","husbandname","sodowo"], gender:["gender","sex"], dob:["dob","dateofbirth","birthdate"], cnic:["cnic","cnicno","nic","nicno"],
+  domicile:["domicile"], religion:["religion"], marital:["marital","maritalstatus"], contact:["contact","mobile","phone","cellno","mobileno","contactno"], email:["email"], address:["address","homeaddress"],
+  empNo:["empno","employeeno","staffno","personalno","pno","servicno","serviceno","id"], postId:["post","designation","appointment","postname"], bps:["bps","scale","payscale","grade"], apptType:["appttype","appointmenttype","typeofappointment","nature","status of appointment","natureofappointment"].map(norm),
+  joinDate:["joindate","dateofjoining","doj","joiningdate","dateofappointment","joininginapeis"], joinSchool:["joinschool","joiningthisschool","dateofjoiningthisschool"], status:["status","currentstatus"], qual:["qual","qualification","academicqualification","highestqualification"], qualSubj:["subjectsofqualification","major","qualsubjects"],
+  prof:["prof","professionalqualification","professional"], expYears:["experience","expyears","experienceyears","previousexperience"], section:["section","wing"], subjects:["subjects","subject","subjectstaught","teachingsubjects"], classes:["classes","classestaught"], classTeacher:["classteacher","classteacherof"], remarks:["remarks"] };
+function readXl(file){ return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=async()=>{ try{ await loadXlsx(); const wb=XLSX.read(fr.result,{type:"array",cellDates:true}); const ws=wb.Sheets[wb.SheetNames[0]]; res(XLSX.utils.sheet_to_json(ws,{header:1,defval:"",raw:false,dateNF:"yyyy-mm-dd"})); }catch(e){ rej(e); } }; fr.onerror=()=>rej(fr.error); fr.readAsArrayBuffer(file); }); }
+function loadXlsx(){ if(window.XLSX) return Promise.resolve(); return new Promise((res,rej)=>{ const s=document.createElement("script"); s.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; s.onload=res; s.onerror=()=>rej(new Error("Excel reader could not load (internet?)")); document.head.appendChild(s); }); }
+function toIsoDate(v){ v=String(v||"").trim(); if(!v) return ""; let m; if((m=v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return `${m[1]}-${m[2].padStart(2,"0")}-${m[3].padStart(2,"0")}`;
+  if((m=v.match(/^(\d{1,2})[\/\-. ](\d{1,2}|[A-Za-z]{3,})[\/\-. ](\d{2,4})$/))){ let mo=/\d/.test(m[2])?Number(m[2]):MON.findIndex(x=>x.toLowerCase()===m[2].slice(0,3).toLowerCase())+1; let y=m[3].length===2?(Number(m[3])>40?"19":"20")+m[3]:m[3]; if(mo>0) return `${y}-${String(mo).padStart(2,"0")}-${m[1].padStart(2,"0")}`; }
+  const t=Date.parse(v); return isNaN(t)?"":isoDay(t); }
+function matchPost(v){ const n=norm(v); if(!n) return ""; return (posts().find(p=>norm(p.name)===n||norm(p.id)===n)||posts().find(p=>norm(p.name).includes(n)||n.includes(norm(p.name).replace(/\(.*$/,"")))||posts().find(p=>{ const ab=(p.name.match(/\(([A-Z]+)\)/)||[])[1]; return ab&&norm(ab)===n; }))?.id||""; }
+V.import = () => { const I=S.imp, sch=visSchools();
+  return `<div class="panel"><h2>Import staff from Excel</h2><p class="hint" style="margin-top:0">The first row must be the headings. Columns are matched by their names (Name, Father name, CNIC, Designation, BPS, Date of joining, Qualification…) in any order. Records with the same CNIC (or staff No) in the same school are updated, others are added. Nothing is saved until you press Save.</p>
+   <div class="grid" style="align-items:end"><div class="f"><label>School</label><select id="impSch" ${mySchool()?"disabled":""}>${sch.map(s=>`<option ${(I?.school||mySchool())===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select></div>
+    <label class="btn p" style="text-align:center">Choose Excel file<input type="file" accept=".xlsx,.xls,.csv" data-chg="impFile" hidden></label><button class="btn" data-act="tpl">Excel template</button></div>
+   ${I?impPreview(I):""}</div>`; };
+function impPreview(I){ const ok=I.rows.filter(r=>!r.err.length);
+  return `<h3 style="margin:14px 0 6px">${h(I.file)} → ${h(I.school)}: ${I.rows.length} rows · <span class="pos">${ok.length} ready</span> (${ok.filter(r=>r.ex).length} update existing) · <span class="neg">${I.rows.length-ok.length} with errors</span></h3>
+   <p class="hint">Columns found: ${I.map.map(([k,c])=>`<b>${h(FL(k))}</b> ← “${h(c)}”`).join(" · ")||"none"}${I.unused.length?`<br>Not used: ${I.unused.map(h).join(", ")}`:""}</p>
+   <div class="scroll" style="max-height:50vh"><table><tr><th>Row</th><th>Name</th><th>Post</th><th>CNIC</th><th>Joined</th><th>Problems</th></tr>${I.rows.map(r=>`<tr style="${r.err.length?"background:#fde8eb":""}"><td>${r.n}</td><td>${h(r.d.name)}</td><td>${h(postOf(r.d.postId)?.name||r.raw.post||"")}</td><td>${h(r.d.cnic||"")}</td><td>${h(r.d.joinDate||"")}</td><td class="mini ${r.err.length?"neg":"mute"}" style="white-space:normal">${[...r.err,...r.warn].map(h).join("; ")}${r.ex?" (updates existing)":""}</td></tr>`).join("")}</table></div>
+   <div class="row"><button class="btn" data-act="impCancel">Cancel</button><button class="btn p" data-act="impSave" ${ok.length?"":"disabled"}>Save ${ok.length} records</button></div>`; }
+async function impFile(file){ const code=mySchool()||$("#impSch").value; let A; try{ A=await readXl(file); }catch(e){ return toast(e.message,true); }
+  const hi=A.findIndex(r=>r.filter(x=>String(x).trim()).length>=3); if(hi<0) return toast("No heading row found.",true); const head=A[hi].map(x=>String(x).trim()), map=[], used=new Set();
+  for(const [k,al] of Object.entries(IMP_ALIAS)){ const j=head.findIndex((c,i)=>!used.has(i)&&al.map(norm).includes(norm(c))); if(j>=0){ map.push([k,head[j],j]); used.add(j); } }
+  if(!map.some(m=>m[0]==="name")) return toast("No 'Name' column found in the first rows.",true);
+  const ex=S.staff.filter(r=>r.school===code), rows=[];
+  A.slice(hi+1).forEach((row,ix)=>{ if(!row.some(x=>String(x).trim())) return; const d={}, raw={}, err=[], warn=[];
+    for(const [k,,j] of map){ let v=String(row[j]??"").trim(); raw[k==="postId"?"post":k]=v; if(!v) continue;
+      if(["dob","joinDate","joinSchool"].includes(k)){ const t=toIsoDate(v); if(!t) warn.push(`${FL(k)} “${v}” not read`); else d[k]=t; }
+      else if(k==="postId"){ const p=matchPost(v); if(!p) err.push(`post “${v}” is not in the list (add it in Setup → Posts)`); else d.postId=p; }
+      else if(k==="gender") d.gender=/^f|female|w/i.test(v)?"Female":/^m/i.test(v)?"Male":v;
+      else if(k==="cnic"){ const c=v.replace(/\D/g,""); if(c.length===13) d.cnic=`${c.slice(0,5)}-${c.slice(5,12)}-${c.slice(12)}`; else { d.cnic=v; warn.push("CNIC not 13 digits"); } }
+      else if(k==="status") d.status=cfg().statuses.find(s=>norm(s)===norm(v))||"In service";
+      else d[k]=v; }
+    if(!d.name) err.push("name missing"); if(!d.postId&&!raw.post) err.push("post / designation missing"); d.status ||= "In service"; if(d.postId&&!d.bps) d.bps=postOf(d.postId)?.bps||"";
+    const e=ex.find(r=>(d.cnic&&r.cnic===d.cnic)||(d.empNo&&r.empNo===d.empNo)); rows.push({n:hi+ix+2,d,raw,err,warn,ex:e||null}); });
+  S.imp={file:file.name,school:code,map,unused:head.filter((c,i)=>c&&!used.has(i)),rows}; render(); }
+
+/* setup: posts list and other lists */
+V.setup = () => { const c=cfg();
+  return `<div class="panel"><h2>Posts — names, category and BPS</h2><p class="hint" style="margin-top:0">One post per line: <b>code = Name | Category (Teaching / Admin / Ancillary) | BPS</b>. Keep the code in front when you rename a post (staff stay on it). For a new post just write <b>Name | Category | BPS</b>. Removing a post that has staff is refused.</p>
+   <form data-form="postsList"><textarea id="psL" rows="16" style="font-family:monospace">${h(c.posts.map(p=>`${p.id} = ${p.name} | ${p.cat} | ${p.bps||""}`).join("\n"))}</textarea><div class="row"><button class="btn p">Save posts</button></div></form></div>
+   <div class="panel"><h2>Other lists</h2><form data-form="lists" class="grid">${[["leaveTypes","Leave types"],["statuses","Staff status"],["apptTypes","Appointment types"],["quals","Qualifications"],["prof","Professional qualifications"]].map(([k,l])=>`<div class="f"><label>${l} (one per line)</label><textarea name="${k}" rows="7">${h((c[k]||[]).join("\n"))}</textarea></div>`).join("")}<div class="row" style="grid-column:1/-1"><button class="btn p">Save lists</button></div></form></div>`; };
+
+/* ---------------- downloads and prints: approval as in the Strength Portal ---------------- */
+const TABLES = { dash:["tDash","Staff — sanctioned vs in post"], posts:["tPosts","Sanctioned posts"], staff:["tStaff","Staff list"], leave:["tLeave","Leave register"], log:["tLog","Staff changes log"] };
+const expBtns = k => `<span class="pills noprint"><button class="btn s" data-act="exp" data-k="${k}" data-f="xlsx">Excel</button><button class="btn s" data-act="exp" data-k="${k}" data-f="print">Print / PDF</button></span>`;
+const prKey = t => norm(String(t||"").replace(/\d[\d\-\/:.]*/g," ")).slice(0,60);
+async function gate(kind, title, rows, cols){ if(isSA()){ audit(kind==="print"?"Printed":"Downloaded (Excel)",title); return {noWm:true}; }
+  const k=prKey("Staff portal "+title), now=Date.now(); let mine=[]; try{ mine=await DB.query("printReq","by","==",me().uid); }catch(e){ toast("Could not check your approvals — "+e.message,true); return null; }
+  const g=mine.find(r=>r.status==="approved"&&r.key===k&&r.kind===kind&&(r.untilMs||0)>now);
+  if(g){ audit(kind==="print"?"Printed":"Downloaded (Excel)",`${title} (${rows} rows) — approved by ${g.decByName||""}`); return g; }
+  if(mine.some(r=>r.status==="pending"&&r.key===k&&r.kind===kind)){ toast("Your request is already waiting for approval.",true); return null; }
+  return new Promise(res=>{ modal(`<h3>🖨 ${kind==="print"?"Print / PDF":"Excel download"} needs approval</h3><p>Every print and download is approved by the Regional Director (as in the Strength Portal — he sees it under Log → Prints & downloads).</p><p><b>${h(title)}</b> · ${nf(rows)} rows</p><div class="f"><label>Why do you need it? *</label><textarea id="prWhy" rows="2"></textarea></div><div class="row"><button class="btn" data-act="closeModal">Cancel</button><button class="btn p" id="prSend">Send request</button></div>`);
+    $("#prSend").onclick=async()=>{ const why=$("#prWhy").value.trim(); if(!why) return toast("Write why you need it.",true);
+      await DB.apply({set:[{col:"printReq",id:newId(),data:{by:me().uid,byName:me().name||"",role:role(),school:me().school||"",kind,key:k,title:"Staff portal — "+title,rows,cols,sample:"",why,status:"pending",atMs:Date.now(),at:TS}}]}); closeModal(); toast("Request sent — you can print once it is approved."); res(null); }; }); }
+function tableAoa(id){ const t=$("#"+id); if(!t) return []; return [...t.rows].map(r=>[...r.cells].map(c=>c.innerText.trim())); }
+async function exportTable(k, f){ const [id,title]=TABLES[k]; const A=tableAoa(id); if(!A.length) return toast("Nothing to export.",true); const g=await gate(f,title,A.length-1,A[0]); if(!g) return;
+  if(f==="print"){ $("#wm").innerHTML=g.noWm?"":wmSvg(); window.print(); return; }
+  await loadXlsx(); const ws=XLSX.utils.aoa_to_sheet(A), wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,title.slice(0,30)); XLSX.writeFile(wb,`${title.replace(/\W+/g,"_")}_${isoDay(Date.now())}.xlsx`); }
+function wmSvg(){ const t=`CONFIDENTIAL — ${me().name||""} (${role()}${me().school&&me().school!=="ALL"?", "+me().school:""}) — ${fmtDT(Date.now())}`;
+  return `<svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="w" width="520" height="260" patternUnits="userSpaceOnUse" patternTransform="rotate(-30)"><text x="0" y="130" font-family="Arial" font-size="15" fill="rgba(179,18,42,.16)">${h(t)}</text></pattern></defs><rect width="100%" height="100%" fill="url(#w)"/></svg>`; }
+
+/* ---------------- actions ---------------- */
+async function saveRec(f){ const id=f.dataset.id, old=id?S.staff.find(x=>x.id===id):null, fd=new FormData(f), d={};
+  for(const fl of ALLF){ if(!fd.has(fl.k)) continue; d[fl.k]=String(fd.get(fl.k)||"").trim(); }
+  if(d.cnic&&!CNIC_RE.test(d.cnic)){ const c=d.cnic.replace(/\D/g,""); if(c.length===13) d.cnic=`${c.slice(0,5)}-${c.slice(5,12)}-${c.slice(12)}`; else return toast("CNIC must be like 12345-1234567-1.",true); }
+  const school=old?.school||mySchool()||$("#recSch")?.value; if(!school) return toast("Pick the school.",true);
+  if(d.cnic&&S.staff.some(r=>r.id!==id&&r.cnic===d.cnic)) return toast("Another staff record already has this CNIC.",true);
+  if(d.postId&&!d.bps) d.bps=String(postOf(d.postId)?.bps||"");
+  const changes=ALLF.filter(fl=>fl.k in d&&String(old?.[fl.k]??"")!==d[fl.k]).map(fl=>({k:fl.k,l:fl.l,from:String(old?.[fl.k]??""),to:d[fl.k]}));
+  if(old&&!changes.length) return toast("Nothing changed.");
+  const now=Date.now(), log=(sid,ch,kind)=>({col:"staffEdits",id:newId(),data:{staffId:sid,school,name:d.name||old?.name||"",kind,changes:ch.map(c=>({...c,from:/cnic/i.test(c.k)?c.from:c.from,to:c.to})),by:me().uid,byName:me().name||"",role:role(),atMs:now,day:isoDay(now),at:TS}});
+  if(!old){ const nid=newId(); await DB.apply({set:[{col:"staff",id:nid,data:{...d,school,createdAt:TS,createdBy:me().name||"",updatedAt:TS}},log(nid,changes.filter(c=>c.to),"Added")]}); toast(`${d.name} added.`); go("rec",{id:nid}); return; }
+  const locked=role()==="clerk"?changes.filter(c=>ALLF.find(x=>x.k===c.k)?.lock&&c.from.trim()):[], free=changes.filter(c=>!locked.includes(c));
+  let reason=""; if(locked.length){ reason=prompt(`These main details are already filled: ${locked.map(c=>c.l).join(", ")}.\nThe change goes to the DQ Office / Regional Director for approval.\n\nReason for the change (e.g. as per CNIC / appointment letter):`)||""; if(!reason.trim()) return toast("Not saved — a reason is needed for the main details.",true); }
+  const ops={set:[],upd:[]};
+  if(free.length){ const u=Object.fromEntries(free.map(c=>[c.k,c.to])); if(old.conf) u.conf=DEL; ops.upd.push({col:"staff",id,data:{...u,updatedAt:TS,updatedBy:me().name||""}}); ops.set.push(log(id,free,"Changed")); }
+  if(locked.length) ops.set.push({col:"staffAppr",id:newId(),data:{staffId:id,school,name:old.name,changes:locked,reason,by:me().uid,byName:me().name||"",status:"pending",atMs:now,at:TS}});
+  await DB.apply(ops); toast(locked.length?`${free.length?"Saved; ":""}${locked.length} main detail change${locked.length>1?"s":""} sent for approval.`:"Saved."); delete (S.hist||{})[id]; render(); }
+async function apprDecide(id, ok){ const a=S.appr.find(x=>x.id===id); if(!a) return; const why=ok?"":(prompt("Reason for not approving:")||""); if(!ok&&!why) return;
+  const ops={set:[],upd:[{col:"staffAppr",id,data:{status:ok?"approved":"rejected",decBy:me().name||"",decAtMs:Date.now(),decReason:why}}]};
+  if(ok){ ops.upd.push({col:"staff",id:a.staffId,data:{...Object.fromEntries(a.changes.map(c=>[c.k,c.to])),updatedAt:TS,updatedBy:me().name||""}}); ops.set.push({col:"staffEdits",id:newId(),data:{staffId:a.staffId,school:a.school,name:a.name,kind:`Approved (asked by ${a.byName}: ${a.reason})`,changes:a.changes,by:me().uid,byName:me().name||"",role:role(),atMs:Date.now(),day:isoDay(Date.now()),at:TS}}); }
+  await DB.apply(ops); toast(ok?"Approved — the record is changed.":"Not approved."); }
+const ACT = {
+  demoLogin: async el => { await Local.login(el.dataset.id); boot(); }, signOut: () => DB.signOut(),
+  modalBg: (el,e) => { if(e.target===el) closeModal(); }, closeModal,
+  go: el => go(el.dataset.v, Object.fromEntries(new URLSearchParams(el.dataset.p||""))),
+  setP: el => go(S.view, Object.fromEntries(new URLSearchParams(el.dataset.p||""))),
+  openRec: el => { if(el.dataset.id) go("rec",{id:el.dataset.id}); }, recNew: () => go("rec",{school:S.params.school||""}),
+  confirm: async el => { const r=S.staff.find(x=>x.id===el.dataset.id); await DB.apply({upd:[{col:"staff",id:r.id,data:{conf:{by:me().name||"",uid:me().uid,atMs:Date.now()},ret:DEL,retBy:DEL}}],set:[{col:"staffEdits",id:newId(),data:{staffId:r.id,school:r.school,name:r.name,kind:"Confirmed by the principal",changes:[],by:me().uid,byName:me().name||"",role:role(),atMs:Date.now(),day:isoDay(Date.now()),at:TS}}]}); delete (S.hist||{})[r.id]; toast("Confirmed."); },
+  retRec: async el => { const r=S.staff.find(x=>x.id===el.dataset.id), why=prompt("What should the clerk correct?"); if(!why) return; await DB.apply({upd:[{col:"staff",id:r.id,data:{ret:why,retBy:me().name||"",conf:DEL}}],set:[{col:"staffEdits",id:newId(),data:{staffId:r.id,school:r.school,name:r.name,kind:"Returned to the clerk: "+why,changes:[],by:me().uid,byName:me().name||"",role:role(),atMs:Date.now(),day:isoDay(Date.now()),at:TS}}]}); delete (S.hist||{})[r.id]; toast("Returned with your remarks."); },
+  apprOk: el => apprDecide(el.dataset.id,true), apprNo: el => apprDecide(el.dataset.id,false),
+  leaveNew: el => { const id=el.dataset.id; modal(`<h3>Add leave</h3><form data-form="leaveSave" data-id="${h(id)}" class="grid"><div class="f"><label>Type</label><select id="lvT">${cfg().leaveTypes.map(t=>`<option>${h(t)}</option>`).join("")}</select></div><div class="f"><label>From</label><input type="date" id="lvF" required></div><div class="f"><label>To</label><input type="date" id="lvTo" required></div><div class="f wide"><label>Remarks</label><input id="lvR"></div><label style="grid-column:1/-1"><input type="checkbox" id="lvS"> Set status to “On leave” now (put it back to “In service” on return)</label><div class="row" style="grid-column:1/-1"><button type="button" class="btn" data-act="closeModal">Cancel</button><button class="btn p">Save</button></div></form>`); },
+  docView: el => { const d=S.docs[el.dataset.id][+el.dataset.i]; modal(`<div class="ph"><h3>${h(d.type)}</h3><button class="btn s" data-act="closeModal">Close</button></div><p class="mini mute">${h(d.byName||"")} · ${h(fmtDT(d.atMs))}</p><img src="${d.img}" style="max-width:100%;max-height:75vh;display:block;margin:auto">`,"wide"); },
+  exp: el => exportTable(el.dataset.k, el.dataset.f),
+  printRec: async () => { const r=S.staff.find(x=>x.id===S.params.id); const g=await gate("print",`Staff record — ${r.name}`,1,["record"]); if(!g) return; $("#wm").innerHTML=g.noWm?"":wmSvg(); window.print(); },
+  impCancel: () => { S.imp=null; render(); },
+  impSave: async () => { const I=S.imp, ok=I.rows.filter(r=>!r.err.length), ops={set:[],upd:[]}, now=Date.now();
+    for(const r of ok){ if(r.ex){ const ch=Object.entries(r.d).filter(([k,v])=>String(r.ex[k]??"")!==v); if(!ch.length) continue; ops.upd.push({col:"staff",id:r.ex.id,data:{...r.d,updatedAt:TS,updatedBy:me().name||""}}); ops.set.push({col:"staffEdits",id:newId(),data:{staffId:r.ex.id,school:I.school,name:r.d.name,kind:"Updated from Excel: "+I.file,changes:ch.map(([k,v])=>({k,l:FL(k),from:String(r.ex[k]??""),to:v})),by:me().uid,byName:me().name||"",role:role(),atMs:now,day:isoDay(now),at:TS}}); }
+      else { const id=newId(); ops.set.push({col:"staff",id,data:{...r.d,school:I.school,createdAt:TS,createdBy:me().name||"",updatedAt:TS}}); ops.set.push({col:"staffEdits",id:newId(),data:{staffId:id,school:I.school,name:r.d.name,kind:"Added from Excel: "+I.file,changes:[],by:me().uid,byName:me().name||"",role:role(),atMs:now,day:isoDay(now),at:TS}}); } }
+    try{ await DB.apply(ops); }catch(e){ return toast("Not saved — "+e.message,true); } audit("Staff imported from Excel",`${I.school}: ${ok.length} rows from ${I.file}`); S.imp=null; toast(`${ok.length} records saved to ${I.school}.`); go("staff",{school:I.school}); },
+  tpl: async () => { await loadXlsx(); const head=["Name","Father / husband name","Gender","Date of birth","CNIC","Mobile","Staff No","Designation","BPS","Appointment type","Date of joining","Qualification","Professional qualification","Subjects taught","Classes taught","Status","Remarks"];
+    const ws=XLSX.utils.aoa_to_sheet([head,["Mrs Ayesha Khan","Imran Khan","Female","1988-05-14","17301-1234567-1","0300-1234567","APS-1023","Senior Subject Teacher (SST)","16","Permanent","2015-04-01","Masters (MA/MSc)","B.Ed","English","IX, X","In service","Example — delete this row"]]), wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Staff"); XLSX.writeFile(wb,"Staff_template.xlsx"); },
+};
+const FORMS = {
+  login: async () => { try{ await DB.signIn($("#lE").value,$("#lP").value); }catch(e){ toast("Sign-in failed: "+(e.code||e.message),true); } },
+  recSave: f => saveRec(f),
+  postsSave: async f => { const code=f.dataset.id, fd=new FormData(f), s={}; for(const p of posts()){ const v=Number(fd.get(p.id)||0); if(v>0) s[p.id]=v; } await DB.apply({set:[{col:"staffPosts",id:code,data:{s,atMs:Date.now(),by:me().name||""}}]}); audit("Sanctioned posts changed",`${code}: ${Object.entries(s).map(([k,v])=>`${postOf(k)?.name||k} ${v}`).join(", ")}`); toast(`Sanctioned posts of ${code} saved.`); setP({edit:""}); },
+  postsList: async () => { const old=posts(); let n=0;
+    const out=$("#psL").value.split("\n").map(x=>x.trim()).filter(Boolean).map(x=>{ let id="", rest=x; const m=x.match(/^([a-z0-9_]+)\s*=\s*(.*)$/i); if(m){ id=m[1]; rest=m[2]; } const [nm,c,bp]=rest.split("|").map(y=>(y||"").trim());
+      return {id:id||(norm(nm).slice(0,14)+"_"+Date.now().toString(36).slice(-3)+(n++)),name:nm,cat:CATS.find(k=>norm(k)===norm(c))||"Teaching",bps:bp?Number(bp)||bp:""}; }).filter(p=>p.name);
+    const gone=old.filter(o=>!out.some(x=>x.id===o.id)), used=gone.filter(o=>S.staff.some(r=>r.postId===o.id)); if(used.length) return toast(`Not saved: staff are on ${used.map(x=>x.name).join(", ")} — move them first.`,true);
+    await DB.apply({set:[{col:"staffCfg",id:"app",data:{...S.cfg,posts:out},merge:true}]}); toast("Posts saved."); },
+  lists: async f => { const fd=new FormData(f), d={}; for(const k of ["leaveTypes","statuses","apptTypes","quals","prof"]) d[k]=String(fd.get(k)||"").split("\n").map(x=>x.trim()).filter(Boolean); await DB.apply({set:[{col:"staffCfg",id:"app",data:{...S.cfg,...d},merge:true}]}); toast("Lists saved."); },
+  leaveSave: async f => { const id=f.dataset.id, r=S.staff.find(x=>x.id===id), from=$("#lvF").value, to=$("#lvTo").value, days=daysBetween(from,to); if(!days) return toast("Check the dates.",true);
+    const ops={set:[{col:"staffLeave",id:newId(),data:{staffId:id,school:r.school,name:r.name,type:$("#lvT").value,from,to,days,remarks:$("#lvR").value.trim(),by:me().uid,byName:me().name||"",atMs:Date.now(),at:TS}},{col:"staffEdits",id:newId(),data:{staffId:id,school:r.school,name:r.name,kind:`Leave: ${$("#lvT").value} ${fmtD(from)} – ${fmtD(to)} (${days} days)`,changes:[],by:me().uid,byName:me().name||"",role:role(),atMs:Date.now(),day:isoDay(Date.now()),at:TS}}],upd:[]};
+    if($("#lvS").checked) ops.upd.push({col:"staff",id,data:{status:"On leave",statusDate:from}}); await DB.apply(ops); closeModal(); delete S.leave[id]; delete (S.hist||{})[id]; S.leaveAll=null; toast("Leave saved."); render(); },
+};
+document.addEventListener("click", e => { const el=e.target.closest("[data-act]"); if(!el) return; const f=ACT[el.dataset.act]; if(f){ if(el.tagName==="A") e.preventDefault(); f(el,e); } });
+document.addEventListener("submit", e => { const f=e.target.closest("form[data-form]"); if(!f) return; e.preventDefault(); FORMS[f.dataset.form]?.(f); });
+document.addEventListener("change", async e => { const el=e.target;
+  if(el.dataset.p!==undefined&&el.closest("main")&&!el.closest("form")){ setP({[el.dataset.p]:el.value}); return; }
+  if(el.dataset.chg==="impFile"){ const f=el.files[0]; el.value=""; if(f) impFile(f); return; }
+  if(el.dataset.chg==="docAdd"){ const f=el.files[0]; el.value=""; if(!f) return; const r=S.staff.find(x=>x.id===el.dataset.id); try{ toast("Saving…"); const img=await shrink(f), now=Date.now(), type=$("#docT").value;
+      await DB.apply({set:[{col:"staffDocs",id:newId(),data:{staffId:r.id,school:r.school,type,img,by:me().uid,byName:me().name||"",atMs:now,at:TS}},{col:"staffEdits",id:newId(),data:{staffId:r.id,school:r.school,name:r.name,kind:"Document added: "+type,changes:[],by:me().uid,byName:me().name||"",role:role(),atMs:now,day:isoDay(now),at:TS}}]});
+      delete S.docs[r.id]; delete (S.hist||{})[r.id]; toast("Document saved."); render(); }catch(x){ toast("Not saved — "+x.message,true); } } });
+document.addEventListener("keydown", e => { if(e.target.dataset?.p==="q"&&e.key==="Enter"){ setP({q:e.target.value}); } });
+DB.start();
+</script>
+</body>
+</html>
