@@ -1,5 +1,5 @@
 // APEIs Strength Portal — opens instantly from the copy saved on this device, then checks for a newer version in the background.
-const C = 'apeis-shell-v2';
+const C = 'apeis-shell-v4';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil((async () => {
   for (const k of await caches.keys()) if (k !== C) await caches.delete(k);

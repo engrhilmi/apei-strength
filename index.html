@@ -408,7 +408,7 @@ const DEMO = !FIREBASE_CONFIG.apiKey || FIREBASE_CONFIG.apiKey.startsWith("PASTE
 /* =====================================================================
    2) DEFAULTS — every one of these can be changed by the Super Admin in Setup
    ===================================================================== */
-const ROLES = { superadmin:"Super Admin", hq:"HQ / DQ Office", viewer:"Senior / Viewer (read-only)", principal:"Principal / Section Head", clerk:"Clerk" };
+const ROLES = { superadmin:"Super Admin", hq:"HQ / DQ Office", viewer:"Senior / Viewer (read-only)", principal:"Principal / Section Head", clerk:"Clerk", teacher:"Class Teacher" };
 // kind: in (+1) | out (−1) | sec (section move, 0) | apei_out (−1, can go to another school of the cluster for acceptance) | apei_in (+1)
 const DEFAULT_ACTIONS = [
   {code:"NEW",   label:"New Admission",        kind:"in",  on:true},
@@ -699,7 +699,7 @@ function fsFail(e){ const msg=String(e?.message||e||""); if(!/INTERNAL ASSERTION
 addEventListener("unhandledrejection", e=>fsFail(e.reason)); addEventListener("error", e=>fsFail(e.error||e.message));
 setTimeout(()=>{ try{ sessionStorage.removeItem("apeis_fsfail"); }catch(x){} }, 10*60e3);
 /* every student write also updates that school's small search index (stuIdx/{school}.i.{id}) — 6 small documents instead of thousands of reads */
-const IDX_F = ["admNo","name","father","cl","sec","gender","cat","status","fatherCnic","contact","dob","bform","motherCnic","contact2","fatherRank","unit","serviceNo","cv","pType","mother","guardian","guardianRel","guardianCnic","dup","dupOk","eyes","height","weight","allergies","disability","ver","medDate","vacc","medication","vreq","flag"];
+const IDX_F = ["admNo","name","father","cl","sec","gender","cat","status","fatherCnic","contact","dob","bform","motherCnic","contact2","fatherRank","unit","serviceNo","cv","pType","mother","guardian","guardianRel","guardianCnic","dup","dupOk","eyes","height","weight","allergies","disability","ver","medDate","vacc","medication","vreq","flag","pslip"];
 const IDX_SEP = "\u001f";
 const idxArr = r => IDX_F.map(k=>r[k]===DEL||r[k]==null?"":String(r[k]).replace(/\u001f/g," ")).join(IDX_SEP);
 const idxObj = (id, school, a) => { if(typeof a==="string") a=a.split(IDX_SEP); const o={id,school}; IDX_F.forEach((k,i)=>o[k]=(a&&a[i])||""); if(o.contact) o.contact=fmtPhones(o.contact); if(o.contact2) o.contact2=fmtPhones(o.contact2); return o; };
@@ -743,7 +743,7 @@ function voidToOps(ops, tx, reason){
 }
 function snapshotData(){ const d={}; for(const s of schoolList()){ const st=schoolStats(s.code); d[s.code]={str:st.str,auth:st.auth,g:st.g,b:st.b,wait:st.wait,n:st.n,w:Object.fromEntries(st.classes.filter(c=>c.wait).map(c=>[c.cl,c.wait]))}; if(hasDc(s)) d[s.code].dc=dcStr(s.code); } return d; }
 async function ensureSnapshot(force){
-  const day=isoDay(Date.now());
+  const day=isoDay(Date.now()); if(role()==="teacher") return;
   if(!force && S.snapshots.some(x=>x.day===day)) return;
   if(!Object.keys(S.schools).length) return;
   try{ await DB.apply({set:[{col:"snapshots",id:day,data:{day,at:TS,by:me().name||"",d:snapshotData()}}],upd:[],inc:[]}, true); if(force) toast("Snapshot saved for "+day+"."); }catch(e){ if(force) toast(e.message,true); }
@@ -759,6 +759,7 @@ const Local = {
     const U = [["sa","Super Admin (you)","superadmin","ALL"],["hq","DQ Office","hq","ALL"],["sr","Comdt (Senior)","viewer","ALL"],["pr-gaps","Principal GAPS","principal","GAPS"],
       ["c-jm","Clerk JM","clerk","JM"],["c-mid","Clerk MidWsk","clerk","MidWsk"],["c-gaps","Clerk GAPS","clerk","GAPS"],["c-gc","Clerk GC","clerk","GC"],["c-bc","Clerk BC","clerk","BC"],["c-apsis","Clerk APSIS","clerk","APSIS"]];
     for (const [uid,name,role,school] of U) st.users[uid]={ uid, name, role, school, email:uid+"@"+LOGIN_DOMAIN, active:true };
+    st.users["t-jm"]={ uid:"t-jm", name:"Teacher JM III-A", role:"teacher", school:"JM", tcl:"III", tsec:"A", wing:"Junior", appt:"Class Teacher", email:"t-jm@"+LOGIN_DOMAIN, active:true };
     this.st = st; this.save();
   },
   pull(){
@@ -851,6 +852,10 @@ const Fire = {
     const data = d => ({ id:d.id, ...d.data({serverTimestamps:"estimate"}) });
     const first={}; let done; const ready=new Promise(r=>done=r); const got=k=>{ first[k]=1; if(first.settings&&first.schools&&first.strength) done(); };
     const waitNow=()=>{ S.waiting=(this.waitAll||[]).filter(w=>w.session===sessOf(w.school)&&!w.deleted); };
+    if(role()==="teacher"){ let dn; const rd=new Promise(r=>dn=r), f2={}, g2=k=>{ f2[k]=1; if(f2.s&&f2.c) dn(); };   // a class teacher reads only what marking attendance needs
+      on(m.doc(db,"settings","app"), d=>{ S.settings=d.data()||{}; g2("s"); if(lockFor(S.user,S.settings)){ this.onAuth(this.auth.currentUser); return; } refresh(); });
+      on(m.collection(db,"schools"), q=>{ S.schools=Object.fromEntries(q.docs.map(d=>[d.id,data(d)])); g2("c"); refresh(); });
+      return Promise.race([rd, sleep(9000)]); }
     on(m.doc(db,"settings","app"), d=>{ S.settings=d.data()||{}; waitNow(); got("settings"); if(lockFor(S.user,S.settings)){ this.onAuth(this.auth.currentUser); return; } refresh(); });
     on(m.collection(db,"schools"), q=>{ S.schools=Object.fromEntries(q.docs.map(d=>[d.id,data(d)])); got("schools"); refresh(); });
     on(m.collection(db,"strength"), q=>{ S.strength=Object.fromEntries(q.docs.map(d=>{ const x=d.data(); return [d.id,{d:x.d||{},w:x.w||{},c:x.c||{}}]; })); got("strength"); refresh(); });
@@ -987,7 +992,7 @@ const allowed = v => NAV.some(n=>n[0]===v && n[2]()) || HIDDEN.some(n=>n[0]===v 
 // one chip: "Jawad · Clerk · GAPS"; the name is skipped when it just repeats the role (e.g. "Super Admin")
 function whoLabel(){ const r=ROLES[role()]||role()||"", n=(me().name||me().email||"").trim(); const parts=[];
   const rr=r.replace(/\s*\(.*\)$/,""); if(n && !norm(rr).startsWith(norm(n))) parts.push(n); if(!norm(n).startsWith(norm(rr))) parts.push(rr); if(mySchool()) parts.push(mySchool()); if(!parts.length) parts.push(rr||n); return h(parts.join(" · ")); }
-const homeView = () => role()==="clerk" ? "entry" : "dash";
+const homeView = () => role()==="clerk" ? "entry" : role()==="teacher" ? "attend" : "dash";
 const VIEWS = {};
 let pendingRegions = new Set();
 
@@ -1374,7 +1379,7 @@ async function saveEntry(){
 
 /* ---------- Transfers ---------- */
 function admTabs(cur){ const inc=S.transfers.filter(t=>t.status==="pending"&&(isSA()||role()==="hq"||t.to===mySchool())).length;
-  return `<div class="subtabs">${[...(canEntry()?[["entry","📥 Daily entry — admissions & withdrawals","entry"]]:[]),["new","📝 New admissions — waiting list","waiting"],["tfr","📋 Transfer requests — seniority list","waiting"],["moves",`🔁 Transfers between APEIs — in transit${inc?` <span class="badge">${inc}</span>`:""}`,"transfers"]].map(([k,l,v])=>`<button class="pill ${cur===k?"on":""}" ${v!=="waiting"?`data-act="go" data-id="${v}"`:`data-act="go" data-id="waiting" data-p="tab=${k}"`}>${l}</button>`).join("")}</div>`; }
+  return `<div class="subtabs">${[...(canEntry()?[["entry","📥 Daily entry — admissions & withdrawals","entry"]]:[]),["new","📝 New admissions — waiting list","waiting"],["tests","🧪 Test results & merit list","tests"],["tfr","📋 Transfer requests — seniority list","waiting"],["moves",`🔁 Transfers between APEIs — in transit${inc?` <span class="badge">${inc}</span>`:""}`,"transfers"]].map(([k,l,v])=>`<button class="pill ${cur===k?"on":""}" ${v!=="waiting"?`data-act="go" data-id="${v}"`:`data-act="go" data-id="waiting" data-p="tab=${k}"`}>${l}</button>`).join("")}</div>`; }
 const HIDDEN_T = HIDDEN.push(["transfers",()=>role()!=="viewer"]);
 VIEWS.transfers = {
   shell:()=>`${admTabs("moves")}<div class="panel"><h2>Incoming — waiting for acceptance</h2><div class="scroll" id="tIn"></div></div><div class="panel"><h2>Outgoing — sent by your school</h2><div class="scroll" id="tOut"></div>
@@ -1684,7 +1689,7 @@ function stuPageHtml(){ const sp=S.sp; if(!sp) return ""; if(sp.err) return `<di
   return `${sp.isNew?"":stuNavBar(r)}<div class="panel ${ed?"editing":""}"><div class="sp-head" style="align-items:flex-start">${phBox}<div style="flex:1"><h2>${sp.isNew?"Add a student to the data bank":h(r.name)}</h2>
       <div class="sub">${h(code)} — ${h(sc?.name||"")} · ${h(r.cl)}-${h(r.sec)} · ${r.status==="On roll"?"On roll":`<span class="tag t-out">${h(r.status)}</span>`}${r.admNo?` · Adm ${h(r.admNo)}`:""}${r.cat?` · ${h(catLabel(r.cat))}`:""}${fee?` · Monthly fee Rs ${nf(fee)}`:""}</div>${sp.isNew?"":stayLine(r)}</div>
       <div class="pills"><button class="btn" data-act="back">← Back</button>${editBtn}${!sp.isNew?expBar("stuOne")+formBar("one"):""}${!sp.isNew&&r.status==="On roll"&&(canEnter(code)||canDecide())?`<button class="btn" data-act="classReq" title="Move the student to another class (parent's request etc.)">⇅ Change of class</button>`:""}${!sp.isNew&&canDecide()?`<button class="btn r" data-act="stuDel" data-id="${h(r.id)}" title="Moves the record to Trash; it can be restored">🗑 Move to Trash</button>`:""}</div></div>
-      ${!sp.isNew?flagBox(r):""}${!sp.isNew?docsStrip(r,may):""}${!sp.isNew?verBox(r,may):""}${r.cv&&!sp.isNew?`<div class="note" style="border-color:#d97706">⚠ <b>Category to re-verify.</b> This school's categories came in against the old list. Check the category${may?` — correct it with ✎ Edit, or if it is already right press <button class="btn s g" data-act="cvOk" data-id="${h(r.id)}">✓ Category is correct</button>`:""}.</div>`:""}
+      ${r.pslip&&!sp.isNew?`<div class="note" style="border-color:#16a34a">✍ <b>Parent-checked</b> — signed parent confirmation slip uploaded ${h(fmtD(r.pslip))}.</div>`:""}${!sp.isNew?flagBox(r):""}${!sp.isNew?docsStrip(r,may):""}${!sp.isNew?verBox(r,may):""}${r.cv&&!sp.isNew?`<div class="note" style="border-color:#d97706">⚠ <b>Category to re-verify.</b> This school's categories came in against the old list. Check the category${may?` — correct it with ✎ Edit, or if it is already right press <button class="btn s g" data-act="cvOk" data-id="${h(r.id)}">✓ Category is correct</button>`:""}.</div>`:""}
     ${sp.isNew?`<div class="note" style="margin-top:10px">Use this for students already on roll. A <b>new admission</b> should be entered on the Entry tab — that adds the student to strength and creates the record by itself.</div>`:""}
     ${!may&&!sp.isNew?`<p class="hint">Read-only for your account${role()==="clerk"?` — this student belongs to ${h(code)}`:""}.</p>`:""}
     ${may&&!ed&&!direct?`<p class="hint">To correct this record, <b>double-click</b> any field (or the Edit button). You will be asked to confirm; every change is kept in the edit log with your name.</p>`:""}
@@ -2528,7 +2533,7 @@ async function admForms(list, f, name){ if(!canSD()){ toast(SD_MSG,true); return
   const html=list.map(admFormHtml).join("");
   if(f==="doc"){ if(!canWD()){ toast(WD_MSG,true); return; } wordFile(name,{title:"",sub:"",orientation:"portrait",models:[],html}); toast(`${list.length} admission form${list.length>1?"s":""} saved as Word.`); }
   else printHtml(`<div style="background:#fff">${html}</div>`,{paper:"A4",orientation:"portrait",allow:false}); }
-function formBar(scope){ if(!canSD()) return ""; const b=[]; if(canPR()) b.push(`<button class="btn s" data-act="admForms" data-id="${scope}" data-f="pdf" title="One A4 page per student">Admission forms — Print / PDF</button>`); if(canWD()) b.push(`<button class="btn s" data-act="admForms" data-id="${scope}" data-f="doc">Admission forms — Word</button>`); return b.join(""); }
+function formBar(scope){ if(!canSD()) return ""; const b=[]; if(canPR()) b.push(`<button class="btn s" data-act="pSlips" data-id="${scope}" title="A slip for the parents to check the details and sign — 2 per A4 page">✍ Parent confirmation slips</button>`); if(canPR()) b.push(`<button class="btn s" data-act="admForms" data-id="${scope}" data-f="pdf" title="One A4 page per student">Admission forms — Print / PDF</button>`); if(canWD()) b.push(`<button class="btn s" data-act="admForms" data-id="${scope}" data-f="doc">Admission forms — Word</button>`); return b.join(""); }
 
 /* ---------- waiting list: school-wise and class-wise summary, every figure opens the applicants ---------- */
 function waitDrillHtml(){ const p=S.params, codes=scopeCodes(p); let T={t:0,n:0,w:0};
@@ -2916,7 +2921,7 @@ function reviewDlg(){ const r=ST().review||{};
     <div class="row"><button type="button" class="btn" data-act="closeModal">Cancel</button><button class="btn p">Save</button></div></form>`); }
 
 /* ---------- v4.10: roles guide, category re-verification, Trash ---------- */
-const ROLE_C = { superadmin:"#7c2d12", hq:"#1d4ed8", principal:"#0f766e", clerk:"#475569", viewer:"#7c3aed" };
+const ROLE_C = { superadmin:"#7c2d12", hq:"#1d4ed8", principal:"#0f766e", clerk:"#475569", viewer:"#7c3aed", teacher:"#b45309" };
 const ROLE_HELP = [["superadmin","Everything, in every school: Setup, users, passwords, permanent deletes, back-dating."],["hq","All schools: approves entries and transfer requests, edits records, moves records to Trash and restores them. No Setup."],
   ["principal","Own school: sees everything of the school; can enter if allowed."],["clerk","Own school: daily entries, data bank, applicants. Edits a record with a double-click warning; undo only within the minutes you allow."],["viewer","Dashboard and reports only — cannot change anything (for the Commandant / senior)."]];
 const roleGuide = () => `<details style="margin:0 0 8px"><summary class="mute" style="cursor:pointer">What each role can do</summary><table style="margin-top:6px">${ROLE_HELP.map(([k,t])=>`<tr><td style="white-space:nowrap"><span class="rolechip" style="background:${ROLE_C[k]}">${h(ROLES[k])}</span></td><td style="white-space:normal">${h(t)}</td></tr>`).join("")}</table><p class="hint">Downloads, printing, WhatsApp and students' personal data can be allowed or blocked for each user in the columns below.</p></details>`;
@@ -3742,6 +3747,7 @@ const BLOCKS = {
   tfrlist:     { name:"Inter-APEI transfer requests — seniority list", title:"TRANSFER REQUESTS", opts:{all:false} },
   feedef:      { name:"Fee defaulters (as on the report date) with comparison", title:"FEE DEFAULTERS", opts:{compare:"prev"} },
   note:        { name:"Free text / remarks", title:"REMARKS", opts:{text:""} },
+  yoy:         { name:"Same month last year — comparison", title:"COMPARISON WITH LAST YEAR" },
   signatures:  { name:"Signature block", title:"", opts:{lines:"Prepared by\nChecked by\nApproved by"} }
 };
 function defaultPresets(){
@@ -3756,6 +3762,7 @@ function defaultPresets(){
     P("newadm","New admissions list (school-wise)","NEW ADMISSIONS - APEIs PSC",[{key:"movelist",on:true,title:"NEW ADMISSIONS",opts:{bySchool:true,...Object.fromEntries(DEFAULT_ACTIONS.filter(a=>!["NEW","READM","OST"].includes(a.code)).map(a=>["a_"+a.code,false]))}}],{period:{kind:"month"},orientation:"portrait"}),
     P("slc","Withdrawals / SLC list (school-wise)","WITHDRAWALS / SLC - APEIs PSC",[{key:"movelist",on:true,title:"WITHDRAWALS / SLC",opts:{bySchool:true,...Object.fromEntries(DEFAULT_ACTIONS.filter(a=>!["WD","SOS"].includes(a.code)).map(a=>["a_"+a.code,false]))}}],{period:{kind:"month"},orientation:"portrait"}),
     P("apeitfr","Inter-APEI transfers in / out (school-wise)","INTER-APEI TRANSFERS - APEIs PSC",[{key:"movelist",on:true,title:"INTER-APEI TRANSFERS",opts:{bySchool:true,...Object.fromEntries(DEFAULT_ACTIONS.filter(a=>!["APEI_IN","APEI_OUT"].includes(a.code)).map(a=>["a_"+a.code,false]))}},"transit","tfrlist"],{period:{kind:"month"}}),
+    P("mreturn","Monthly strength return","MONTHLY STRENGTH RETURN - APEIs PSC",[{key:"birdseye",on:true,opts:{perRow:6}},"yoy","signatures"],{paper:"A3",font:10,fit:true,flow:true,monthly:true}),
     P("feedef","Fee defaulters with comparison","FEE DEFAULTERS - APEIs PSC",["feedef"],{orientation:"portrait",showLogo:true}),
     P("status","Entry status & day care","DAILY STATUS - APEIs PSC",["status","daycare"],{orientation:"portrait"})
   ];
@@ -3769,7 +3776,9 @@ function normCfg(c){
   c.asOf ||= ""; c.period ||= {kind:"cutoff"}; c.schools ||= []; c.orientation ||= "landscape"; c.font ||= 11; c.paper ||= "A4"; c.fit=!!c.fit; c.flow=!!c.flow;
   for(const k of ["color","showLogo","showUpdated"]) if(c[k]===undefined) c[k]=true; return c;
 }
-const rcfg = () => { if(!S.rcfg){ const p=presets().find(x=>x.id===(S.rpid||ST().defaultPreset))||presets()[0]; S.rpid=p.id; S.rcfg=normCfg(p); } return S.rcfg; };
+const lastMonthEnd = () => { const d=new Date(); d.setDate(0); return isoDay(d.getTime()); };
+const rcfg = () => { if(!S.rcfg){ const p=presets().find(x=>x.id===(S.rpid||ST().defaultPreset))||presets()[0]; S.rpid=p.id; S.rcfg=normCfg(p);
+    if(p.monthly&&!S.rcfg.asOf){ const e=lastMonthEnd(), d=new Date(e+"T12:00"); S.rcfg.asOf=e; S.rcfg.subtitle ||= `For the month of ${d.toLocaleString("en-GB",{month:"long"})} ${d.getFullYear()}`; S.rcfg.period={kind:"custom",from:e.slice(0,8)+"01",to:e}; } } return S.rcfg; };
 const cfgCodes = c => { const all=schoolList().map(s=>s.code); return c.schools?.length ? all.filter(x=>c.schools.includes(x)) : all; };
 
 /* ---------- table model shared by screen, print and Excel ---------- */
@@ -3841,6 +3850,7 @@ const BUILD = {
   tfrlist(b,x){ const R=tfrList({tst:b.opts.all?"all":""}).filter(t=>x.codes.includes(t.choice1)); return [tbl(`${b.title} (${R.length})`,["Seniority","No.","Appl date","Name","Father","Class","Category","Studying at","1st choice","2nd","Status"],R.length?R.map(t=>({c:[String(t.rank||""),t.id,isoToDmy(t.appDate),t.name,t.father||"",t.cl,catLabel(t.cat),t.curSchool==="__other"?t.curExt||"Other":t.curSchool,t.choice1,t.choice2||"",t.status]})):[{c:["","None"]}])]; },
   feedef(b,x){ const a=x.asOf||isoDay(Date.now()); const days=[...new Set((S.feeRets||[]).map(r=>r.day))].sort(); const prev=b.opts.compare==="prev"?days.filter(d=>d<a).at(-1)||"":""; return feeModels(a,prev); },
   note(b){ return b.opts.text||b.title ? [{t:"text", title:b.title, text:b.opts.text||"", style:b.opts.style||"p"}] : []; },
+  yoy(b,x){ return yoyModel(b,x); },
   signatures(b){ return [{t:"sign", lines:String(b.opts.lines||"").split("\n").map(s=>s.trim()).filter(Boolean)}]; }
 };
 function trendSvg(p){
@@ -3858,6 +3868,7 @@ async function buildReport(c){
   const w=periodWin(c.period.kind,c.period.from,c.period.to); const needTx=c.blocks.some(b=>b.on&&["kpis","movement","movelist","category","schoolwise"].includes(b.key));
   const tx=needTx?await getTx(w):[]; const x={codes:cfgCodes(c), w, tx, plabel:periodLabel(c.period.kind,w)};
   if(c.blocks.some(b=>b.on&&b.key==="feedef")) await loadFeeRets().catch(()=>[]);
+  if(c.blocks.some(b=>b.on&&b.key==="yoy")) x.yoy=await yoyPrep(c, x.codes).catch(e=>({err:e.message}));
   if(c.blocks.some(b=>b.on&&b.key==="roll")) await Promise.all(x.codes.map(code=>ensureStu(code).catch(()=>[])));
   const st=c.asOf ? await asOfState(c.asOf) : null; x.asOf=st?st.day:"";
   if(st) S.asOf=st; try{ return { x, blocks:c.blocks.filter(b=>b.on).map(b=>({b, parts:BUILD[b.key](b,x)})) }; } finally{ S.asOf=null; }
@@ -4083,7 +4094,7 @@ const SETUP = {
      <form data-form="opening"><div class="scroll"><table><tr><th>Class - Sec</th><th class="n">Seats</th><th class="n">${h(L("g"))}</th><th class="n">${h(L("b"))}</th><th class="n">Opening total</th><th class="n">Live now</th></tr>
      ${sc.classes.map((c,i)=>c.secs.map((x,j)=>{ const v=cur(code,c.cl,x.s); return `<tr><td>${h(c.cl)} - ${h(x.s)}${x.est?` <span class="tag t-mid">est.</span>`:""}</td><td class="n"><input class="in num" type="number" min="1" name="c_${i}_${j}" value="${x.cap??""}" placeholder="${sc.cap}"></td><td class="n"><input class="in num" type="number" min="0" name="g_${i}_${j}" value="${x.g||0}"></td><td class="n"><input class="in num" type="number" min="0" name="b_${i}_${j}" value="${x.b||0}"></td><td class="n">${(x.g||0)+(x.b||0)}</td><td class="n">${v.g+v.b}</td></tr>`; }).join("")).join("")}
      </table></div><div class="row"><button class="btn p">Save opening strength for ${h(code)}</button></div></form></div>`; },
-  users(){ const Lu=[...S.users].sort((a,b)=>(a.role+a.school+a.name).localeCompare(b.role+b.school+b.name));
+  users(){ const Lu=uFiltered();
     return `${signupPanel()}${accessPanel()}${adminFnHtml()}<div class="panel"><h2>Create a login</h2><form data-form="addUser" class="grid" autocomplete="off">
       <div class="f"><label for="uName">Full name</label><input id="uName" required></div>
       <div class="f"><label for="uEmail">Email or username</label><input id="uEmail" required placeholder="jawad or jawad@gmail.com"></div>
@@ -4092,9 +4103,9 @@ const SETUP = {
       <div class="f"><label for="uSch">School</label><select id="uSch"><option value="ALL">ALL (Super Admin / HQ / Senior)</option>${schoolList(true).map(s=>`<option>${h(s.code)}</option>`).join("")}</select></div>
       <button class="btn p">Create</button></form>
       <p class="hint">Senior / Viewer sees the Dashboard and Reports only and cannot change anything — give this to your Commandant with the QR code. Usernames without "@" become name@${h(LOGIN_DOMAIN)}.</p></div>
-      <div class="panel"><h2>All users</h2>${roleGuide()}<p class="hint" style="margin-top:0">To change someone's role or school, pick it in the <b>Role</b> / <b>School</b> column — it is saved at once and the person sees the change the next time the page refreshes.</p><div class="scroll"><table><tr><th>Name</th><th>Login</th><th>Role</th><th>School</th>${PERMS.map(p=>`<th>${p[1]}</th>`).join("")}<th>Undo own entry (min)</th><th>Undo record changes</th><th>↶ Undo button</th><th>Active</th><th>Password / remove</th></tr>${Lu.map(u=>`<tr><td><input class="in" style="max-width:220px" value="${h(u.name)}" data-uf="name" data-id="${h(u.uid)}" aria-label="Name of ${h(u.email)}"></td><td>${h(u.email)}</td>
+      <div class="panel"><h2>All users</h2>${roleGuide()}<p class="hint" style="margin-top:0">To change someone's role or school, pick it in the <b>Role</b> / <b>School</b> column — it is saved at once and the person sees the change the next time the page refreshes.</p>${uFilterBar()}<div class="scroll"><table><tr><th>Name</th><th>Login</th><th>Role</th><th>School</th><th>Section / class</th>${PERMS.map(p=>`<th>${p[1]}</th>`).join("")}<th>Undo own entry (min)</th><th>Undo record changes</th><th>↶ Undo button</th><th>Active</th><th>Password / remove</th></tr>${Lu.map(u=>`${uGrpHead(u)}<tr><td><input class="in" style="max-width:220px" value="${h(u.name)}" data-uf="name" data-id="${h(u.uid)}" aria-label="Name of ${h(u.email)}"></td><td>${h(u.email)}</td>
        <td style="white-space:nowrap"><span class="rolechip" style="background:${ROLE_C[u.role]||"#64748b"}">${h(ROLES[u.role]||u.role)}</span><br><select class="in" data-uf="role" data-id="${h(u.uid)}" ${u.uid===me().uid?"disabled":""} title="Change this user's role">${Object.entries(ROLES).map(([k,v])=>`<option value="${k}" ${u.role===k?"selected":""}>${v}</option>`).join("")}</select></td>
-       <td><select class="in" data-uf="school" data-id="${h(u.uid)}" ${u.uid===me().uid?"disabled":""}><option ${u.school==="ALL"?"selected":""}>ALL</option>${schoolList(true).map(s=>`<option ${u.school===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select></td>
+       <td><select class="in" data-uf="school" data-id="${h(u.uid)}" ${u.uid===me().uid?"disabled":""}><option ${u.school==="ALL"?"selected":""}>ALL</option>${schoolList(true).map(s=>`<option ${u.school===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select></td><td>${uWingCell(u)}</td>
        ${PERMS.map(p=>p[0]).map(k=>`<td>${u.role==="superadmin"?`<span class="mute">always</span>`:k==="sd"?sdGrantSel(u):`<select class="in" data-uf="${k}" data-id="${h(u.uid)}"><option value="" ${!u[k]?"selected":""}>Role default (${permDef(u.role,k)?"allowed":"blocked"})</option><option value="yes" ${u[k]==="yes"?"selected":""}>Allowed</option><option value="no" ${u[k]==="no"?"selected":""}>Blocked</option></select>`}</td>`).join("")}
        <td>${u.role==="clerk"?`<input class="in num" type="number" min="0" placeholder="${h(ST().voidMinutes??15)}" value="${h(u.voidMin??"")}" data-uu="voidMin" data-id="${h(u.uid)}" title="Blank = the general setting">`:`<span class="mute">—</span>`}</td>
        <td>${u.role==="superadmin"?`<span class="mute">always</span>`:["hq","clerk"].includes(u.role)?`<select class="in" data-uu="undoUntil" data-id="${h(u.uid)}"><option value="">${untilOf(u)>Date.now()?(untilOf(u)>Date.parse("2099-01-01")?"Allowed (until revoked)":"Allowed until "+fmtDT(untilOf(u))):"Not allowed"}</option><option value="m15">Allow for 15 minutes</option><option value="m30">Allow for 30 minutes</option><option value="m60">Allow for 1 hour</option><option value="m120">Allow for 2 hours</option><option value="m240">Allow for 4 hours</option><option value="custom">Allow for … minutes (type)</option><option value="d1">Allow for 1 day</option><option value="d7">Allow for 7 days</option><option value="d30">Allow for 30 days</option><option value="forever">Allow until I revoke</option><option value="0">Not allowed</option></select>`:`<span class="mute">—</span>`}</td>
@@ -4382,7 +4393,7 @@ Object.assign(EXTRA_ACT,{
 });
 
 /* ---------- 📘 user guide for each kind of account (PDFs kept next to the portal in the "guides" folder) ---------- */
-const GUIDES={superadmin:["guide-superadmin.pdf","Super Admin — master guide"],hq:["guide-dq-office.pdf","DQ Office guide"],clerk:["guide-clerk.pdf","School clerks' guide"],viewer:["guide-view-only.pdf","View-only guide"]};
+const GUIDES={superadmin:["guide-superadmin.pdf","Super Admin — master guide"],hq:["guide-dq-office.pdf","DQ Office guide"],clerk:["guide-clerk.pdf","School clerks' guide"],viewer:["guide-view-only.pdf","View-only guide"],teacher:["guide-class-teacher.pdf","Class teachers' guide"]};
 const guideFor = r => GUIDES[r] || GUIDES.viewer;
 Object.assign(EXTRA_ACT,{ guide: async el => { const r=el?.dataset?.r || role(), [f,l]=guideFor(r), url="guides/"+f, link=(ST().guideLinks||{})[r==="principal"?"viewer":r];
   if(!link && location.protocol.startsWith("http")){ let ok=true; try{ const x=await fetch(url,{method:"HEAD",cache:"no-store"}); ok=x.ok; }catch(e){ ok=false; }
@@ -4588,7 +4599,7 @@ document.addEventListener("keydown",e=>{ if(S.view!=="student"||e.altKey||e.ctrl
   e.preventDefault(); stuStep(e.key==="ArrowRight"?1:-1); });
 
 /* ---------- 📎 documents of a student: thumbnails, open full size ---------- */
-const DOC_T=["B-Form / birth certificate","Father's CNIC","Mother's CNIC","Guardian's CNIC","Previous school certificate / SLC","Service / employment card","Fee slip","Other"];
+const DOC_T=["Parent confirmation slip (signed)","B-Form / birth certificate","Father's CNIC","Mother's CNIC","Guardian's CNIC","Previous school certificate / SLC","Service / employment card","Fee slip","Other"];
 async function docsLoad(id, school){ try{ const D=ownOnly()?await DB.queryW("stuDocs",[["school","==",school],["stuId","==",id]]):await DB.query("stuDocs","stuId","==",id); if(S.sp?.id===id){ S.sp.docs=D.sort((a,b)=>(a.atMs||0)-(b.atMs||0)); fillRegion("spBody",true); } }catch(e){ if(S.sp?.id===id) S.sp.docs=[]; } }
 function docsStrip(r, may){ const sp=S.sp, D=[];
   if(sp.photo) D.push({t:"Photo",img:sp.photo}); if(sp.form?.img) D.push({t:"Admission form",img:sp.form.img});
@@ -4607,7 +4618,8 @@ Object.assign(EXTRA_ACT,{ docView: el => docShow(Number(el.dataset.id)),
 document.addEventListener("change",async e=>{ const el=e.target; if(!el.matches?.('[data-chg="docAdd"]')) return; const f=el.files[0]; el.value=""; const r=S.sp?.rec; if(!f||!r) return;
   try{ toast("Saving the document…"); const img=await shrinkImage(f,1600,0.7), id=newId(), d={stuId:r.id,school:r.school,type:$("#docT")?.value||"Other",img,by:me().uid,byName:me().name||"",atMs:Date.now(),at:TS};
     await DB.apply({set:[{col:"stuDocs",id,data:d},{col:"docLog",id,data:{school:r.school,type:d.type,stuId:r.id,by:me().uid,byName:me().name||"",atMs:d.atMs,day:isoDay(d.atMs)}},{col:"edits",id:newId(),data:{stuId:r.id,school:r.school,stuName:r.name,admNo:r.admNo||"",changes:[{k:"_doc",l:"Document",from:"",to:"added: "+d.type}],at:TS,day:isoDay(Date.now()),by:me().uid,byName:me().name||"",role:role()}}],upd:[],inc:[],noIdx:true});
-    (S.sp.docs ||= []).push({id,...d}); toast("Document saved."); fillRegion("spBody",true); }catch(x){ toast("Not saved — "+x.message,true); } });
+    if(/parent confirmation slip/i.test(d.type)) await DB.apply({set:[],upd:[{col:"students",id:r.id,data:{pslip:d.atMs}}],inc:[]}).catch(()=>{});
+    (S.sp.docs ||= []).push({id,...d}); toast(/parent confirmation slip/i.test(d.type)?"Signed parent slip saved — the record shows ✍ Parent-checked.":"Document saved."); fillRegion("spBody",true); }catch(x){ toast("Not saved — "+x.message,true); } });
 
 /* ---------- record of every Excel upload: who, which school, file, rows ---------- */
 const UP_KIND={entries:"Entries",students:"Students (data bank)",wait:"Applicants",tfr:"Transfer requests",dc:"Day care children",fee:"Fee defaulters",rep:"Repeaters"};
@@ -5007,15 +5019,16 @@ Object.assign(EXTRA_FORMS,{ aiQ: () => aiSend($("#aiIn")?.value) });
 
 /* ---------- v4.37 — sign-up with the Super Admin's approval; successor takes over the predecessor's history ---------- */
 const myUids = () => [me().uid, ...(me().prevUids||[])].filter(Boolean).slice(0,30);
-const SU_APPT = ["Principal","Vice Principal","Section Head","APEI Sectt staff","Clerk","Other"];
-const suRole = a => /principal|section/i.test(a)?"principal":/clerk/i.test(a)?"clerk":"viewer";
+const SU_APPT = ["Principal","Vice Principal","Section Head","Class Teacher","APEI Sectt staff","Clerk","Other"];
+const suRole = a => /teacher/i.test(a)?"teacher":/principal|section/i.test(a)?"principal":/clerk/i.test(a)?"clerk":"viewer";
 function signupHtml(){ return `<div class="login"><div class="panel"><h2 style="font-size:20px;margin-bottom:4px">Request an account</h2>
    <p class="hint" style="margin-top:0">Your account works after the Regional Director approves it. Give correct details — they are checked.</p>
    <form data-form="signup" class="grid" style="grid-template-columns:1fr 1fr" autocomplete="off">
     <div class="f" style="grid-column:1/-1"><label for="suName">Full name with rank / title</label><input id="suName" required placeholder="e.g. Mrs Ayesha Khan / Maj Imran Ali"></div>
     <div class="f"><label for="suAppt">Appointment</label><select id="suAppt" required>${SU_APPT.map(x=>`<option>${h(x)}</option>`).join("")}</select></div>
     <div class="f"><label for="suSch">School</label><select id="suSch" required><option value="ALL">APEI Sectt (all schools)</option>${schoolList(true).map(s=>`<option value="${h(s.code)}">${h(s.code)} — ${h(s.name)}</option>`).join("")}</select></div>
-    <div class="f"><label for="suSec">Section / wing (if any)</label><input id="suSec" placeholder="e.g. Junior section, Accounts"></div>
+    <div class="f"><label for="suSec">Section / wing</label><select id="suSec" required><option value="">— choose —</option>${WINGS.map(w=>`<option>${h(w)}</option>`).join("")}</select></div>
+    <div id="suTch" class="grid" style="grid-column:1/-1;grid-template-columns:1fr 1fr;display:none;padding:8px;border:1px dashed #b45309;border-radius:10px"><div class="f"><label for="suTcl">Class teacher of — class</label><input id="suTcl" list="suClL" placeholder="e.g. III, VII, Pre-I"><datalist id="suClL"></datalist></div><div class="f"><label for="suTsec">Section</label><input id="suTsec" placeholder="e.g. A"></div></div>
     <div class="f"><label for="suMob">Mobile number</label><input id="suMob" required placeholder="0300-1234567"></div>
     <div class="f"><label for="suCnic">CNIC</label><input id="suCnic" required placeholder="12345-1234567-1"></div>
     <div class="f"><label for="suEmail">Email (your login)</label><input id="suEmail" type="email" required autocomplete="username"></div>
@@ -5027,6 +5040,8 @@ function signupWaitHtml(d){ const rej=d.status==="rejected";
    <p>${rej?`Your request for an account was not approved${d.rejReason?`: <b>${h(d.rejReason)}</b>`:""}. Contact the Regional Director's office.`:`Thank you, <b>${h(d.name||"")}</b>. Your request (${h(d.appt||"")}${d.school&&d.school!=="ALL"?", "+h(d.school):", APEI Sectt"}) is waiting for the Regional Director's approval. Open the portal again later — once approved, you go straight in.`}</p>
    <div class="row"><button class="btn" data-act="signOut">Sign out</button>${rej?"":`<button class="btn p" onclick="location.reload()">Check again</button>`}</div></div></div>`; }
 async function signupSubmit(){ const v=id=>($("#"+id)?.value||"").trim(), d={name:v("suName"),appt:v("suAppt"),school:v("suSch"),sec:v("suSec"),mobile:v("suMob"),cnic:v("suCnic")};
+  if(!d.sec) return toast("Choose your section / wing.",true);
+  if(/teacher/i.test(d.appt)){ d.tcl=v("suTcl"); d.tsec=v("suTsec").toUpperCase(); if(d.school==="ALL") return toast("Pick your school.",true); if(!d.tcl||!d.tsec) return toast("Class teachers: write your class and section (e.g. III and A).",true); }
   if(phonesBad(d.mobile).length) return toast("Write the mobile number like 0300-1234567.",true); if(!CNIC_OK.test(d.cnic)) return toast("Write the CNIC like 12345-1234567-1.",true);
   if(d.appt!=="APEI Sectt staff"&&d.appt!=="Other"&&d.school==="ALL") return toast("Pick your school.",true); if(v("suPw")!==v("suPw2")) return toast("The two passwords do not match.",true);
   d.mobile=fmtPhones(d.mobile);
@@ -5036,7 +5051,7 @@ if(typeof Local!=="undefined") Local.signUp = async function(email,pw,d){ const 
 function signupPanel(){ const L2=(S.signups||[]); if(DEMO&&Local.st?.signups) S.signups=Object.values(Local.st.signups).filter(x=>x.status==="pending").map(x=>({id:x.uid,...x}));
   const R=S.signups||L2; if(!R.length) return `<div class="panel"><h2>Sign-up requests</h2><p class="mute" style="margin:0">None waiting. New users press “New user? Request an account” on the sign-in page; their requests appear here for your approval.</p></div>`;
   return `<div class="panel" style="border:2px solid #f59e0b"><h2>🆕 Sign-up requests waiting for you (${R.length})</h2><div class="scroll"><table><tr><th>Received</th><th>Name</th><th>Appointment</th><th>School / section</th><th>Mobile</th><th>CNIC</th><th>Email</th><th></th></tr>
-   ${R.sort((a,b)=>(a.atMs||0)-(b.atMs||0)).map(r=>`<tr><td>${h(fmtDT(r.atMs))}</td><td><b>${h(r.name)}</b></td><td>${h(r.appt)}</td><td>${h(r.school==="ALL"?"APEI Sectt":r.school)}${r.sec?" · "+h(r.sec):""}</td><td>${h(r.mobile)}</td><td>${h(r.cnic)}</td><td>${h(r.email)}</td>
+   ${R.sort((a,b)=>(a.atMs||0)-(b.atMs||0)).map(r=>`<tr><td>${h(fmtDT(r.atMs))}</td><td><b>${h(r.name)}</b></td><td>${h(r.appt)}</td><td>${h(r.school==="ALL"?"APEI Sectt":r.school)}${r.sec?" · "+h(r.sec):""}${r.tcl?` · <b>class ${h(r.tcl)}-${h(r.tsec||"")}</b>`:""}</td><td>${h(r.mobile)}</td><td>${h(r.cnic)}</td><td>${h(r.email)}</td>
      <td style="white-space:nowrap"><button class="btn s p" data-act="suApprove" data-id="${h(r.id)}">Approve…</button> <button class="btn s r" data-act="suReject" data-id="${h(r.id)}">Reject</button></td></tr>`).join("")}</table></div></div>`; }
 const predOpts = (school, excl) => (S.users||[]).filter(u=>u.role!=="superadmin"&&u.uid!==excl&&!u.replacedBy&&(school==="ALL"?u.school==="ALL":u.school===school)).sort((a,b)=>(a.school+a.name).localeCompare(b.school+b.name)).map(u=>`<option value="${h(u.uid)}">${h(u.name)} — ${h(ROLES[u.role]||u.role)} ${u.school!=="ALL"?h(u.school):""}${u.active===false?" (switched off)":""}</option>`).join("");
 function suApproveDlg(id){ const r=(S.signups||[]).find(x=>x.id===id); if(!r) return; const role0=suRole(r.appt);
@@ -5044,9 +5059,12 @@ function suApproveDlg(id){ const r=(S.signups||[]).find(x=>x.id===id); if(!r) re
    <div class="grid"><div class="f"><label for="saName">Name as shown in the portal</label><input id="saName" value="${h(r.name)}"></div>
     <div class="f"><label for="saRole">Role</label><select id="saRole">${Object.entries(ROLES).filter(([k])=>k!=="superadmin").map(([k,v])=>`<option value="${k}" ${k===role0?"selected":""}>${h(v)}</option>`).join("")}</select></div>
     <div class="f"><label for="saSch">School</label><select id="saSch"><option value="ALL" ${r.school==="ALL"?"selected":""}>ALL</option>${schoolList(true).map(s=>`<option ${s.code===r.school?"selected":""}>${h(s.code)}</option>`).join("")}</select></div>
+    <div class="f"><label for="saWing">Section / wing</label><select id="saWing"><option value="">—</option>${WINGS.map(w=>`<option ${w===(r.sec||wingOfCl(r.school,r.tcl))?"selected":""}>${h(w)}</option>`).join("")}</select></div>
+    <div class="f"><label for="saTcl">Class teacher of — class</label><select id="saTcl">${clOpts(r.school,r.tcl)}</select></div>
+    <div class="f"><label for="saTsec">Section (class teachers)</label><input id="saTsec" value="${h(r.tsec||"")}" placeholder="A"></div>
     <label class="ck" style="grid-column:1/-1"><input type="checkbox" id="saStu" ${/sectt/i.test(r.appt)?"checked":""}> Viewer may see student records of all schools (APEI Sectt staff) — still no prints or downloads without your approval</label>
     <div class="f" style="grid-column:1/-1"><label for="saPred">Takes over from (predecessor) — his log, entries and history then show under this person</label><select id="saPred"><option value="">— nobody (new post) —</option>${predOpts(r.school,"")}</select></div></div>
-   <p class="mini mute">Principal / Section Head: own school, view everything, flag problems, no entries. Clerk: entries for his school. Viewer: Dashboard & Reports (+ student records if ticked).</p>
+   <p class="mini mute">Class Teacher: marks attendance of his own class only, sees nothing else. Principal / Section Head: own school, view everything, flag problems, no entries. Clerk: entries for his school. Viewer: Dashboard & Reports (+ student records if ticked).</p>
    <div class="row"><button class="btn" data-act="closeModal">Cancel</button><button class="btn p" data-act="suApproveGo" data-id="${h(id)}">Approve and switch on</button></div>`); }
 async function giveHistory(ops, fromUid, toUid){ const o=(S.users||[]).find(u=>u.uid===fromUid), t=(S.users||[]).find(u=>u.uid===toUid);
   const prev=[...new Set([...(t?.prevUids||[]),fromUid,...(o?.prevUids||[])])].filter(x=>x&&x!==toUid);
@@ -5055,9 +5073,10 @@ Object.assign(EXTRA_ACT,{
   suOpen: () => { S.signupForm=true; boot(); }, suClose: () => { S.signupForm=false; boot(); },
   suApprove: el => suApproveDlg(el.dataset.id),
   suApproveGo: async el => { const r=(S.signups||[]).find(x=>x.id===el.dataset.id); if(!r) return; const role0=$("#saRole").value, sch=$("#saSch").value, pred=$("#saPred").value;
-    if(["clerk","principal"].includes(role0)&&sch==="ALL") return toast("Pick the school for a clerk or principal.",true);
+    if(["clerk","principal","teacher"].includes(role0)&&sch==="ALL") return toast("Pick the school for a clerk, principal or teacher.",true);
+    const tcl=$("#saTcl")?.value||"", tsec=($("#saTsec")?.value||"").trim().toUpperCase(); if(role0==="teacher"&&(!tcl||!tsec)) return toast("Pick the class and section for a class teacher.",true);
     const ops=opsNew(); ops.noIdx=true; const prev=pred?await giveHistory(ops,pred,r.uid||r.id):[];
-    ops.set.push({col:"users",id:r.uid||r.id,data:{uid:r.uid||r.id,name:$("#saName").value.trim()||r.name,email:r.email,role:role0,school:sch,active:true,appt:r.appt,sec:r.sec||"",mobile:r.mobile||"",cnic:r.cnic||"",stuView:role0==="viewer"&&$("#saStu").checked,prevUids:prev,createdMs:Date.now(),approvedBy:me().name||"",createdAt:TS}});
+    ops.set.push({col:"users",id:r.uid||r.id,data:{uid:r.uid||r.id,name:$("#saName").value.trim()||r.name,email:r.email,role:role0,school:sch,active:true,appt:r.appt,sec:r.sec||"",wing:$("#saWing")?.value||"",...(role0==="teacher"?{tcl,tsec}:{}),mobile:r.mobile||"",cnic:r.cnic||"",stuView:role0==="viewer"&&$("#saStu").checked,prevUids:prev,createdMs:Date.now(),approvedBy:me().name||"",createdAt:TS}});
     ops.upd.push({col:"signups",id:r.id,data:{status:"approved",decidedBy:me().name||"",decidedAt:TS}});
     try{ await DB.apply(ops); }catch(e){ return toast("Not approved — "+e.message,true); } if(DEMO&&Local.st.signups?.[r.id]) Local.st.signups[r.id].status="approved";
     S.signups=(S.signups||[]).filter(x=>x.id!==r.id); audit("Sign-up approved",`${r.name} (${r.appt}, ${sch}) as ${ROLES[role0]}${pred?" — takes over from "+((S.users||[]).find(u=>u.uid===pred)?.name||pred):""}`); closeModal(); toast(`${r.name} can now sign in.`); fillRegion("stBody",true); refresh(); },
@@ -5204,6 +5223,236 @@ document.addEventListener("change",async e=>{ const el=e.target;
   if(el.dataset?.lku){ const u=(S.users||[]).find(x=>x.uid===el.dataset.lku); await DB.apply({set:[],inc:[],upd:[{col:"users",id:el.dataset.lku,data:{locked:el.checked}}],noIdx:true}); audit(el.checked?"User locked":"User unlocked",u?.name||""); toast(`${u?.name||"User"} ${el.checked?"locked — sees only the message":"unlocked"}.`); }
   else if(el.dataset?.lkm){ await DB.apply({set:[],inc:[],upd:[{col:"users",id:el.dataset.lkm,data:{lockMsg:el.value.trim()}}],noIdx:true}); toast("Message saved."); } });
 
+/* ---------- v4.41 — monthly strength return + comparison with the same month last year ---------- */
+const ymOf = day => day.slice(0,7);
+const lyDay = day => { const d=new Date(day+"T12:00"); d.setFullYear(d.getFullYear()-1); return isoDay(d.getTime()); };
+async function yoyPrep(c, codes){ const day=c.asOf||isoDay(Date.now()), ly=lyDay(day), m0=day.slice(0,8)+"01", l0=ly.slice(0,8)+"01";
+  const [T,TL,man]=await Promise.all([getTx({from:Date.parse(m0+"T00:00"),to:Date.parse(day+"T23:59:59")}), getTx({from:Date.parse(l0+"T00:00"),to:Date.parse(ly+"T23:59:59")}).catch(()=>[]), DB.getDoc("yoy",ymOf(ly)).catch(()=>null)]);
+  const snapLy=S.snapshots.filter(s=>s.day<=ly&&s.day>=lyDay(isoDay(Date.parse(day+"T12:00")-0)).slice(0,8)+"01").at(-1) || null;
+  const st=c.asOf?await asOfState(c.asOf).catch(()=>null):null; const now={}; if(st) S.asOf=st; try{ for(const code of codes) now[code]=schoolStats(code).str; } finally{ S.asOf=null; }
+  const cnt=(L,code)=>{ const m=moveCounts(code,L,{from:0,to:Date.now()+864e5}); return {adm:m.in,wd:m.out}; };
+  const R=codes.map(code=>{ const a=cnt(T,code), M=man?.d?.[code]||{}, b=TL.length?cnt(TL,code):{adm:M.adm??null,wd:M.wd??null}; const lyStr=snapLy?.d?.[code]?.str ?? (M.str??null);
+    return {code,str:now[code],lyStr,adm:a.adm,lyAdm:b.adm??M.adm??null,wd:a.wd,lyWd:b.wd??M.wd??null}; });
+  return {day,ly,R,src:snapLy?"snapshot":man?"entered":"none"}; }
+function yoyModel(b,x){ const Y=x.yoy; if(!Y||Y.err) return [{t:"text",title:"",text:"Comparison not available"+(Y?.err?": "+Y.err:""),style:"p"}];
+  const v=n=>n==null?"–":nf(n), d=(a,b2)=>b2==null?"–":sgt(a-b2), T=k=>Y.R.reduce((s,r)=>s+(r[k]||0),0), anyLy=k=>Y.R.some(r=>r[k]!=null);
+  const rows=Y.R.map(r=>({c:[r.code,num(r.str,"n"),v(r.lyStr),r.lyStr==null?"–":num(r.str-r.lyStr,"sd"),num(r.adm,"n"),v(r.lyAdm),num(r.wd,"n"),v(r.lyWd)]}));
+  rows.push({cls:"tot",c:[L("gtotal"),num(T("str"),"n"),anyLy("lyStr")?nf(T("lyStr")):"–",anyLy("lyStr")?num(T("str")-T("lyStr"),"sd"):"–",num(T("adm"),"n"),anyLy("lyAdm")?nf(T("lyAdm")):"–",num(T("wd"),"n"),anyLy("lyWd")?nf(T("lyWd")):"–"]});
+  return [tbl(`${b.title} — ${fmtD(Date.parse(Y.day+"T12:00"))} against ${fmtD(Date.parse(Y.ly+"T12:00"))}`,[L("school"),"Strength now","Same date last year","Change","Admissions this month","Same month last year","Withdrawals this month","Same month last year"],rows),
+    ...(Y.src==="none"?[{t:"text",title:"",style:"p",text:`Last year's figures are not in the portal yet — the Super Admin can enter them (Reports → Monthly strength return → ✎ Last year's figures).`}]:[])]; }
+/* last year's figures typed in once (the portal started this year) */
+function yoyDlg(){ const e=lastMonthEnd(), ly=lyDay(e), ym=ymOf(ly); S.yoyYm=ym;
+  DB.getDoc("yoy",ym).catch(()=>null).then(doc=>{ const D=doc?.d||{};
+    modal(`<h3>✎ Last year's figures — ${h(ym)}</h3><p class="hint" style="margin-top:0">Used for the comparison until the portal has its own records from a year back. Month: <select id="yyM">${Array.from({length:12},(_,i)=>{ const d=new Date(ly+"T12:00"); d.setMonth(d.getMonth()-i); const k=isoDay(d.getTime()).slice(0,7); return `<option ${k===ym?"selected":""}>${k}</option>`; }).join("")}</select></p>
+     <table><tr><th>School</th><th class="n">Strength at month end</th><th class="n">Admissions in the month</th><th class="n">Withdrawals in the month</th></tr>${schoolList().map(s=>`<tr><td><b>${h(s.code)}</b></td>${["str","adm","wd"].map(k=>`<td class="n"><input class="in num" type="number" min="0" data-yy="${h(s.code)}|${k}" value="${D[s.code]?.[k]??""}" style="width:100px"></td>`).join("")}</tr>`).join("")}</table>
+     <div class="row"><button class="btn" data-act="closeModal">Cancel</button><button class="btn p" data-act="yoySave">Save</button></div>`); }); }
+Object.assign(EXTRA_ACT,{ yoyDlg, yoySave: async () => { const ym=$("#yyM")?.value||S.yoyYm, d={}; for(const el of document.querySelectorAll("[data-yy]")){ const [c,k]=el.dataset.yy.split("|"); if(el.value!=="") (d[c] ||= {})[k]=Number(el.value)||0; }
+  await DB.apply({set:[{col:"yoy",id:ym,data:{d,atMs:Date.now(),by:me().name||""}}],upd:[],inc:[],noIdx:true}); closeModal(); toast(`Last year's figures for ${ym} saved.`); S.rcfg=null; renderView(); } });
+document.addEventListener("change",e=>{ if(e.target.id==="yyM"){ S.yoyYm=e.target.value; closeModal(); const v=e.target.value; DB.getDoc("yoy",v).catch(()=>null).then(()=>{ const e2=lastMonthEnd(); yoyDlg2(v); }); } });
+function yoyDlg2(ym){ DB.getDoc("yoy",ym).catch(()=>null).then(doc=>{ const D=doc?.d||{}; S.yoyYm=ym;
+  modal(`<h3>✎ Last year's figures — ${h(ym)}</h3><input type="hidden" id="yyM" value="${h(ym)}"><table><tr><th>School</th><th class="n">Strength at month end</th><th class="n">Admissions in the month</th><th class="n">Withdrawals in the month</th></tr>${schoolList().map(s=>`<tr><td><b>${h(s.code)}</b></td>${["str","adm","wd"].map(k=>`<td class="n"><input class="in num" type="number" min="0" data-yy="${h(s.code)}|${k}" value="${D[s.code]?.[k]??""}" style="width:100px"></td>`).join("")}</tr>`).join("")}</table><div class="row"><button class="btn" data-act="closeModal">Cancel</button><button class="btn p" data-act="yoySave">Save</button></div>`); }); }
+/* reminder on the 1st–5th; ?preset=… opens a preset in Reports */
+{ const o=VIEWS.reports.shell; VIEWS.reports.shell=(...a)=>{ if(S.params.preset&&S.params.preset!==S.rpid){ S.rpid=S.params.preset; S.rcfg=null; S.rtab="design"; } let x=o(...a);
+    if(isSA()&&S.rpid==="mreturn") x=x.replace('<div class="rlayout">',`<p class="note" style="margin:0 0 8px">📅 Monthly return for the month ending <b>${h(fmtD(Date.parse(rcfg().asOf+"T12:00")))}</b> — check it, then Print / PDF. <button class="btn s" data-act="yoyDlg">✎ Last year's figures</button></p><div class="rlayout">`); return x; }; }
+{ const N=notes; notes=function(){ const out=N(); if(isSA()&&new Date().getDate()<=5){ const e=lastMonthEnd(), m=new Date(e+"T12:00").toLocaleString("en-GB",{month:"long",year:"numeric"}); out.push({id:"mret_"+e, urgent:!seenSet().has("mret_"+e), html:`📅 The <b>monthly strength return for ${h(m)}</b> is ready to check and print.`, go:"reports", gop:"preset=mreturn"}); } return out; }; }
+
+/* ---------- v4.41 — 🧪 admission test results, merit list, offers; ✍ parent slips ---------- */
+const testId = (code,cl) => `${sessOf(code)}_${code}_${cl}`.replace(/[\/\s]+/g,"_");
+const mk = w => { const n=parseFloat(String(w.marks??"").replace(/[^\d.]/g,"")); return isNaN(n)?null:n; };
+HIDDEN.push(["tests",()=>role()!=="viewer"]);
+VIEWS.tests = {
+  shell:()=>`${admTabs("tests")}<div class="panel" id="tsBody"></div>`,
+  regions:{ tsBody(){ const p=S.params, sch=schoolList().filter(s=>!mySchool()||s.code===mySchool()), code=p.tsS&&sch.some(s=>s.code===p.tsS)?p.tsS:(mySchool()||sch[0]?.code), sc=S.schools[code]; if(!sc) return "";
+    const cl=p.tsC&&sc.classes.some(c=>c.cl===p.tsC)?p.tsC:(sc.classes.find(c=>S.waiting.some(w=>w.school===code&&w.cl===c.cl))||sc.classes[0]).cl, id=testId(code,cl);
+    if(!S.tcfg||S.tcfg.id!==id){ S.tcfg={id,loading:1}; DB.getDoc("tests",id).then(d=>{ S.tcfg={id,...(d||{})}; fillRegion("tsBody",true); }).catch(()=>{ S.tcfg={id}; }); }
+    const T=S.tcfg, total=Number(T.total)||100, pass=Number(T.pass)||Math.round(total*0.4), c=sc.classes.find(x=>x.cl===cl), st=classStats(code,c), offered=S.waiting.filter(w=>w.school===code&&w.cl===cl&&w.status===OFFER_ST).length, vac=Math.max(0,st.auth-st.str-offered);
+    const A=S.waiting.filter(w=>w.school===code&&w.cl===cl&&!["Admitted","Cancelled"].includes(w.status)).sort((a,b)=>{ const x=mk(a),y=mk(b); return (y??-1)-(x??-1)||(a.date||"").localeCompare(b.date||""); });
+    let rank=0; const may=canEnter(code);
+    return `<div class="ph"><h2>🧪 Entrance test — results and merit list</h2><div class="pills">${mySchool()?"":`<select class="in" style="width:auto" data-chg="setPsel" data-k="tsS">${sch.map(s=>`<option ${s.code===code?"selected":""}>${h(s.code)}</option>`).join("")}</select>`}<select class="in" style="width:auto" data-chg="setPsel" data-k="tsC">${sc.classes.map(x=>`<option ${x.cl===cl?"selected":""}>${h(x.cl)} (${S.waiting.filter(w=>w.school===code&&w.cl===x.cl&&!["Admitted","Cancelled"].includes(w.status)).length})</option>`).join("")}</select><button class="btn s" data-act="tsPrint">🖨 Merit list</button></div></div>
+     <form data-form="tsCfg" class="grid" style="align-items:end"><div class="f"><label>Test date</label><input type="date" id="tsD" value="${h(T.date||"")}" ${may?"":"disabled"}></div><div class="f"><label>Total marks</label><input type="number" id="tsT" value="${total}" ${may?"":"disabled"}></div><div class="f"><label>Pass marks</label><input type="number" id="tsP" value="${pass}" ${may?"":"disabled"}></div>${may?`<button class="btn">Save test details</button>`:""}</form>
+     <p class="hint">${h(code)} ${h(cl)}: seats ${nf(st.auth)}, strength ${nf(st.str)}, already offered ${offered} → <b>${vac} seat${vac===1?"":"s"} to offer</b>. Type the marks (saved at once); the list sorts by marks, then by date of application. Offered children go to <b>${h(OFFER_ST)}</b> (not counted in strength).</p>
+     ${A.length?`<div class="scroll"><table id="tsTbl"><tr><th>Merit</th><th>Name</th><th>Father</th><th>${h(L("g"))}/${h(L("b"))}</th><th>Category</th><th>Contact</th><th>Applied</th><th class="n">Marks / ${total}</th><th>Result</th><th>Status</th><th></th></tr>
+      ${A.map(w=>{ const m=mk(w), ok=m!=null&&m>=pass; if(ok) rank++; return `<tr class="${w.status===OFFER_ST?"sel":""}"><td><b>${ok?rank:""}</b></td><td><b>${h(w.name)}</b></td><td>${h(w.father||"")}</td><td>${w.gender==="g"?"G":w.gender==="b"?"B":""}</td><td>${h(catLabel(w.cat))}</td><td>${h(w.contact||"")}</td><td>${h(w.date?fmtD(Date.parse(w.date+"T12:00")):"")}</td>
+        <td class="n">${may?`<input class="in num" style="width:70px" data-wf="marks" data-id="${h(w.id)}" value="${h(w.marks||"")}">`:h(w.marks||"")}</td><td>${m==null?`<span class="mute">—</span>`:ok?`<span class="tag t-ok">Pass</span>`:`<span class="tag t-out">Fail</span>`}</td><td class="mini">${h(w.status)}</td>
+        <td style="white-space:nowrap">${may&&ok&&w.status!==OFFER_ST?`<button class="btn s p" data-act="tsOffer" data-id="${h(w.id)}">Offer seat</button>`:""}${w.status===OFFER_ST?`<button class="btn s" data-act="offerSlip" data-id="${h(w.id)}">🖨 Offer letter</button>`:""}</td></tr>`; }).join("")}</table></div>
+      ${(()=>{ const nn=Math.min(vac,A.filter(w=>w.status!==OFFER_ST&&mk(w)!=null&&mk(w)>=pass).length); return may&&nn?`<div class="row" style="justify-content:flex-start"><button class="btn p" data-act="tsOfferTop" data-s="${h(code)}" data-c="${h(cl)}" data-n="${nn}">Offer seats to the top ${nn} who passed</button></div>`:""; })()}`:`<p class="mute">No applicants for ${h(cl)} — add them in 📝 New admissions.</p>`}`; } }
+};
+async function offerOps(L){ const now=Date.now(); await DB.apply({set:[],inc:[],upd:L.map(w=>({col:"waiting",id:w.id,data:{status:OFFER_ST,offerAt:now,offerBy:me().name||"",updatedAt:TS}}))}); document.activeElement?.blur?.(); setTimeout(()=>fillRegion("tsBody",true),60); }
+Object.assign(EXTRA_FORMS,{ tsCfg: async () => { const id=S.tcfg?.id; if(!id) return; const [,code,...c]=id.split("_"); const d={date:$("#tsD").value,total:Number($("#tsT").value)||100,pass:Number($("#tsP").value)||0,school:S.params.tsS||mySchool()||schoolList()[0].code,by:me().name||"",atMs:Date.now()};
+  await DB.apply({set:[{col:"tests",id,data:d}],upd:[],inc:[],noIdx:true}); S.tcfg={id,...d}; toast("Test details saved."); fillRegion("tsBody",true); } });
+Object.assign(EXTRA_ACT,{
+  tsOffer: async el => { const w=S.waiting.find(x=>x.id===el.dataset.id); await offerOps([w]); toast(`${w.name}: seat offered.`); },
+  tsOfferTop: el => { const code=el.dataset.s, cl=el.dataset.c, n=+el.dataset.n, T=S.tcfg||{}, pass=Number(T.pass)||Math.round((Number(T.total)||100)*0.4);
+    const L=S.waiting.filter(w=>w.school===code&&w.cl===cl&&!["Admitted","Cancelled",OFFER_ST].includes(w.status)&&mk(w)!=null&&mk(w)>=pass).sort((a,b)=>mk(b)-mk(a)||(a.date||"").localeCompare(b.date||"")).slice(0,n);
+    if(!L.length) return toast("Nobody has passed yet.",true); ask(`Offer seats to ${L.length} children?`,L.map(w=>`${h(w.name)} — ${h(w.marks)}`).join("<br>"),"Offer seats",async()=>{ await offerOps(L); toast(`${L.length} seats offered — see 🎫 ${OFFER_ST}.`); }); },
+  tsPrint: () => { const t=$("#tsTbl"); if(!t) return toast("No list to print.",true); const c=t.cloneNode(true); c.querySelectorAll("tr").forEach(r=>r.lastElementChild?.remove()); c.querySelectorAll("input").forEach(i=>i.replaceWith(i.value));
+    const code=S.params.tsS||mySchool()||schoolList()[0].code, T=S.tcfg||{};
+    printHtml(`<div class="paper"><div class="phead"><h2>MERIT LIST — ${h(S.schools[code]?.name||code)}</h2><p>Class ${h(S.params.tsC||"")} · Test ${h(T.date?fmtD(Date.parse(T.date+"T12:00")):"")} · Total ${h(T.total||"")} · Pass ${h(T.pass||"")}</p></div><table class="rt">${c.innerHTML}</table><div class="rsign"><div><span></span>Prepared by</div><div><span></span>Principal</div></div></div>`,{paper:"A4",orientation:"landscape"}); },
+  offerSlip: el => { const w=S.waiting.find(x=>x.id===el.dataset.id); if(!w) return; const sc=S.schools[w.school];
+    printHtml(`<div class="paper" style="font-size:13px"><div class="phead"><h2>${h(sc?.name||w.school)}</h2><p>${h(ST().org||"")}</p></div>
+      <h3 style="text-align:center;margin:10px 0">OFFER OF ADMISSION — ${h(sessOf(w.school))}</h3>
+      <p>Dear Parent / Guardian,</p><p>We are pleased to offer <b>${h(w.name)}</b> ${w.gender==="g"?"d/o":"s/o"} <b>${h(w.father||"")}</b> a seat in <b>Class ${h(w.cl)}</b> on the result of the entrance test${w.marks?` (marks: <b>${h(w.marks)}</b>)`:""}. Kindly confirm by returning the slip below${w.offerAt?` within 7 days of ${h(fmtD(w.offerAt))}`:""}, and complete the admission formalities at the school office.</p>
+      <div class="rsign"><div><span></span>Principal</div></div><hr style="border:0;border-top:2px dashed #555;margin:22px 0">
+      <h3 style="text-align:center">PARENT'S REPLY</h3><p>Child: <b>${h(w.name)}</b> · Class ${h(w.cl)} · ${h(w.school)}</p>
+      <p>☐ We accept the seat; our child will join on ____________ &nbsp;&nbsp; ☐ We do not wish to take the seat</p>
+      <div class="rsign"><div><span></span>Parent's name &amp; signature</div><div><span></span>CNIC</div><div><span></span>Date</div></div></div>`,{paper:"A4",orientation:"portrait"}); },
+  pSlips: async el => { const sc=el.dataset.id; let list=[];
+    if(sc==="one") list=[S.sp.rec]; else if(sc==="list"){ await ensureStu(stuSchool()); list=stuFiltered(stuSchool()); }
+    else { const R=S.findRows||findRows(S.params), codes=[...new Set(R.map(r=>r.school))]; await Promise.all(codes.map(c=>ensureStu(c).catch(()=>[]))); const all=new Map(codes.flatMap(c=>stuOf(c)||[]).map(r=>[r.id,r])); list=R.map(r=>all.get(r.id)).filter(Boolean); }
+    if(!list.length) return toast("No students in the list.",true); if(list.length>400) return toast(`${list.length} students — narrow the list to one class or section first.`,true);
+    const F=activeFields().filter(f=>!["status","leftDate","leftReason","cv"].includes(f.key)&&!/^(eyes|height|weight|medDate|vacc|medication|hearing|dental)$/.test(f.key));
+    const slip=r=>`<div style="border:1.5px solid #333;padding:10px 12px;margin-bottom:10px;page-break-inside:avoid;font-size:11.5px"><div style="display:flex;justify-content:space-between"><b>${h(S.schools[r.school]?.name||r.school)} — PARENT CONFIRMATION SLIP</b><span>${h(r.cl)}-${h(r.sec)} · Adm ${h(r.admNo||"")}</span></div>
+      <p style="margin:4px 0 6px">Please check every detail of your child. Write any correction in the right column, sign and return to the class teacher.</p>
+      <table class="rt" style="width:100%"><tr><th style="width:28%">Detail</th><th>As in the school record</th><th style="width:32%">Correction (if any)</th></tr>${F.map(f=>`<tr><td>${h(f.label)}</td><td>${h(f.key==="cat"?catLabel(r.cat):r[f.key]??"")}</td><td></td></tr>`).join("")}</table>
+      <p style="margin:6px 0 0">☐ All details are correct &nbsp;&nbsp; ☐ Corrections written above</p><div class="rsign"><div><span></span>Parent / guardian signature</div><div><span></span>Name &amp; CNIC</div><div><span></span>Date</div></div></div>`;
+    printHtml(`<div class="paper">${list.map(slip).join("")}</div>`,{paper:"A4",orientation:"portrait"}); audit("Parent confirmation slips printed",`${list.length} slips`); },
+});
+
+/* ---------- v4.42 — 👩‍🏫 class teachers mark attendance of their own class; 📋 monthly attendance register for ever ---------- */
+const WINGS = ["Pre-school","Junior","Middle","Senior","Whole school / office"];
+const ROMAN_N = {I:1,II:2,III:3,IV:4,V:5,VI:6,VII:7,VIII:8,IX:9,X:10,XI:11,XII:12};
+function wingOfCl(code, cl){ if(!cl) return ""; const c=S.schools[code]?.classes?.find(x=>x.cl===cl), l=String(c?lvlOf(c):cl).trim();
+  if(/^(EYS|Pre|PG|Nur|KG|Play|Mont)/i.test(l)) return "Pre-school"; const n=ROMAN_N[l.split(/[\s(\-]/)[0].toUpperCase()] || Number(l.match(/^\d+/)?.[0]);
+  if(n) return n<=5?"Junior":n<=8?"Middle":"Senior"; if(/^(O|A|AS|IG|F\.?Sc|FA|ICS|HSSC|SSC|Matric)/i.test(l)) return "Senior"; return ""; }
+function wingOfUser(u){ if(u.wing) return u.wing; if(u.role==="teacher"&&u.tcl) return wingOfCl(u.school,u.tcl); const s=String(u.sec||"");
+  return WINGS.includes(s)?s:/pre|eys|mont/i.test(s)?"Pre-school":/jun|jnr|prim/i.test(s)?"Junior":/mid/i.test(s)?"Middle":/sen|snr|college|o.?level|a.?level|matric/i.test(s)?"Senior":/office|admin|account|whole/i.test(s)?"Whole school / office":""; }
+const clOpts = (code, sel) => `<option value="">—</option>`+((S.schools[code]?.classes)||[]).map(c=>`<option ${c.cl===sel?"selected":""}>${h(c.cl)}</option>`).join("");
+const secsOf = (code, cl) => (S.schools[code]?.classes?.find(c=>c.cl===cl)?.secs||[]).map(x=>x.s);
+/* sign-up form: class + section appear for class teachers; the wing follows the class */
+document.addEventListener("change",e=>{ const t=e.target;
+  if(t.id==="suAppt"||t.id==="suSch"){ const on=/teacher/i.test($("#suAppt")?.value||""), box=$("#suTch"); if(box) box.style.display=on?"grid":"none";
+    const dl=$("#suClL"); if(dl) dl.innerHTML=((S.schools[$("#suSch")?.value]?.classes)||[]).map(c=>`<option value="${h(c.cl)}">`).join(""); }
+  if(t.id==="suTcl"){ const w=wingOfCl($("#suSch")?.value,t.value); if(w&&$("#suSec")) $("#suSec").value=w; }
+  if(t.id==="saSch"&&$("#saTcl")) $("#saTcl").innerHTML=clOpts(t.value,"");
+  if(t.id==="saTcl"&&$("#saWing")){ const w=wingOfCl($("#saSch")?.value,t.value); if(w) $("#saWing").value=w; } });
+/* Setup → Users: find, filter and group (school › section, section, role) */
+function uFiltered(){ const p=S.params, q=norm(p.uQ||""), g=p.uG||"sw", wo=w=>{ const i=WINGS.indexOf(w); return i<0?9:i; }, so=c=>{ const i=schoolList(true).findIndex(s=>s.code===c); return c==="ALL"?-1:i<0?99:i; };
+  const L=[...S.users].filter(u=>(!p.uS||u.school===p.uS)&&(!p.uW||(p.uW==="none"?!wingOfUser(u):wingOfUser(u)===p.uW))&&(!p.uR||u.role===p.uR)&&(!q||norm([u.name,u.email,u.appt,u.tcl&&u.tcl+"-"+(u.tsec||"")].join(" ")).includes(q)));
+  const sch=u=>u.school==="ALL"?"APEI Sectt / all schools":u.school, wg=u=>wingOfUser(u)||"no section given";
+  const key=u=>g==="none"?"":g==="role"?(ROLES[u.role]||u.role):g==="wing"?wg(u):g==="school"?sch(u):`${sch(u)} › ${wg(u)}`;
+  const rk=u=>["superadmin","hq","viewer","principal","clerk","teacher"].indexOf(u.role);
+  L.sort((a,b)=>(g==="none"||g==="role"?rk(a)-rk(b):0)||(g==="wing"?wo(wingOfUser(a))-wo(wingOfUser(b)):0)||(["sw","school"].includes(g)?so(a.school)-so(b.school):0)||(g==="sw"?wo(wingOfUser(a))-wo(wingOfUser(b)):0)||(g==="wing"?so(a.school)-so(b.school):0)
+    ||rk(a)-rk(b)||String(a.tcl||"").localeCompare(String(b.tcl||""),undefined,{numeric:true})||String(a.tsec||"").localeCompare(String(b.tsec||""))||String(a.name||"").localeCompare(String(b.name||"")));
+  S._ug={key,last:null,cnt:{}}; for(const u of L){ const k=key(u); S._ug.cnt[k]=(S._ug.cnt[k]||0)+1; } S._ugN=L.length; return L; }
+function uGrpHead(u){ const k=S._ug.key(u); if(!k||k===S._ug.last) return ""; S._ug.last=k; return `<tr><td colspan="40" style="background:#eef2ff;font-weight:800;color:#1e3a8a;position:sticky;left:0">${h(k)} <span class="mute" style="font-weight:600">· ${S._ug.cnt[k]}</span></td></tr>`; }
+function uFilterBar(){ const p=S.params, sel=(k,opts,cur)=>`<select class="in" style="width:auto" data-chg="setPsel" data-k="${k}">${opts.map(([v,l])=>`<option value="${h(v)}" ${String(cur||"")===v?"selected":""}>${h(l)}</option>`).join("")}</select>`;
+  const n=c=>S.users.filter(u=>u.role===c).length;
+  return `<div class="pills" style="flex-wrap:wrap;gap:6px;margin:0 0 8px">${sel("uG",[["sw","Group: school › section"],["school","Group: school"],["wing","Group: section (Pre, Junior, Middle, Senior)"],["role","Group: role"],["none","No groups"]],p.uG||"sw")}
+    ${sel("uS",[["","All schools"],["ALL","APEI Sectt"],...schoolList(true).map(s=>[s.code,s.code])],p.uS)}${sel("uW",[["","All sections"],...WINGS.map(w=>[w,w]),["none","No section given"]],p.uW)}
+    ${sel("uR",[["","All roles"],...Object.entries(ROLES).map(([k,v])=>[k,`${v} (${n(k)})`])],p.uR)}
+    <input class="in" style="width:200px" placeholder="🔎 Name, login, class…" value="${h(p.uQ||"")}" data-chg="setPsel" data-k="uQ"><span class="mini mute" style="align-self:center">Showing ${S._ugN} of ${S.users.length}</span></div>`; }
+function uWingCell(u){ if(u.role==="superadmin") return `<span class="mute">—</span>`;
+  return `<select class="in" style="width:auto" data-uf="wing" data-id="${h(u.uid)}" title="Section / wing"><option value="">—</option>${WINGS.map(w=>`<option ${w===wingOfUser(u)?"selected":""}>${h(w)}</option>`).join("")}</select>`
+   +(u.role==="teacher"?`<div style="display:flex;gap:4px;margin-top:4px;align-items:center"><span class="mini">Class</span><select class="in" style="width:auto" data-uf="tcl" data-id="${h(u.uid)}">${clOpts(u.school,u.tcl)}</select><input class="in" style="width:48px" data-uf="tsec" data-id="${h(u.uid)}" value="${h(u.tsec||"")}" placeholder="Sec"></div>`:"")
+   +(u.appt?`<div class="mini mute">${h(u.appt)}</div>`:""); }
+/* teachers see only their own page */
+for(const n of NAV){ const f=n[2]; n[2]=()=>role()!=="teacher"&&f(); }
+for(const n of HIDDEN){ const f=n[1]; n[1]=()=>role()!=="teacher"&&f(); }
+NAV.unshift(["attend","📋 Attendance",()=>role()==="teacher"]);
+for(const p of PORTALS){ const f=p.show; p.show=()=>role()!=="teacher"&&f(); }
+document.head.insertAdjacentHTML("beforeend",`<style>
+.attList{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px;margin:8px 0 12px}
+.attRow{display:flex;align-items:center;gap:8px;text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;font:inherit;color:inherit;cursor:pointer;min-height:50px;-webkit-tap-highlight-color:transparent}
+.attRow b{flex:1;font-weight:600}.attRow .mute{min-width:20px}
+.attRow i{font-style:normal;font-weight:800;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:#dcfce7;color:#166534;flex:none}
+.attRow.ab{background:#fef2f2;border-color:#f87171}.attRow.ab i{background:#dc2626;color:#fff}
+.attRow.lv{background:#fffbeb;border-color:#fbbf24}.attRow.lv i{background:#d97706;color:#fff}
+.attBar{position:sticky;bottom:0;display:flex;gap:8px;justify-content:flex-end;align-items:center;padding:10px;background:rgba(255,255,255,.96);border-top:1px solid var(--line);z-index:5}
+.attBar .btn{white-space:nowrap}@media(max-width:700px){.attBar{padding-right:64px}}
+.attCnt span{display:inline-block;padding:3px 9px;border-radius:99px;margin-right:4px;font-weight:700;font-size:13px}
+.attG{border-collapse:collapse}.attG th,.attG td{padding:3px 4px;font-size:12px;border:1px solid #e2e8f0;text-align:center}.attG td.nm{text-align:left;white-space:nowrap}
+.attG td.a{background:#fee2e2;color:#991b1b;font-weight:800}.attG td.l{background:#fef3c7;color:#92400e;font-weight:800}.attG td.p{color:#16a34a}.attG .su{background:#f1f5f9}
+</style>`);
+const attId = (code,cl,sec,day) => `${code}_${cl}_${sec}_${day}`.replace(/[\/\s]+/g,"_");
+const ymLabel = ym => new Date(ym+"-15T12:00").toLocaleString("en-GB",{month:"long",year:"numeric"});
+const ymShift = (ym,n) => { const d=new Date(ym+"-15T12:00"); d.setMonth(d.getMonth()+n); return isoDay(d.getTime()).slice(0,7); };
+const attRedraw = () => { if(S.view==="attend") renderView(); else if(S.view==="students") fillRegion("attBody",true); };
+S.attStu={};
+async function attStudents(code,cl,sec){ const k=[code,cl,sec].join("|"); if(S.attStu[k]) return S.attStu[k]; let R;
+  if(role()==="teacher") R=await DB.queryW("students",[["school","==",code],["cl","==",cl],["sec","==",sec]]); else { await ensureStu(code); R=(stuOf(code)||[]).filter(r=>r.cl===cl&&r.sec===sec); }
+  R=R.sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""))); return S.attStu[k]=R; }
+async function attLoad(code,cl,sec,day){ const key=[code,cl,sec,day].join("|"); if(S.am?.key===key) return; S.am={key,code,cl,sec,day,loading:1,st:{}};
+  try{ const [R,doc]=await Promise.all([attStudents(code,cl,sec), DB.getDoc("att",attId(code,cl,sec,day)).catch(()=>null)]); if(S.am.key!==key) return;
+    const ids=new Set([...(doc?.a||[]),...(doc?.l||[])]); S.am.rows=R.filter(r=>r.status==="On roll"||ids.has(r.id));
+    for(const i of doc?.a||[]) S.am.st[i]="A"; for(const i of doc?.l||[]) S.am.st[i]="L"; S.am.saved=doc?{by:doc.by,atMs:doc.atMs}:null; }catch(e){ S.am.err=e.message; }
+  S.am.loading=0; attRedraw(); }
+const attCnt = () => { const A=S.am, n=A.rows.length, a=A.rows.filter(r=>A.st[r.id]==="A").length, l=A.rows.filter(r=>A.st[r.id]==="L").length;
+  return `<span style="background:#dcfce7;color:#166534">Present ${n-a-l}</span><span style="background:#fee2e2;color:#991b1b">Absent ${a}</span>${l?`<span style="background:#fef3c7;color:#92400e">Leave ${l}</span>`:""}<span class="mute">of ${n}</span>`; };
+const attMinDay = () => role()==="teacher" ? isoDay(Date.now()-7*864e5) : "2000-01-01";
+function attMarkHtml(){ const A=S.am; if(!A||A.loading) return `<div class="empty">Loading the class list…</div>`; if(A.err) return `<div class="empty">Could not load the class: ${h(A.err)}</div>`;
+  const today=isoDay(Date.now()), sun=new Date(A.day+"T12:00").getDay()===0;
+  return `<div class="pills" style="align-items:center;gap:8px;flex-wrap:wrap"><b>${h(A.code)} · Class ${h(A.cl)}-${h(A.sec)}</b><input type="date" class="in" style="width:auto" data-chg="setPsel" data-k="d" value="${A.day}" min="${attMinDay()}" max="${today}"><span class="attCnt" id="attCnt">${attCnt()}</span></div>
+   ${sun?`<p class="note" style="border-color:#f59e0b">This day is a Sunday.</p>`:""}
+   ${A.saved?`<p class="note" style="border-color:#16a34a">✓ Saved by ${h(A.saved.by||"")} at ${h(fmtDT(A.saved.atMs))}. You can still change it and save again.</p>`:`<p class="note" style="border-color:#f59e0b">Not marked yet for ${h(fmtD(Date.parse(A.day+"T12:00")))}.</p>`}
+   <p class="hint" style="margin:4px 0">Everyone starts as <b>present (P)</b>. Tap a name once for <b>absent (A)</b>, twice for <b>leave (L)</b>, three times for present again — then press <b>Save</b>.</p>
+   ${A.rows.length?`<div class="attList">${A.rows.map((r,i)=>`<button type="button" class="attRow ${A.st[r.id]==="A"?"ab":A.st[r.id]==="L"?"lv":""}" data-act="attTap" data-id="${h(r.id)}"><span class="mute">${i+1}</span><b>${h(r.name)}<br><span class="mini mute" style="font-weight:400">${h(r.admNo||"")}${r.father?" · "+h(r.father):""}</span></b><i>${A.st[r.id]||"P"}</i></button>`).join("")}</div>
+   <div class="attBar"><span class="mini mute" id="attDirty"></span><button class="btn" data-act="attAllP">All present</button><button class="btn p" data-act="attSave">💾 Save</button></div>`
+   :`<div class="empty">No students on roll in ${h(A.cl)}-${h(A.sec)} in the portal. The school clerk adds them in Students.</div>`}`; }
+/* the month's register: one row per child, one column per day; any month, going back for ever */
+async function attRegLoad(code,cl,sec,ym){ const k=[code,cl,sec,ym].join("|"); if(S.ar?.key===k) return; S.ar={key:k,loading:1};
+  try{ const [R,D]=await Promise.all([attStudents(code,cl,sec), DB.queryW("att",[["school","==",code],["cl","==",cl],["sec","==",sec],["ym","==",ym]])]); if(S.ar.key!==k) return; S.ar={key:k,R,D}; }catch(e){ S.ar={key:k,err:e.message}; } attRedraw(); }
+function attRegHtml(code,cl,sec,ym){ attRegLoad(code,cl,sec,ym); const X=S.ar; const nav=`<div class="pills" style="align-items:center;gap:6px"><button class="btn s" data-act="setP" data-p="m=${ymShift(ym,-1)}">‹ ${h(ymLabel(ymShift(ym,-1)))}</button><b style="padding:0 6px">${h(ymLabel(ym))}</b>${ym<isoDay(Date.now()).slice(0,7)?`<button class="btn s" data-act="setP" data-p="m=${ymShift(ym,1)}">${h(ymLabel(ymShift(ym,1)))} ›</button>`:""}<input type="month" class="in" style="width:auto" data-chg="setPsel" data-k="m" value="${ym}" max="${isoDay(Date.now()).slice(0,7)}"><button class="btn s" data-act="attRegPrint">🖨 Print</button><button class="btn s" data-act="attRegXl">Excel</button></div>`;
+  if(!X||X.loading) return nav+`<div class="empty">Loading the register…</div>`; if(X.err) return nav+`<div class="empty">Could not load: ${h(X.err)}</div>`;
+  const days=new Date(+ym.slice(0,4),+ym.slice(5,7),0).getDate(), byDay={}; for(const d of X.D) byDay[+d.day.slice(8,10)]=d;
+  const inDocs=new Set(X.D.flatMap(d=>[...(d.a||[]),...(d.l||[])])), R=X.R.filter(r=>r.status==="On roll"||inDocs.has(r.id)), marked=Object.keys(byDay).length;
+  const cell=(r,i)=>{ const d=byDay[i]; if(!d) return `<td class="${new Date(ym+"-"+String(i).padStart(2,"0")+"T12:00").getDay()===0?"su":""}"></td>`; return (d.a||[]).includes(r.id)?`<td class="a">A</td>`:(d.l||[]).includes(r.id)?`<td class="l">L</td>`:`<td class="p">•</td>`; };
+  const rows=R.map((r,k)=>{ const a=X.D.filter(d=>(d.a||[]).includes(r.id)).length, l=X.D.filter(d=>(d.l||[]).includes(r.id)).length, p=marked-a-l;
+    return `<tr><td>${k+1}</td><td class="nm"><b>${h(r.name)}</b> <span class="mute">${h(r.admNo||"")}</span>${r.status!=="On roll"?` <span class="tag t-out">${h(r.status)}</span>`:""}</td>${Array.from({length:days},(_,i)=>cell(r,i+1)).join("")}<td><b>${p}</b></td><td>${a||""}</td><td>${l||""}</td><td>${marked?Math.round(p*100/marked)+"%":""}</td></tr>`; }).join("");
+  const foot=`<tr><td></td><td class="nm"><b>Present that day</b></td>${Array.from({length:days},(_,i)=>{ const d=byDay[i+1]; return `<td>${d?`<b>${d.p??""}</b>`:""}</td>`; }).join("")}<td colspan="4"></td></tr>`;
+  const tot=X.D.reduce((s,d)=>s+(d.n||0),0), pr=X.D.reduce((s,d)=>s+(d.p||0),0);
+  S.arPrint={code,cl,sec,ym,days,R,byDay,marked};
+  return nav+`<p class="hint">${h(code)} · Class ${h(cl)}-${h(sec)} · attendance marked on <b>${marked}</b> day${marked===1?"":"s"}${marked?` · average attendance <b>${Math.round(pr*100/Math.max(1,tot))}%</b>`:""}. <span class="tag" style="background:#fee2e2;color:#991b1b">A</span> absent <span class="tag" style="background:#fef3c7;color:#92400e">L</span> leave • present · blank: not marked</p>
+   <div class="scroll" id="attRegTbl"><table class="attG"><tr><th>#</th><th>Name</th>${Array.from({length:days},(_,i)=>`<th class="${new Date(ym+"-"+String(i+1).padStart(2,"0")+"T12:00").getDay()===0?"su":""}">${i+1}</th>`).join("")}<th>P</th><th>A</th><th>L</th><th>%</th></tr>${rows}${foot}</table></div>`; }
+/* today, by school and by section */
+async function attTodayLoad(day){ if(S.attT?.day===day&&Date.now()-S.attT.at<120e3) return; if(S.attT?.busy) return; S.attT={...(S.attT||{}),busy:1};
+  try{ const W=[["day","==",day]]; if(mySchool()&&!(isSA()||role()==="hq"||isStuViewer?.())) W.push(["school","==",mySchool()]); const D=await DB.queryW("att",W); S.attT={day,at:Date.now(),D}; }catch(e){ S.attT={day,at:Date.now(),D:[],err:e.message}; } if(S.view==="dash") fillRegion("dStatus",true); else attRedraw(); }
+const isStuViewer = () => role()==="viewer"&&me().stuView===true;
+function attSchoolTbl(day, link){ const X=S.attT; if(!X||X.day!==day) return `<p class="mute">Loading attendance…</p>`; const codes=schoolList().filter(s=>!mySchool()||s.code===mySchool()).map(s=>s.code);
+  const rows=codes.map(c=>{ const D=X.D.filter(d=>d.school===c), secs=(S.schools[c]?.classes||[]).reduce((s,x)=>s+(x.secs||[]).length,0), n=D.reduce((s,d)=>s+(d.n||0),0), p=D.reduce((s,d)=>s+(d.p||0),0), a=D.reduce((s,d)=>s+(d.a||[]).length,0), l=D.reduce((s,d)=>s+(d.l||[]).length,0);
+    return `<tr class="${link?"click":""}" ${link?`data-act="go" data-id="students" data-p="tab=att&at=today&aS=${h(c)}"`:""}><td><b>${h(c)}</b></td><td class="n">${D.length} / ${secs}</td><td class="n">${nf(n)}</td><td class="n">${nf(p)}</td><td class="n">${a?`<b style="color:#b91c1c">${nf(a)}</b>`:0}</td><td class="n">${l||0}</td><td class="n"><b>${n?Math.round(p*100/n)+"%":"–"}</b></td></tr>`; }).join("");
+  return `<table class="sttab"><tr><th>School</th><th class="n">Sections marked</th><th class="n">On roll (marked sections)</th><th class="n">Present</th><th class="n">Absent</th><th class="n">Leave</th><th class="n">Attendance</th></tr>${rows}</table>${X.err?`<p class="mini mute">${h(X.err)}</p>`:""}`; }
+function attSecTbl(code, day){ const X=S.attT; if(!X||X.day!==day) return ""; const D=Object.fromEntries(X.D.filter(d=>d.school===code).map(d=>[d.cl+"|"+d.sec,d]));
+  const T=(S.users||[]).filter(u=>u.role==="teacher"&&u.school===code&&u.active!==false); const tOf=(cl,s)=>T.filter(u=>u.tcl===cl&&u.tsec===s).map(u=>u.name).join(", ");
+  const rows=(S.schools[code]?.classes||[]).flatMap(c=>(c.secs||[]).map(x=>{ const d=D[c.cl+"|"+x.s];
+    return `<tr><td><b>${h(c.cl)}-${h(x.s)}</b></td><td>${h(tOf(c.cl,x.s))||`<span class="mute">${isSA()?"no teacher account":""}</span>`}</td>${d?`<td class="n">${d.n}</td><td class="n">${d.p}</td><td class="n">${(d.a||[]).length?`<b style="color:#b91c1c">${(d.a||[]).length}</b>`:0}</td><td class="n">${(d.l||[]).length||0}</td><td class="n"><b>${d.n?Math.round(d.p*100/d.n)+"%":"–"}</b></td><td class="mini">✓ ${h(d.by||"")} ${h(fmtT?fmtT(d.atMs):"")}</td>`:`<td colspan="5" class="mute">—</td><td><span class="tag t-out">Not marked</span></td>`}
+     <td><button class="btn s" data-act="setP" data-p="at=reg&aC=${encodeURIComponent(c.cl)}&aX=${encodeURIComponent(x.s)}">📅 Register</button>${attCanMark(code)?` <button class="btn s" data-act="setP" data-p="at=mark&aC=${encodeURIComponent(c.cl)}&aX=${encodeURIComponent(x.s)}&d=${day}">✎ Mark</button>`:""}</td></tr>`; })).join("");
+  return `<h3 style="margin:14px 0 6px">${h(code)} — section by section</h3><div class="scroll"><table><tr><th>Section</th><th>Class teacher</th><th class="n">On roll</th><th class="n">Present</th><th class="n">Absent</th><th class="n">Leave</th><th class="n">%</th><th>Marked</th><th></th></tr>${rows}</table></div>`; }
+const attCanMark = code => isSA()||role()==="hq"||((role()==="clerk"||role()==="principal")&&mySchool()===code);
+function attTabHtml(){ const p=S.params, at=p.at||"today", sch=schoolList().filter(s=>!mySchool()||s.code===mySchool()), code=p.aS&&S.schools[p.aS]?p.aS:(mySchool()||(at==="today"?"":sch[0]?.code)), today=isoDay(Date.now());
+  const pills=`<div class="pills" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">${[["today","Today"],["reg","📅 Monthly register"],...(sch.some(s=>attCanMark(s.code))?[["mark","✎ Mark attendance"]]:[])].map(([k,l])=>`<button class="pill ${at===k?"on":""}" data-act="setP" data-p="at=${k}">${l}</button>`).join("")}</div>`;
+  if(at==="today"){ const day=p.d&&p.d<=today?p.d:today; attTodayLoad(day);
+    return `<div class="ph"><h2>📋 Attendance</h2></div>${pills}<div class="pills" style="gap:6px;margin-bottom:8px">${mySchool()?"":`<select class="in" style="width:auto" data-chg="setPsel" data-k="aS"><option value="">All schools</option>${sch.map(s=>`<option ${s.code===code?"selected":""}>${h(s.code)}</option>`).join("")}</select>`}<input type="date" class="in" style="width:auto" data-chg="setPsel" data-k="d" value="${day}" max="${today}"></div>
+     ${attSchoolTbl(day,!mySchool())}${code?attSecTbl(code,day):`<p class="hint">Click a school to see each section and who has not marked yet.</p>`}
+     <p class="hint">Class teachers mark their own class on their phones (Setup → Users: role <b>Class Teacher</b> with class and section). ${attCanMark(mySchool()||"x")||isSA()?"The clerk can mark a section himself with ✎ Mark when its teacher has no account.":""}</p>`; }
+  const c0=code||sch[0]?.code, cls=S.schools[c0]?.classes||[], cl=cls.some(c=>c.cl===p.aC)?p.aC:cls[0]?.cl, secs=secsOf(c0,cl), sec=secs.includes(p.aX)?p.aX:secs[0];
+  const pick=`<div class="pills" style="gap:6px;margin-bottom:8px">${mySchool()?"":`<select class="in" style="width:auto" data-chg="setPsel" data-k="aS">${sch.map(s=>`<option ${s.code===c0?"selected":""}>${h(s.code)}</option>`).join("")}</select>`}<select class="in" style="width:auto" data-chg="setPsel" data-k="aC">${cls.map(c=>`<option ${c.cl===cl?"selected":""}>${h(c.cl)}</option>`).join("")}</select><select class="in" style="width:auto" data-chg="setPsel" data-k="aX">${secs.map(s=>`<option ${s===sec?"selected":""}>${h(s)}</option>`).join("")}</select></div>`;
+  if(!cl||!sec) return pills+pick+`<p class="mute">No sections.</p>`;
+  if(at==="reg") return `<div class="ph"><h2>📅 Attendance register</h2></div>${pills}${pick}${attRegHtml(c0,cl,sec,/^\d{4}-\d\d$/.test(p.m||"")?p.m:today.slice(0,7))}`;
+  if(!attCanMark(c0)) return pills+`<p class="mute">Only the school's clerk or principal can mark attendance here.</p>`;
+  const day=p.d&&p.d<=today?p.d:today; attLoad(c0,cl,sec,day); return `<div class="ph"><h2>✎ Mark attendance</h2></div>${pills}${pick}${attMarkHtml()}`; }
+VIEWS.attend = { shell(){ const u=me(), p=S.params, today=isoDay(Date.now());
+  if(!u.tcl||!u.tsec) return `<div class="panel"><h2>📋 Attendance</h2><p>Your class and section are not set yet. Ask the Regional Director's office to set them (Setup → Users).</p></div>`;
+  const tabs=`<div class="subtabs">${[["","📋 Mark today"],["reg","📅 Monthly register"]].map(([k,l])=>`<button class="pill ${(p.am||"")===k?"on":""}" data-act="setP" data-p="am=${k}">${l}</button>`).join("")}</div>`;
+  if(p.am==="reg") return tabs+`<div class="panel"><div class="ph"><h2>📅 Class ${h(u.tcl)}-${h(u.tsec)} — register</h2></div>${attRegHtml(u.school,u.tcl,u.tsec,/^\d{4}-\d\d$/.test(p.m||"")?p.m:today.slice(0,7))}</div>`;
+  let day=p.d||today; if(day>today||day<attMinDay()) day=today; attLoad(u.school,u.tcl,u.tsec,day);
+  return tabs+`<div class="panel"><div class="ph"><h2>📋 Attendance — Class ${h(u.tcl)}-${h(u.tsec)}</h2></div>${attMarkHtml()}</div>`; } };
+/* Dashboard: today's attendance by school (once any section has marked) */
+{ const o=VIEWS.dash?.regions?.dStatus; if(o) VIEWS.dash.regions.dStatus=(...a)=>{ const x=o(...a); if(!(isSA()||["hq","clerk","principal"].includes(role())||isStuViewer())) return x; const day=isoDay(Date.now()); attTodayLoad(day);
+  return S.attT?.day===day&&S.attT.D?.length ? x+`<h3 style="margin:14px 0 6px">📋 Attendance today <button class="btn s" data-act="go" data-id="students" data-p="tab=att">Open</button></h3>${attSchoolTbl(day,true)}` : x; }; }
+Object.assign(EXTRA_ACT,{
+  attTap: el => { const A=S.am; if(!A) return; const id=el.dataset.id, nx={undefined:"A",A:"L",L:undefined}[A.st[id]]; if(nx) A.st[id]=nx; else delete A.st[id];
+    el.className="attRow "+(nx==="A"?"ab":nx==="L"?"lv":""); el.querySelector("i").textContent=nx||"P"; $("#attCnt").innerHTML=attCnt(); A.dirty=true; const dd=$("#attDirty"); if(dd) dd.textContent="Not saved yet"; },
+  attAllP: () => { const A=S.am; if(!A) return; A.st={}; A.dirty=true; attRedraw(); },
+  attSave: async el => { const A=S.am; if(!A||el.disabled) return; el.disabled=true; const a=A.rows.filter(r=>A.st[r.id]==="A").map(r=>r.id), l=A.rows.filter(r=>A.st[r.id]==="L").map(r=>r.id);
+    const d={school:A.code,cl:A.cl,sec:A.sec,day:A.day,ym:A.day.slice(0,7),a,l,n:A.rows.length,p:A.rows.length-a.length-l.length,by:me().name||"",byUid:me().uid,byRole:role(),atMs:Date.now()};
+    try{ await DB.apply({set:[{col:"att",id:attId(A.code,A.cl,A.sec,A.day),data:d}],upd:[],inc:[],noIdx:true}); }catch(e){ el.disabled=false; return toast("Not saved — "+e.message,true); }
+    A.saved={by:d.by,atMs:d.atMs}; A.dirty=false; S.ar=null; if(S.attT) S.attT.at=0; toast(`Attendance saved — present ${d.p}, absent ${a.length}${l.length?`, leave ${l.length}`:""}.`); attRedraw(); },
+  attRegPrint: () => { const t=$("#attRegTbl table"), X=S.arPrint; if(!t||!X) return; printHtml(`<div class="paper"><div class="phead"><h2>ATTENDANCE REGISTER — ${h(S.schools[X.code]?.name||X.code)}</h2><p>Class ${h(X.cl)}-${h(X.sec)} · ${h(ymLabel(X.ym))}</p></div><style>.attG{border-collapse:collapse;width:100%}.attG th,.attG td{border:1px solid #999;padding:2px 3px;font-size:9px;text-align:center}.attG td.nm{text-align:left}.attG td.a{background:#fee2e2;font-weight:700}.attG td.l{background:#fef3c7}.attG .su{background:#eee}</style>${t.outerHTML}<div class="rsign"><div><span></span>Class teacher</div><div><span></span>Section head</div><div><span></span>Principal</div></div></div>`,{paper:"A3",orientation:"landscape"}); },
+  attRegXl: async () => { const X=S.arPrint; if(!X) return; const head=["#","Adm No","Name",...Array.from({length:X.days},(_,i)=>String(i+1)),"Present","Absent","Leave"];
+    const rows=X.R.map((r,k)=>{ const c=Array.from({length:X.days},(_,i)=>{ const d=X.byDay[i+1]; return !d?"":(d.a||[]).includes(r.id)?"A":(d.l||[]).includes(r.id)?"L":"P"; }); return [k+1,r.admNo||"",r.name,...c,c.filter(x=>x==="P").length,c.filter(x=>x==="A").length,c.filter(x=>x==="L").length]; });
+    await writeBook(`Attendance_${X.code}_${X.cl}-${X.sec}_${X.ym}.xlsx`,[[`${X.cl}-${X.sec} ${X.ym}`,[head,...rows]]]); },
+});
+
 /* =====================================================================
    13) STUDENT DATA BANK — one record per student, filled gradually.
    Strength figures keep coming from the counters, so a half-filled register never breaks them.
@@ -5250,10 +5499,11 @@ function stuRegHtml(){ const code=stuSchool(); if(!code) return `<div class="pan
         <p class="hint" style="margin-top:0">Strength comes from the entries; this shows how many of those students are already in the data bank. Fill it school by school with the Excel import — nothing here changes strength.</p><div class="scroll" id="sReg"></div></div>`;}
 const stuTab = () => { const t=S.params.tab||"reg"; return canSeeStudents()?t:"cat"; };
 VIEWS.students = {
-  shell(){ const T=[["reg","Register"],["cat","Category-wise strength"],["chk",`Data check${canSeeStudents()&&flagCount()?` <span class="badge" title="Records flagged as not up to standard">🚩 ${nf(flagCount())}</span>`:""}`],["unv",`📥 Unverified${canSeeStudents()?` <span class="badge">${nf(idxAll().filter(r=>r.status==="On roll"&&!r.ver&&(!mySchool()||r.school===mySchool())).length)}</span>`:""}`],["verd",`✅ Verified${canSeeStudents()?` <span class="badge" style="background:#16a34a">${nf(idxAll().filter(r=>r.status==="On roll"&&r.ver&&(!mySchool()||r.school===mySchool())).length)}</span>`:""}`],["sib","Siblings in APEIs"],["dup",`👥 Duplicates${canSeeStudents()&&dupGroups().length?` (${dupGroups().length})`:""}`],["health","❤ Health"],["con","Contacts"],["docs","📎 Documents"],["trash","🗑 Trash"]].filter(([k])=>k==="docs"?(isSA()||role()==="hq"):k==="con"?isSA():k==="trash"?canDecide()&&canSeeStudents():k==="health"?canSeeStudents()&&canSD():k==="cat"||canSeeStudents()); const t=stuTab();
+  shell(){ const T=[["reg","Register"],["cat","Category-wise strength"],["chk",`Data check${canSeeStudents()&&flagCount()?` <span class="badge" title="Records flagged as not up to standard">🚩 ${nf(flagCount())}</span>`:""}`],["unv",`📥 Unverified${canSeeStudents()?` <span class="badge">${nf(idxAll().filter(r=>r.status==="On roll"&&!r.ver&&(!mySchool()||r.school===mySchool())).length)}</span>`:""}`],["verd",`✅ Verified${canSeeStudents()?` <span class="badge" style="background:#16a34a">${nf(idxAll().filter(r=>r.status==="On roll"&&r.ver&&(!mySchool()||r.school===mySchool())).length)}</span>`:""}`],["sib","Siblings in APEIs"],["dup",`👥 Duplicates${canSeeStudents()&&dupGroups().length?` (${dupGroups().length})`:""}`],["health","❤ Health"],["att","📋 Attendance"],["con","Contacts"],["docs","📎 Documents"],["trash","🗑 Trash"]].filter(([k])=>k==="att"?canSeeStudents():k==="docs"?(isSA()||role()==="hq"):k==="con"?isSA():k==="trash"?canDecide()&&canSeeStudents():k==="health"?canSeeStudents()&&canSD():k==="cat"||canSeeStudents()); const t=stuTab();
     return `<div class="subtabs">${T.map(([k,l])=>`<button class="pill ${t===k?"on":""}" data-act="setP" data-p="tab=${k}">${l}</button>`).join("")}${canSeeStudents()?`<span class="hint" style="margin:0 0 0 auto;align-self:center">Tip: the search box at the top finds any student in all schools — press <kbd>/</kbd></span>`:""}</div>`
-      + (t==="unv"||t==="verd" ? `<div class="panel" id="vlBody"></div>` : t==="dup" ? `<div class="panel" id="dupBody"></div>` : t==="health" ? `<div class="panel" id="hlBody"></div>` : t==="trash" && canDecide() ? `<div class="panel"><div class="scroll" id="trBody"></div></div>` : t==="chk" ? chkShell() : t==="con" && isSA() ? contactsHtml() : t==="cat" ? catPanelHtml() : t==="sib" ? `<div class="panel"><div class="ph"><h2>Siblings across all APEIs</h2><div class="pills"><select class="in" style="width:auto" data-chg="setPsel" data-k="sibSch"><option value="">All schools</option>${schoolList().map(s=>`<option ${S.params.sibSch===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select><label class="ck"><input type="checkbox" data-chg="setPck" data-k="sibX" ${S.params.sibX?"checked":""}> only families in 2+ campuses</label><label class="ck"><input type="checkbox" data-chg="setPck" data-k="sibAll" ${S.params.sibAll?"checked":""}> include students who left</label>${expBar("siblings")}</div></div><div class="scroll" id="sibBody"></div></div>` : stuRegHtml()); },
+      + (t==="att" ? `<div class="panel" id="attBody"></div>` : t==="unv"||t==="verd" ? `<div class="panel" id="vlBody"></div>` : t==="dup" ? `<div class="panel" id="dupBody"></div>` : t==="health" ? `<div class="panel" id="hlBody"></div>` : t==="trash" && canDecide() ? `<div class="panel"><div class="scroll" id="trBody"></div></div>` : t==="chk" ? chkShell() : t==="con" && isSA() ? contactsHtml() : t==="cat" ? catPanelHtml() : t==="sib" ? `<div class="panel"><div class="ph"><h2>Siblings across all APEIs</h2><div class="pills"><select class="in" style="width:auto" data-chg="setPsel" data-k="sibSch"><option value="">All schools</option>${schoolList().map(s=>`<option ${S.params.sibSch===s.code?"selected":""}>${h(s.code)}</option>`).join("")}</select><label class="ck"><input type="checkbox" data-chg="setPck" data-k="sibX" ${S.params.sibX?"checked":""}> only families in 2+ campuses</label><label class="ck"><input type="checkbox" data-chg="setPck" data-k="sibAll" ${S.params.sibAll?"checked":""}> include students who left</label>${expBar("siblings")}</div></div><div class="scroll" id="sibBody"></div></div>` : stuRegHtml()); },
   regions:{
+    attBody(){ return attTabHtml(); },
     sibBody(){ return sibHtml(); },
     chkBody(){ return chkHtml(); },
     trBody(){ return trashHtml(); },
